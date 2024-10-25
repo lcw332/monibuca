@@ -17,6 +17,7 @@ import (
 const (
 	StartKey = "start"
 	EndKey   = "end"
+	RangeKey = "range"
 )
 
 type (

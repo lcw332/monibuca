@@ -1,6 +1,6 @@
 syntax = "proto3";
 import "google/api/annotations.proto";
-//import "google/protobuf/empty.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 package mp4;
 option go_package="m7s.live/m7s/v5/plugin/mp4/pb";
@@ -8,14 +8,21 @@ option go_package="m7s.live/m7s/v5/plugin/mp4/pb";
 service api {
   rpc List (ReqRecordList) returns (ResponseList) {
     option (google.api.http) = {
-      get: "/mp4/api/list/{filePath=**}"
+      get: "/mp4/api/list/{streamPath=**}"
+    };
+  }
+  rpc Catalog (google.protobuf.Empty) returns (ResponseCatalog) {
+    option (google.api.http) = {
+      get: "/mp4/api/catalog"
     };
   }
 }
 
 message ReqRecordList {
-  string filePath = 1;
+  string streamPath = 1;
   string range = 2;
+  uint32 page = 3;
+  uint32 pageSize = 4;
 }
 
 message RecordFile {
@@ -29,5 +36,21 @@ message RecordFile {
 message ResponseList {
   int32 code = 1;
   string message = 2;
-  repeated RecordFile data = 3;
+  uint32 total = 3;
+  uint32 page = 4;
+  uint32 pageSize = 5;
+  repeated RecordFile data = 6;
+}
+
+message Catalog {
+  string streamPath = 1;
+  uint32 count = 2;
+  google.protobuf.Timestamp startTime = 3;
+  google.protobuf.Timestamp endTime = 4;
+}
+
+message ResponseCatalog {
+  int32 code = 1;
+  string message = 2;
+  repeated Catalog data = 3;
 }

@@ -30,7 +30,7 @@ require (
 	github.com/quic-go/quic-go v0.43.1
 	github.com/rs/zerolog v1.33.0
 	github.com/samber/slog-common v0.17.1
-	github.com/shirou/gopsutil/v4 v4.24.9
+	github.com/shirou/gopsutil/v4 v4.24.8
 	github.com/vishvananda/netlink v1.1.0
 	github.com/yapingcat/gomedia v0.0.0-20240601043430-920523f8e5c7
 	golang.org/x/text v0.17.0
@@ -51,7 +51,6 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20240202021202-6d0b6a386732 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
@@ -89,6 +88,7 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/samber/lo v1.44.0 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/tetratelabs/wazero v1.8.0 // indirect

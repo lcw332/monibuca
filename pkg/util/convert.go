@@ -27,6 +27,13 @@ func TimeQueryParse(query string) (time.Time, error) {
 }
 
 func TimeQueryParseRefer(query string, refer time.Time) (time.Time, error) {
+	if unixTimeReg.MatchString(query) {
+		unixTime, err := strconv.ParseInt(query, 10, 64)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return time.Unix(unixTime, 0), nil
+	}
 	if !strings.Contains(query, "T") {
 		query = refer.Format("2006-01-02") + "T" + query
 	}

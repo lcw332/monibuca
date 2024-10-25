@@ -3,16 +3,18 @@ package plugin_mp4
 import (
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
-	"m7s.live/pro/plugin/mp4/pb"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"m7s.live/pro"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"m7s.live/pro/plugin/mp4/pb"
+
+	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg/util"
 	mp4 "m7s.live/pro/plugin/mp4/pkg"
 	"m7s.live/pro/plugin/mp4/pkg/box"
@@ -30,32 +32,59 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 		err = fmt.Errorf("db not init")
 		return
 	}
+	var startTime, endTime time.Time
 	r := strings.Split(req.Range, "~")
 	if len(r) != 2 {
-		err = fmt.Errorf("invalid range")
-		return
-	}
-	var startTime, endTime time.Time
-	startTime, err = util.TimeQueryParse(r[0])
-	if err != nil {
-		return
-	}
-	endTime, err = util.TimeQueryParseRefer(r[1], startTime)
-	if err != nil {
-		return
-	}
-	if req.FilePath == "" {
-		p.DB.Find(&streams, "end_time>? AND start_time<?", startTime, endTime)
+		startTime = time.Unix(0, 0)
+		endTime = time.Now()
 	} else {
-		p.DB.Find(&streams, "end_time>? AND start_time<? AND file_path like ?", startTime, endTime, req.FilePath+"%")
+		startTime, err = util.TimeQueryParse(r[0])
+		if err != nil {
+			return
+		}
+		endTime, err = util.TimeQueryParseRefer(r[1], startTime)
+		if err != nil {
+			return
+		}
+	}
+	if req.StreamPath == "" {
+		p.DB.Find(&streams, "end_time>? AND start_time<?", startTime, endTime)
+	} else if strings.Contains(req.StreamPath, "*") {
+		p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path like ?", startTime, endTime, strings.ReplaceAll(req.StreamPath, "*", "%"))
+	} else {
+		p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path=?", startTime, endTime, req.StreamPath)
 	}
 	resp = &pb.ResponseList{}
 	for _, stream := range streams {
 		resp.Data = append(resp.Data, &pb.RecordFile{
-			Id:        uint32(stream.ID),
-			StartTime: timestamppb.New(stream.StartTime),
-			EndTime:   timestamppb.New(stream.EndTime),
-			FilePath:  stream.FilePath,
+			Id:         uint32(stream.ID),
+			StartTime:  timestamppb.New(stream.StartTime),
+			EndTime:    timestamppb.New(stream.EndTime),
+			FilePath:   stream.FilePath,
+			StreamPath: stream.StreamPath,
+		})
+	}
+	return
+}
+
+func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.ResponseCatalog, err error) {
+	resp = &pb.ResponseCatalog{}
+	var result []struct {
+		StreamPath string
+		Count      uint
+		StartTime  time.Time
+		EndTime    time.Time
+	}
+	err = p.DB.Model(&m7s.RecordStream{}).Select("stream_path,count(id) as count,min(start_time) as start_time,max(end_time) as end_time").Group("stream_path").Find(&result).Error
+	if err != nil {
+		return
+	}
+	for _, row := range result {
+		resp.Data = append(resp.Data, &pb.Catalog{
+			StreamPath: row.StreamPath,
+			Count:      uint32(row.Count),
+			StartTime:  timestamppb.New(row.StartTime),
+			EndTime:    timestamppb.New(row.EndTime),
 		})
 	}
 	return
