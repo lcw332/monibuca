@@ -240,7 +240,7 @@ func (p *PublishTimeout) Start() error {
 
 func (p *PublishTimeout) Dispose() {
 	p.Publisher.TimeoutTimer.Stop()
-	if p.Publisher.Device != nil && p.Publisher.Device.Status == DeviceStatusPulling && p.Publisher.Plugin.Server.Devices.Has(p.Publisher.Device.GetTaskID()) {
+	if p.Publisher.Device != nil && p.Publisher.Device.Status == DeviceStatusPulling && p.Publisher.Plugin.Server.Devices.Has(p.Publisher.Device.GetKey()) {
 		p.Publisher.Device.ChangeStatus(DeviceStatusOnline)
 	}
 }

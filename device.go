@@ -42,7 +42,7 @@ type (
 		Handler              IDevice `gorm:"-:all" yaml:"-"`
 	}
 	DeviceManager struct {
-		task.Manager[uint32, *Device]
+		task.Manager[uint, *Device]
 	}
 	DeviceTask struct {
 		task.TickTask
@@ -54,6 +54,10 @@ type (
 		url *url.URL
 	}
 )
+
+func (d *Device) GetKey() uint {
+	return d.ID
+}
 
 func (d *Device) GetStreamPath() string {
 	if d.StreamPath == "" {
