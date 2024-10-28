@@ -126,6 +126,7 @@ func (d *HTTPDevice) GetTickInterval() time.Duration {
 
 func (d *HTTPDevice) Tick(any) {
 	pinger, err := ping.NewPinger(d.url.Hostname())
+	pinger.SetPrivileged(true)
 	if err != nil {
 		d.Device.ChangeStatus(DeviceStatusOffline)
 		return
