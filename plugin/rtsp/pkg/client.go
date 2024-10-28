@@ -63,13 +63,24 @@ func (c *Client) Run() (err error) {
 		if err != nil {
 			return
 		}
-		var media []*Media
-		if media, err = c.Describe(); err != nil {
+		var medias []*Media
+		if medias, err = c.Describe(); err != nil {
 			return
 		}
 		receiver := &Receiver{Publisher: c.pullCtx.Publisher, Stream: c.Stream}
-		if err = receiver.SetMedia(media); err != nil {
+		if err = receiver.SetMedia(medias); err != nil {
 			return
+		}
+		for i, media := range medias {
+			switch media.Kind {
+			case "audio", "video":
+				_, err = c.SetupMedia(media, i)
+				if err != nil {
+					return
+				}
+			default:
+				c.Warn("media kind not support", "kind", media.Kind)
+			}
 		}
 		if err = c.Play(); err != nil {
 			return

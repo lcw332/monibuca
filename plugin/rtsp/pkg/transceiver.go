@@ -93,10 +93,7 @@ func (s *Sender) Send() (err error) {
 	}, func(video *mrtp.Video) error {
 		return s.sendRTP(&video.RTPData, s.VideoChannelID)
 	})
-	for err == nil {
-		_, _, err = s.NetConnection.Receive(true)
-	}
-	return
+	return s.NetConnection.Receive(true, nil, nil)
 }
 
 func (r *Receiver) SetMedia(medias []*Media) (err error) {
@@ -140,78 +137,65 @@ func (r *Receiver) Receive() (err error) {
 	audioFrame.RTPCodecParameters = r.AudioCodecParameters
 	videoFrame.SetAllocator(r.MemoryAllocator)
 	videoFrame.RTPCodecParameters = r.VideoCodecParameters
-	var channelID byte
-	var buf []byte
-	for err == nil {
+	return r.NetConnection.Receive(false, func(channelID byte, buf []byte) {
+		switch int(channelID) {
+		case r.AudioChannelID:
+			if !r.PubAudio {
+				return
+			}
+			packet := &rtp.Packet{}
+			if err = packet.Unmarshal(buf); err != nil {
+				return
+			}
+			if len(audioFrame.Packets) == 0 || packet.Timestamp == audioFrame.Packets[0].Timestamp {
+				audioFrame.AddRecycleBytes(buf)
+				audioFrame.Packets = append(audioFrame.Packets, packet)
+			} else {
+				if err = r.WriteAudio(audioFrame); err != nil {
+					return
+				}
+				audioFrame = &mrtp.Audio{}
+				audioFrame.AddRecycleBytes(buf)
+				audioFrame.Packets = []*rtp.Packet{packet}
+				audioFrame.RTPCodecParameters = r.AudioCodecParameters
+				audioFrame.SetAllocator(r.MemoryAllocator)
+			}
+		case r.VideoChannelID:
+			if !r.PubVideo {
+				return
+			}
+			packet := &rtp.Packet{}
+			if err = packet.Unmarshal(buf); err != nil {
+				return
+			}
+			if len(videoFrame.Packets) == 0 || packet.Timestamp == videoFrame.Packets[0].Timestamp {
+				videoFrame.AddRecycleBytes(buf)
+				videoFrame.Packets = append(videoFrame.Packets, packet)
+			} else {
+				// t := time.Now()
+				if err = r.WriteVideo(videoFrame); err != nil {
+					return
+				}
+				// fmt.Println("write video", time.Since(t))
+				videoFrame = &mrtp.Video{}
+				videoFrame.AddRecycleBytes(buf)
+				videoFrame.Packets = []*rtp.Packet{packet}
+				videoFrame.RTPCodecParameters = r.VideoCodecParameters
+				videoFrame.SetAllocator(r.MemoryAllocator)
+			}
+		default:
 
-		channelID, buf, err = r.NetConnection.Receive(false)
-		if err != nil {
+		}
+	}, func(channelID byte, buf []byte) {
+		msg := &RTCP{Channel: channelID}
+		r.MemoryAllocator.Free(buf)
+		if err = msg.Header.Unmarshal(buf); err != nil {
 			return
 		}
-		if len(buf) == 0 {
-			continue
+		if msg.Packets, err = rtcp.Unmarshal(buf); err != nil {
+			return
 		}
-		if channelID&1 == 0 {
-			switch int(channelID) {
-			case r.AudioChannelID:
-				if !r.PubAudio {
-					continue
-				}
-				packet := &rtp.Packet{}
-				if err = packet.Unmarshal(buf); err != nil {
-					return
-				}
-				if len(audioFrame.Packets) == 0 || packet.Timestamp == audioFrame.Packets[0].Timestamp {
-					audioFrame.AddRecycleBytes(buf)
-					audioFrame.Packets = append(audioFrame.Packets, packet)
-				} else {
-					if err = r.WriteAudio(audioFrame); err != nil {
-						return
-					}
-					audioFrame = &mrtp.Audio{}
-					audioFrame.AddRecycleBytes(buf)
-					audioFrame.Packets = []*rtp.Packet{packet}
-					audioFrame.RTPCodecParameters = r.AudioCodecParameters
-					audioFrame.SetAllocator(r.MemoryAllocator)
-				}
-			case r.VideoChannelID:
-				if !r.PubVideo {
-					continue
-				}
-				packet := &rtp.Packet{}
-				if err = packet.Unmarshal(buf); err != nil {
-					return
-				}
-				if len(videoFrame.Packets) == 0 || packet.Timestamp == videoFrame.Packets[0].Timestamp {
-					videoFrame.AddRecycleBytes(buf)
-					videoFrame.Packets = append(videoFrame.Packets, packet)
-				} else {
-					// t := time.Now()
-					if err = r.WriteVideo(videoFrame); err != nil {
-						return
-					}
-					// fmt.Println("write video", time.Since(t))
-					videoFrame = &mrtp.Video{}
-					videoFrame.AddRecycleBytes(buf)
-					videoFrame.Packets = []*rtp.Packet{packet}
-					videoFrame.RTPCodecParameters = r.VideoCodecParameters
-					videoFrame.SetAllocator(r.MemoryAllocator)
-				}
-			default:
-
-			}
-		} else {
-			msg := &RTCP{Channel: channelID}
-			r.MemoryAllocator.Free(buf)
-			if err = msg.Header.Unmarshal(buf); err != nil {
-				return
-			}
-			if msg.Packets, err = rtcp.Unmarshal(buf); err != nil {
-				return
-			}
-			r.Stream.Debug("rtcp", "type", msg.Header.Type, "length", msg.Header.Length)
-			// TODO: rtcp msg
-		}
-	}
-	return
+		r.Stream.Debug("rtcp", "type", msg.Header.Type, "length", msg.Header.Length)
+		// TODO: rtcp msg
+	})
 }

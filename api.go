@@ -682,6 +682,7 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 					StreamPath: req.StreamPath,
 					Alias:      req.Alias,
 				}
+				var pubId uint32
 				s.AliasStreams.Add(aliasInfo)
 				aliasStream, ok := s.Streams.Get(aliasInfo.Alias)
 				if canReplace {
@@ -694,8 +695,13 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				} else {
 					aliasInfo.Publisher = aliasStream
 				}
+				if aliasInfo.Publisher != nil {
+					pubId = aliasInfo.Publisher.ID
+				}
+				s.Info("add alias", "alias", req.Alias, "streamPath", req.StreamPath, "replace", ok && canReplace, "pub", pubId)
 			}
 		} else {
+			s.Info("remove alias", "alias", req.Alias)
 			if aliasStream, ok := s.AliasStreams.Get(req.Alias); ok {
 				s.AliasStreams.Remove(aliasStream)
 				if aliasStream.Publisher != nil {

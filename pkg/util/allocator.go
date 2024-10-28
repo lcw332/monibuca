@@ -1,3 +1,5 @@
+//go:build !treap
+
 package util
 
 type (
@@ -49,6 +51,9 @@ func compareBySize(a, b *Block) bool {
 }
 
 func compareByOffset(a, b *Block) bool {
+	if a.Start == b.Start {
+		panic("duplicate block")
+	}
 	return a.Start < b.Start
 }
 
