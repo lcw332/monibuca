@@ -154,6 +154,7 @@ func (a *AnnexB) Demux(codecCtx codec.ICodecCtx) (ret any, err error) {
 }
 
 func (a *AnnexB) Mux(codecCtx codec.ICodecCtx, frame *AVFrame) {
+	a.InitRecycleIndexes(0)
 	delimiter2 := codec.NALU_Delimiter2[:]
 	a.AppendOne(delimiter2)
 	if frame.IDR {

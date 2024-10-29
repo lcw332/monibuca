@@ -2,6 +2,9 @@
 
 package util
 
+const TreeIndexSize = 0
+const TreeIndexOffset = 1
+
 type (
 	Tree struct {
 		left, right *Block
@@ -44,6 +47,9 @@ func NewAllocator(size int) (result *Allocator) {
 }
 
 func compareBySize(a, b *Block) bool {
+	//if a.Start == b.Start {
+	//	panic("duplicate block")
+	//}
 	if sizea, sizeb := a.End-a.Start, b.End-b.Start; sizea != sizeb {
 		return sizea < sizeb
 	}
@@ -51,9 +57,9 @@ func compareBySize(a, b *Block) bool {
 }
 
 func compareByOffset(a, b *Block) bool {
-	if a.Start == b.Start {
-		panic("duplicate block")
-	}
+	//if a.Start == b.Start {
+	//	panic("duplicate block")
+	//}
 	return a.Start < b.Start
 }
 
@@ -140,6 +146,9 @@ func (b *Block) delete(block *Block, treeIndex int) *Block {
 	if b == nil {
 		return nil
 	}
+	defer func() {
+		block.trees[treeIndex] = emptyTrees[treeIndex]
+	}()
 	if compareFunc, tree := compares[treeIndex], &b.trees[treeIndex]; b == block {
 		if tree.left == nil {
 			return tree.right
@@ -188,10 +197,11 @@ func (a *Allocator) Allocate(size int) (offset int) {
 	a.deleteSizeTree(block)
 	a.deleteOffsetTree(block)
 	if newStart := offset + size; newStart < block.End {
-		newBlock := a.getBlock(newStart, block.End)
-		a.sizeTree = a.sizeTree.insert(newBlock, 0)
-		a.offsetTree = a.offsetTree.insert(newBlock, 1)
-		// block.End = block.Start + size
+		block.Start = newStart
+		a.insertSizeTree(block)
+		a.insertOffsetTree(block)
+	} else {
+		a.putBlock(block)
 	}
 	return
 }
@@ -201,7 +211,7 @@ func (a *Allocator) findAvailableBlock(size int) (lastAvailableBlock *Block) {
 	for block != nil {
 		if bSize := block.End - block.Start; bSize == size {
 			return block
-		} else if tree := &block.trees[0]; size < bSize {
+		} else if tree := &block.trees[TreeIndexSize]; size < bSize {
 			lastAvailableBlock = block
 			block = tree.left
 		} else {
@@ -216,7 +226,7 @@ func (a *Allocator) getBlock(start, end int) *Block {
 		return &Block{Start: start, End: end}
 	} else {
 		block := a.pool
-		a.pool = block.trees[0].left
+		a.pool = block.trees[TreeIndexSize].left
 		block.trees = emptyTrees
 		block.Start, block.End = start, end
 		return block
@@ -225,15 +235,13 @@ func (a *Allocator) getBlock(start, end int) *Block {
 
 func (a *Allocator) putBlock(b *Block) {
 	b.trees = emptyTrees
-	b.trees[0].left = a.pool
+	b.trees[TreeIndexSize].left = a.pool
 	a.pool = b
 }
 
 func (a *Allocator) Free(offset, size int) {
 	//a.history = append(a.history, History{Malloc: false, Offset: offset, Size: size})
-	block := a.getBlock(offset, offset+size)
-	a.sizeTree, a.offsetTree = a.sizeTree.insert(block, 0), a.offsetTree.insert(block, 1)
-	a.mergeAdjacentBlocks(block)
+	a.mergeAdjacentBlocks(a.getBlock(offset, offset+size))
 }
 
 func (a *Allocator) GetBlocks() (blocks []*Block) {
@@ -250,33 +258,65 @@ func (a *Allocator) GetFreeSize() (ret int) {
 	return
 }
 
+func (a *Allocator) insertSizeTree(block *Block) {
+	//if block.End == block.Start {
+	//	panic("empty block")
+	//}
+	//a.sizeTree.Walk(func(b *Block) {
+	//	if block.Start >= b.Start && block.Start < b.End {
+	//		out, _ := yaml.Marshal(a.history)
+	//		fmt.Println(string(out))
+	//	}
+	//}, 0)
+	a.sizeTree = a.sizeTree.insert(block, TreeIndexSize)
+}
+
+func (a *Allocator) insertOffsetTree(block *Block) {
+	//if block.End == block.Start {
+	//	panic("empty block")
+	//}
+	//a.offsetTree.Walk(func(b *Block) {
+	//	if block.Start >= b.Start && block.Start < b.End {
+	//		out, _ := yaml.Marshal(a.history)
+	//		fmt.Println(string(out))
+	//	}
+	//}, 1)
+	a.offsetTree = a.offsetTree.insert(block, TreeIndexOffset)
+}
+
 func (a *Allocator) deleteSizeTree(block *Block) {
-	a.sizeTree = a.sizeTree.delete(block, 0)
-	block.trees[0] = emptyTrees[0]
+	a.sizeTree = a.sizeTree.delete(block, TreeIndexSize)
 }
 
 func (a *Allocator) deleteOffsetTree(block *Block) {
-	a.offsetTree = a.offsetTree.delete(block, 1)
-	block.trees[1] = emptyTrees[1]
+	a.offsetTree = a.offsetTree.delete(block, TreeIndexOffset)
 }
 
 func (a *Allocator) mergeAdjacentBlocks(block *Block) {
-	if leftAdjacent := a.offsetTree.findLeftAdjacentBlock(block.Start); leftAdjacent != nil {
-		a.deleteSizeTree(leftAdjacent)
-		a.deleteOffsetTree(leftAdjacent)
-		a.deleteSizeTree(block)
-		block.Start = leftAdjacent.Start
-		a.sizeTree = a.sizeTree.insert(block, 0)
-		a.putBlock(leftAdjacent)
-	}
-	if rightAdjacent := a.offsetTree.findRightAdjacentBlock(block.End); rightAdjacent != nil {
-		a.deleteSizeTree(rightAdjacent)
+	switch leftAdjacent, rightAdjacent := a.offsetTree.findLeftAdjacentBlock(block.Start), a.offsetTree.findRightAdjacentBlock(block.End); true {
+	case leftAdjacent != nil && rightAdjacent != nil:
 		a.deleteOffsetTree(rightAdjacent)
-		a.deleteSizeTree(block)
-		block.End = rightAdjacent.End
-		a.sizeTree = a.sizeTree.insert(block, 0)
+		a.deleteSizeTree(rightAdjacent)
+		a.deleteSizeTree(leftAdjacent)
+		leftAdjacent.End = rightAdjacent.End
+		a.insertSizeTree(leftAdjacent)
 		a.putBlock(rightAdjacent)
+	case leftAdjacent == nil && rightAdjacent == nil:
+		a.insertSizeTree(block)
+		a.insertOffsetTree(block)
+		return
+	case leftAdjacent != nil:
+		a.deleteSizeTree(leftAdjacent)
+		leftAdjacent.End = block.End
+		a.insertSizeTree(leftAdjacent)
+	case rightAdjacent != nil:
+		a.deleteOffsetTree(rightAdjacent)
+		a.deleteSizeTree(rightAdjacent)
+		rightAdjacent.Start = block.Start
+		a.insertSizeTree(rightAdjacent)
+		a.insertOffsetTree(rightAdjacent)
 	}
+	a.putBlock(block)
 }
 
 func (b *Block) findLeftAdjacentBlock(offset int) *Block {
@@ -284,7 +324,7 @@ func (b *Block) findLeftAdjacentBlock(offset int) *Block {
 		if b.End == offset {
 			return b
 		}
-		if tree := &b.trees[1]; b.End > offset {
+		if tree := &b.trees[TreeIndexOffset]; b.End > offset {
 			b = tree.left
 		} else {
 			b = tree.right
@@ -298,7 +338,7 @@ func (b *Block) findRightAdjacentBlock(offset int) *Block {
 		if b.Start == offset {
 			return b
 		}
-		if tree := &b.trees[1]; b.Start < offset {
+		if tree := &b.trees[TreeIndexOffset]; b.Start < offset {
 			b = tree.right
 		} else {
 			b = tree.left
