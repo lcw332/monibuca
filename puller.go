@@ -134,8 +134,8 @@ func (p *PullJob) Publish() (err error) {
 	p.Publisher.Type = PublishTypePull
 	if err == nil && p.conf.MaxRetry != 0 {
 		p.Publisher.OnDispose(func() {
-			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout) {
-				p.Stop(pkg.ErrPublishDelayCloseTimeout)
+			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout,pkg.ErrStopFromAPI) {
+				p.Stop(p.Publisher.StopReason())
 			}
 		})
 	}

@@ -36,6 +36,7 @@ type ApiClient interface {
 	VideoTrackSnap(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*TrackSnapShotResponse, error)
 	ChangeSubscribe(ctx context.Context, in *ChangeSubscribeRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 	SetStreamAlias(ctx context.Context, in *SetStreamAliasRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	StopPublish(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 	StopSubscribe(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
 	GetFormily(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
@@ -171,6 +172,15 @@ func (c *apiClient) SetStreamAlias(ctx context.Context, in *SetStreamAliasReques
 	return out, nil
 }
 
+func (c *apiClient) StopPublish(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/StopPublish", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *apiClient) StopSubscribe(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, "/global.api/StopSubscribe", in, out, opts...)
@@ -260,6 +270,7 @@ type ApiServer interface {
 	VideoTrackSnap(context.Context, *StreamSnapRequest) (*TrackSnapShotResponse, error)
 	ChangeSubscribe(context.Context, *ChangeSubscribeRequest) (*SuccessResponse, error)
 	SetStreamAlias(context.Context, *SetStreamAliasRequest) (*SuccessResponse, error)
+	StopPublish(context.Context, *StreamSnapRequest) (*SuccessResponse, error)
 	StopSubscribe(context.Context, *RequestWithId) (*SuccessResponse, error)
 	GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
 	GetFormily(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
@@ -313,6 +324,9 @@ func (UnimplementedApiServer) ChangeSubscribe(context.Context, *ChangeSubscribeR
 }
 func (UnimplementedApiServer) SetStreamAlias(context.Context, *SetStreamAliasRequest) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetStreamAlias not implemented")
+}
+func (UnimplementedApiServer) StopPublish(context.Context, *StreamSnapRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopPublish not implemented")
 }
 func (UnimplementedApiServer) StopSubscribe(context.Context, *RequestWithId) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopSubscribe not implemented")
@@ -585,6 +599,24 @@ func _Api_SetStreamAlias_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_StopPublish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StreamSnapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).StopPublish(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/StopPublish",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).StopPublish(ctx, req.(*StreamSnapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Api_StopSubscribe_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestWithId)
 	if err := dec(in); err != nil {
@@ -787,6 +819,10 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetStreamAlias",
 			Handler:    _Api_SetStreamAlias_Handler,
+		},
+		{
+			MethodName: "StopPublish",
+			Handler:    _Api_StopPublish_Handler,
 		},
 		{
 			MethodName: "StopSubscribe",

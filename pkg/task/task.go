@@ -199,8 +199,14 @@ func (task *Task) StopReason() error {
 	return context.Cause(task.Context)
 }
 
-func (task *Task) StopReasonIs(err error) bool {
-	return errors.Is(err, task.StopReason())
+func (task *Task) StopReasonIs(errs ...error) bool {
+	stopReason := task.StopReason()
+	for _, err := range errs {
+		if errors.Is(err, stopReason) {
+			return true
+		}
+	}
+	return false
 }
 
 func (task *Task) Stop(err error) {

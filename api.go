@@ -396,6 +396,16 @@ func (s *Server) StopSubscribe(ctx context.Context, req *pb.RequestWithId) (res 
 	return &pb.SuccessResponse{}, err
 }
 
+func (s *Server) StopPublish(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.SuccessResponse, err error) {
+	s.Streams.Call(func() error {
+		if s, ok := s.Streams.Get(req.StreamPath); ok {
+			s.Stop(pkg.ErrStopFromAPI)
+		}
+		return nil
+	})
+	return &pb.SuccessResponse{}, err
+}
+
 // /api/stream/list
 func (s *Server) StreamList(_ context.Context, req *pb.StreamListRequest) (res *pb.StreamListResponse, err error) {
 	s.Streams.Call(func() error {

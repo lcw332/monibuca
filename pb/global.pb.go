@@ -3083,7 +3083,7 @@ var file_global_proto_rawDesc = []byte{
 	0x0a, 0x05, 0x61, 0x6c, 0x69, 0x61, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x61,
 	0x6c, 0x69, 0x61, 0x73, 0x12, 0x1e, 0x0a, 0x0a, 0x61, 0x75, 0x74, 0x6f, 0x52, 0x65, 0x6d, 0x6f,
 	0x76, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0a, 0x61, 0x75, 0x74, 0x6f, 0x52, 0x65,
-	0x6d, 0x6f, 0x76, 0x65, 0x32, 0xc3, 0x10, 0x0a, 0x03, 0x61, 0x70, 0x69, 0x12, 0x50, 0x0a, 0x07,
+	0x6d, 0x6f, 0x76, 0x65, 0x32, 0xb3, 0x11, 0x0a, 0x03, 0x61, 0x70, 0x69, 0x12, 0x50, 0x0a, 0x07,
 	0x53, 0x79, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
 	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a,
 	0x17, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x2e, 0x53, 0x79, 0x73, 0x49, 0x6e, 0x66, 0x6f,
@@ -3166,7 +3166,14 @@ var file_global_proto_rawDesc = []byte{
 	0x1a, 0x17, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x2e, 0x53, 0x75, 0x63, 0x63, 0x65, 0x73,
 	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x1c, 0x82, 0xd3, 0xe4, 0x93, 0x02,
 	0x16, 0x22, 0x11, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x2f, 0x61,
-	0x6c, 0x69, 0x61, 0x73, 0x3a, 0x01, 0x2a, 0x12, 0x64, 0x0a, 0x0d, 0x53, 0x74, 0x6f, 0x70, 0x53,
+	0x6c, 0x69, 0x61, 0x73, 0x3a, 0x01, 0x2a, 0x12, 0x6e, 0x0a, 0x0b, 0x53, 0x74, 0x6f, 0x70, 0x50,
+	0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x12, 0x19, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x2e,
+	0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x53, 0x6e, 0x61, 0x70, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x1a, 0x17, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x2e, 0x53, 0x75, 0x63, 0x63, 0x65,
+	0x73, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2b, 0x82, 0xd3, 0xe4, 0x93,
+	0x02, 0x25, 0x22, 0x20, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x2f,
+	0x73, 0x74, 0x6f, 0x70, 0x2f, 0x7b, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x50, 0x61, 0x74, 0x68,
+	0x3d, 0x2a, 0x2a, 0x7d, 0x3a, 0x01, 0x2a, 0x12, 0x64, 0x0a, 0x0d, 0x53, 0x74, 0x6f, 0x70, 0x53,
 	0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x12, 0x15, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61,
 	0x6c, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x57, 0x69, 0x74, 0x68, 0x49, 0x64, 0x1a,
 	0x17, 0x2e, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x2e, 0x53, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73,
@@ -3332,37 +3339,39 @@ var file_global_proto_depIdxs = []int32{
 	15, // 48: global.api.VideoTrackSnap:input_type -> global.StreamSnapRequest
 	27, // 49: global.api.ChangeSubscribe:input_type -> global.ChangeSubscribeRequest
 	34, // 50: global.api.SetStreamAlias:input_type -> global.SetStreamAliasRequest
-	26, // 51: global.api.StopSubscribe:input_type -> global.RequestWithId
-	0,  // 52: global.api.GetConfig:input_type -> global.GetConfigRequest
-	0,  // 53: global.api.GetFormily:input_type -> global.GetConfigRequest
-	4,  // 54: global.api.ModifyConfig:input_type -> global.ModifyConfigRequest
-	44, // 55: global.api.GetDeviceList:input_type -> google.protobuf.Empty
-	33, // 56: global.api.AddDevice:input_type -> global.DeviceInfo
-	26, // 57: global.api.RemoveDevice:input_type -> global.RequestWithId
-	33, // 58: global.api.UpdateDevice:input_type -> global.DeviceInfo
-	10, // 59: global.api.SysInfo:output_type -> global.SysInfoResponse
-	7,  // 60: global.api.Summary:output_type -> global.SummaryResponse
-	44, // 61: global.api.Shutdown:output_type -> google.protobuf.Empty
-	44, // 62: global.api.Restart:output_type -> google.protobuf.Empty
-	11, // 63: global.api.TaskTree:output_type -> global.TaskTreeResponse
-	13, // 64: global.api.StreamList:output_type -> global.StreamListResponse
-	14, // 65: global.api.WaitList:output_type -> global.StreamWaitListResponse
-	16, // 66: global.api.StreamInfo:output_type -> global.StreamInfoResponse
-	31, // 67: global.api.GetSubscribers:output_type -> global.SubscribersResponse
-	23, // 68: global.api.AudioTrackSnap:output_type -> global.TrackSnapShotResponse
-	23, // 69: global.api.VideoTrackSnap:output_type -> global.TrackSnapShotResponse
-	25, // 70: global.api.ChangeSubscribe:output_type -> global.SuccessResponse
-	25, // 71: global.api.SetStreamAlias:output_type -> global.SuccessResponse
-	25, // 72: global.api.StopSubscribe:output_type -> global.SuccessResponse
-	3,  // 73: global.api.GetConfig:output_type -> global.GetConfigResponse
-	3,  // 74: global.api.GetFormily:output_type -> global.GetConfigResponse
-	25, // 75: global.api.ModifyConfig:output_type -> global.SuccessResponse
-	32, // 76: global.api.GetDeviceList:output_type -> global.DeviceListResponse
-	25, // 77: global.api.AddDevice:output_type -> global.SuccessResponse
-	25, // 78: global.api.RemoveDevice:output_type -> global.SuccessResponse
-	25, // 79: global.api.UpdateDevice:output_type -> global.SuccessResponse
-	59, // [59:80] is the sub-list for method output_type
-	38, // [38:59] is the sub-list for method input_type
+	15, // 51: global.api.StopPublish:input_type -> global.StreamSnapRequest
+	26, // 52: global.api.StopSubscribe:input_type -> global.RequestWithId
+	0,  // 53: global.api.GetConfig:input_type -> global.GetConfigRequest
+	0,  // 54: global.api.GetFormily:input_type -> global.GetConfigRequest
+	4,  // 55: global.api.ModifyConfig:input_type -> global.ModifyConfigRequest
+	44, // 56: global.api.GetDeviceList:input_type -> google.protobuf.Empty
+	33, // 57: global.api.AddDevice:input_type -> global.DeviceInfo
+	26, // 58: global.api.RemoveDevice:input_type -> global.RequestWithId
+	33, // 59: global.api.UpdateDevice:input_type -> global.DeviceInfo
+	10, // 60: global.api.SysInfo:output_type -> global.SysInfoResponse
+	7,  // 61: global.api.Summary:output_type -> global.SummaryResponse
+	44, // 62: global.api.Shutdown:output_type -> google.protobuf.Empty
+	44, // 63: global.api.Restart:output_type -> google.protobuf.Empty
+	11, // 64: global.api.TaskTree:output_type -> global.TaskTreeResponse
+	13, // 65: global.api.StreamList:output_type -> global.StreamListResponse
+	14, // 66: global.api.WaitList:output_type -> global.StreamWaitListResponse
+	16, // 67: global.api.StreamInfo:output_type -> global.StreamInfoResponse
+	31, // 68: global.api.GetSubscribers:output_type -> global.SubscribersResponse
+	23, // 69: global.api.AudioTrackSnap:output_type -> global.TrackSnapShotResponse
+	23, // 70: global.api.VideoTrackSnap:output_type -> global.TrackSnapShotResponse
+	25, // 71: global.api.ChangeSubscribe:output_type -> global.SuccessResponse
+	25, // 72: global.api.SetStreamAlias:output_type -> global.SuccessResponse
+	25, // 73: global.api.StopPublish:output_type -> global.SuccessResponse
+	25, // 74: global.api.StopSubscribe:output_type -> global.SuccessResponse
+	3,  // 75: global.api.GetConfig:output_type -> global.GetConfigResponse
+	3,  // 76: global.api.GetFormily:output_type -> global.GetConfigResponse
+	25, // 77: global.api.ModifyConfig:output_type -> global.SuccessResponse
+	32, // 78: global.api.GetDeviceList:output_type -> global.DeviceListResponse
+	25, // 79: global.api.AddDevice:output_type -> global.SuccessResponse
+	25, // 80: global.api.RemoveDevice:output_type -> global.SuccessResponse
+	25, // 81: global.api.UpdateDevice:output_type -> global.SuccessResponse
+	60, // [60:82] is the sub-list for method output_type
+	38, // [38:60] is the sub-list for method input_type
 	38, // [38:38] is the sub-list for extension type_name
 	38, // [38:38] is the sub-list for extension extendee
 	0,  // [0:38] is the sub-list for field type_name

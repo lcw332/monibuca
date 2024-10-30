@@ -1,10 +1,9 @@
 package m7s
 
 import (
-	"m7s.live/pro/pkg/config"
-	"os"
-	"path/filepath"
 	"time"
+
+	"m7s.live/pro/pkg/config"
 
 	"m7s.live/pro/pkg/task"
 
@@ -80,14 +79,14 @@ func (p *RecordJob) Start() (err error) {
 	if _, ok := s.Records.Get(p.GetKey()); ok {
 		return pkg.ErrRecordSamePath
 	}
-	dir := p.FilePath
-	if p.Fragment == 0 || p.Append {
-		dir = filepath.Dir(p.FilePath)
-	}
-	p.SetDescription("filePath", p.FilePath)
-	if err = os.MkdirAll(dir, 0755); err != nil {
-		return
-	}
+	// dir := p.FilePath
+	// if p.Fragment == 0 || p.Append {
+	// 	dir = filepath.Dir(p.FilePath)
+	// }
+	// p.SetDescription("filePath", p.FilePath)
+	// if err = os.MkdirAll(dir, 0755); err != nil {
+	// 	return
+	// }
 	p.AddTask(p.recorder, p.Logger)
 	return
 }
