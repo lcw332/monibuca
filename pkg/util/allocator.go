@@ -241,7 +241,29 @@ func (a *Allocator) putBlock(b *Block) {
 
 func (a *Allocator) Free(offset, size int) {
 	//a.history = append(a.history, History{Malloc: false, Offset: offset, Size: size})
-	a.mergeAdjacentBlocks(a.getBlock(offset, offset+size))
+	switch leftAdjacent, rightAdjacent := a.offsetTree.findLeftAdjacentBlock(offset), a.offsetTree.findRightAdjacentBlock(offset+size); true {
+	case leftAdjacent != nil && rightAdjacent != nil:
+		a.deleteOffsetTree(rightAdjacent)
+		a.deleteSizeTree(rightAdjacent)
+		a.deleteSizeTree(leftAdjacent)
+		leftAdjacent.End = rightAdjacent.End
+		a.insertSizeTree(leftAdjacent)
+		a.putBlock(rightAdjacent)
+	case leftAdjacent == nil && rightAdjacent == nil:
+		block := a.getBlock(offset, offset+size)
+		a.insertSizeTree(block)
+		a.insertOffsetTree(block)
+	case leftAdjacent != nil:
+		a.deleteSizeTree(leftAdjacent)
+		leftAdjacent.End = offset + size
+		a.insertSizeTree(leftAdjacent)
+	case rightAdjacent != nil:
+		a.deleteOffsetTree(rightAdjacent)
+		a.deleteSizeTree(rightAdjacent)
+		rightAdjacent.Start = offset
+		a.insertSizeTree(rightAdjacent)
+		a.insertOffsetTree(rightAdjacent)
+	}
 }
 
 func (a *Allocator) GetBlocks() (blocks []*Block) {
@@ -290,33 +312,6 @@ func (a *Allocator) deleteSizeTree(block *Block) {
 
 func (a *Allocator) deleteOffsetTree(block *Block) {
 	a.offsetTree = a.offsetTree.delete(block, TreeIndexOffset)
-}
-
-func (a *Allocator) mergeAdjacentBlocks(block *Block) {
-	switch leftAdjacent, rightAdjacent := a.offsetTree.findLeftAdjacentBlock(block.Start), a.offsetTree.findRightAdjacentBlock(block.End); true {
-	case leftAdjacent != nil && rightAdjacent != nil:
-		a.deleteOffsetTree(rightAdjacent)
-		a.deleteSizeTree(rightAdjacent)
-		a.deleteSizeTree(leftAdjacent)
-		leftAdjacent.End = rightAdjacent.End
-		a.insertSizeTree(leftAdjacent)
-		a.putBlock(rightAdjacent)
-	case leftAdjacent == nil && rightAdjacent == nil:
-		a.insertSizeTree(block)
-		a.insertOffsetTree(block)
-		return
-	case leftAdjacent != nil:
-		a.deleteSizeTree(leftAdjacent)
-		leftAdjacent.End = block.End
-		a.insertSizeTree(leftAdjacent)
-	case rightAdjacent != nil:
-		a.deleteOffsetTree(rightAdjacent)
-		a.deleteSizeTree(rightAdjacent)
-		rightAdjacent.Start = block.Start
-		a.insertSizeTree(rightAdjacent)
-		a.insertOffsetTree(rightAdjacent)
-	}
-	a.putBlock(block)
 }
 
 func (b *Block) findLeftAdjacentBlock(offset int) *Block {

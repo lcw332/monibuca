@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -91,13 +90,16 @@ func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.R
 }
 
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
-	filePath := r.PathValue("filePath")
+	streamPath := r.PathValue("streamPath")
 	query := r.URL.Query()
 	rangeStr := strings.Split(query.Get("range"), "~")
 	var startTime, endTime time.Time
 	if len(rangeStr) != 2 {
-		http.NotFound(w, r)
-		return
+		rangeStr = []string{query.Get(m7s.StartKey), query.Get(m7s.EndKey)}
+		if rangeStr[0] == "" || rangeStr[1] == "" {
+			http.NotFound(w, r)
+			return
+		}
 	}
 	var err error
 	startTime, err = util.TimeQueryParse(rangeStr[0])
@@ -111,9 +113,9 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//timeRange := endTime.Sub(startTime)
-	p.Info("download", "filePath", filePath, "start", startTime, "end", endTime)
+	p.Info("download", "streamPath", streamPath, "start", startTime, "end", endTime)
 	var streams []m7s.RecordStream
-	p.DB.Find(&streams, "end_time>? AND start_time<? AND file_path=?", startTime, endTime, filePath)
+	p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path=?", startTime, endTime, streamPath)
 	muxer := mp4.NewMuxer(0)
 	var n int
 	n, err = w.Write(box.MakeFtypBox(box.TypeISOM, 0x200, box.TypeISOM, box.TypeISO2, box.TypeAVC1, box.TypeMP41))
@@ -126,9 +128,10 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	sampleOffset := muxer.CurrentOffset + box.BasicBoxLen*2
 	mdatOffset := sampleOffset
 	var audioTrack, videoTrack *mp4.Track
+	var file *os.File
 	for i, stream := range streams {
 		tsOffset = lastTs
-		file, err := os.Open(filepath.Join(filePath, fmt.Sprintf("%d.mp4", stream.ID)))
+		file, err = os.Open(stream.FilePath)
 		if err != nil {
 			return
 		}
@@ -156,6 +159,7 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 			startTimestamp := startTime.Sub(stream.StartTime).Milliseconds()
 			var startSample *box.Sample
 			if startSample, err = demuxer.SeekTime(uint64(startTimestamp)); err != nil {
+				tsOffset = 0
 				continue
 			}
 			tsOffset = -int64(startSample.DTS)

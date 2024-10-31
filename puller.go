@@ -200,7 +200,7 @@ func (p *RecordFilePuller) Start() (err error) {
 		if p.PullEndTime, err = util.TimeQueryParse(p.PullJob.Args.Get(EndKey)); err != nil {
 			return
 		}
-		tx := p.PullJob.Plugin.DB.Find(&p.Streams, "end_time>? AND end_time<? AND stream_path=?", p.PullStartTime, p.PullEndTime, p.PullJob.RemoteURL)
+		tx := p.PullJob.Plugin.DB.Find(&p.Streams, "end_time>? AND start_time<? AND stream_path=?", p.PullStartTime, p.PullEndTime, p.PullJob.RemoteURL)
 		if tx.Error != nil {
 			return tx.Error
 		}

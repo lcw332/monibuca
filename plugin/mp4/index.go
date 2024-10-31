@@ -78,7 +78,7 @@ var _ = m7s.InstallPlugin[MP4Plugin](defaultConfig, &pb.Api_ServiceDesc, pb.Regi
 
 func (p *MP4Plugin) RegisterHandler() map[string]http.HandlerFunc {
 	return map[string]http.HandlerFunc{
-		"/download/{filePath...}": p.download,
+		"/download/{streamPath...}": p.download,
 	}
 }
 
