@@ -227,10 +227,14 @@ func (r *Recorder) Run() (err error) {
 			}
 		case *rtmp.H265Ctx:
 			if ctx.Enhanced {
-				switch bytes[1] & 0b1111 {
+				switch t := bytes[0] & 0b1111; t {
 				case rtmp.PacketTypeCodedFrames:
 					offset += 3
 				case rtmp.PacketTypeSequenceStart:
+					return nil
+				case rtmp.PacketTypeCodedFramesX:
+				default:
+					r.Warn("unknown h265 packet type", "type", t)
 					return nil
 				}
 			} else if bytes[1] == 0 {

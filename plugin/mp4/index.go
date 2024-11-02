@@ -203,7 +203,7 @@ func (p *MP4Plugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			durVideo = video.Timestamp - lastVTime
 		}
 		bs := video.Memory.ToBytes()
-		if ctx, ok := sub.VideoReader.Track.ICodecCtx.(*rtmp.H265Ctx); ok && ctx.Enhanced && bs[1]&0b1111 == rtmp.PacketTypeCodedFrames {
+		if ctx, ok := sub.VideoReader.Track.ICodecCtx.(*rtmp.H265Ctx); ok && ctx.Enhanced && bs[0]&0b1111 == rtmp.PacketTypeCodedFrames {
 			offsetVideo = 8
 		} else {
 			offsetVideo = 5
