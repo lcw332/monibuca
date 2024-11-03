@@ -103,6 +103,9 @@ func (r *Video) Parse(t *AVTrack) (err error) {
 				}
 			case h264parser.NALU_PPS:
 				ctx.RecordInfo.PPS = [][]byte{nalu.ToBytes()}
+				if ctx.CodecData, err = h264parser.NewCodecDataFromSPSAndPPS(ctx.RecordInfo.SPS[0], ctx.RecordInfo.PPS[0]); err != nil {
+					return
+				}
 			case codec.NALU_IDR_Picture:
 				t.Value.IDR = true
 			}
@@ -162,6 +165,9 @@ func (r *Video) Parse(t *AVTrack) (err error) {
 				}
 			case h265parser.NAL_UNIT_PPS:
 				ctx.RecordInfo.PPS = [][]byte{nalu.ToBytes()}
+				if ctx.CodecData, err = h265parser.NewCodecDataFromVPSAndSPSAndPPS(ctx.RecordInfo.VPS[0], ctx.RecordInfo.SPS[0], ctx.RecordInfo.PPS[0]); err != nil {
+					return
+				}
 			case h265parser.NAL_UNIT_CODED_SLICE_BLA_W_LP,
 				h265parser.NAL_UNIT_CODED_SLICE_BLA_W_RADL,
 				h265parser.NAL_UNIT_CODED_SLICE_BLA_N_LP,
