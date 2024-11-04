@@ -1,0 +1,20 @@
+global:
+  loglevel: debug
+  tcp: :50050
+  http: :8081
+  disableall: true
+rtsp:
+  enable: true
+  tcp: :8554
+  pull:
+    live/test: rtsp://localhost/live/test
+mp4:
+  enable: true
+  onsub:
+    pull:
+      ^vod(\d)/(.+)$: live/$2
+  onpub:
+    record:
+      ^live/.+:
+        fragment: 30s
+        filepath: record/mp4

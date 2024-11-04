@@ -14,13 +14,13 @@ import (
 	_ "m7s.live/pro/plugin/rtsp"
 	_ "m7s.live/pro/plugin/stress"
 	_ "m7s.live/pro/plugin/webrtc"
-	"path/filepath"
 )
 
 func main() {
 	ctx := context.Background()
-	conf := flag.String("c", "", "config file dir")
+	conf1 := flag.String("c1", "", "config1 file")
+	conf2 := flag.String("c2", "", "config2 file")
 	flag.Parse()
-	go m7s.Run(ctx, filepath.Join(*conf, "config2.yaml"))
-	m7s.Run(ctx, filepath.Join(*conf, "config1.yaml"))
+	go m7s.Run(ctx, *conf2)
+	m7s.Run(ctx, *conf1)
 }

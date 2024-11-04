@@ -53,7 +53,7 @@ func (p *RecordReader) Run() (err error) {
 		}
 		p.File, err = os.Open(stream.FilePath)
 		if err != nil {
-			return
+			continue
 		}
 		p.demuxer = NewDemuxer(p.File)
 		if err = p.demuxer.Demux(); err != nil {

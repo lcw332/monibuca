@@ -472,7 +472,7 @@ func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, con
 		case <-subscriber.waitPublishDone.Done():
 			err = subscriber.Publisher.WaitTrack()
 		case <-subscriber.Done():
-			err = subscriber.Err()
+			err = subscriber.StopReason()
 		}
 	}
 	return

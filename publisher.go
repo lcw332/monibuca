@@ -559,10 +559,16 @@ func (p *Publisher) GetVideoTrack(dataType reflect.Type) (t *AVTrack) {
 }
 
 func (p *Publisher) HasAudioTrack() bool {
+	if p == nil {
+		return false
+	}
 	return p.AudioTrack.Length > 0
 }
 
 func (p *Publisher) HasVideoTrack() bool {
+	if p == nil {
+		return false
+	}
 	return p.VideoTrack.Length > 0
 }
 

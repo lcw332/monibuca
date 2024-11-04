@@ -134,7 +134,7 @@ func (p *PullJob) Publish() (err error) {
 	p.Publisher.Type = PublishTypePull
 	if err == nil && p.conf.MaxRetry != 0 {
 		p.Publisher.OnDispose(func() {
-			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout,pkg.ErrStopFromAPI) {
+			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, pkg.ErrStopFromAPI) {
 				p.Stop(p.Publisher.StopReason())
 			}
 		})
@@ -187,6 +187,7 @@ func (p *RecordFilePuller) GetPullJob() *PullJob {
 }
 
 func (p *RecordFilePuller) Start() (err error) {
+	p.SetRetry(0, 0)
 	if p.PullJob.Plugin.DB == nil {
 		return pkg.ErrNoDB
 	}
