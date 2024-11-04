@@ -139,6 +139,7 @@ func (c *NetConnection) Connect(remoteURL string) (err error) {
 	c.BufReader = util.NewBufReader(conn)
 	c.URL = rtspURL
 	c.UserAgent = "monibuca" + m7s.Version
+	c.Session = ""
 	c.auth = util.NewAuth(c.URL.User)
 	c.SetDescription("remoteAddr", conn.RemoteAddr().String())
 	c.MemoryAllocator = util.NewScalableMemoryAllocator(1 << 12)
