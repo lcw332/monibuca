@@ -7,9 +7,7 @@ rtmp:
   enable: true
   tcp: :1936
   pull:
-      live/test:
-        url: rtmp://localhost/live/test
-        maxretry: -1
+      live/test: rtmp://localhost/live/test
   onpub:
     push:
       live/test: rtmp://localhost/live/test2

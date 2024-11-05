@@ -7,7 +7,7 @@ mp4:
     delayclosetimeout: 1s
   onsub:
     pull:
-      ^vod/(.+)$: live/$1
+      ^vod(\d)/(.+)$: live/$2
   onpub:
     record:
       ^live/.+:

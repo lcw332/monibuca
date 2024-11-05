@@ -12,6 +12,8 @@ gb28181:
     pull:
       .* : $0
 mp4:
+  publish:
+    delayclosetimeout: 3s
   onsub:
     pull:
-      ^vod/(.+)$: live/$1
+      ^vod/(.+)$: $1

@@ -1,6 +1,6 @@
 global:
   loglevel: debug
-  tcp: :50050
+  tcp: :50052
   http: :8081
   disableall: true
 rtsp:
