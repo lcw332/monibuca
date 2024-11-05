@@ -80,7 +80,7 @@ func (p *TransformJob) Publish(streamPath string) (err error) {
 	p.Publisher.Type = PublishTypeTransform
 	if err == nil {
 		p.Publisher.OnDispose(func() {
-			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout,pkg.ErrStopFromAPI) {
+			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, pkg.ErrStopFromAPI) {
 				p.Stop(p.Publisher.StopReason())
 			}
 		})
@@ -123,9 +123,9 @@ func (p *TransformJob) Start() (err error) {
 	return
 }
 
-func (p *TransformJob) TransformPublished(pub *Publisher) {
-
-}
+//func (p *TransformJob) TransformPublished(pub *Publisher) {
+//
+//}
 
 func (p *TransformJob) Dispose() {
 	transList := &p.Plugin.Server.Transforms

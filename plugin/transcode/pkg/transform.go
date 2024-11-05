@@ -3,6 +3,7 @@ package transcode
 import (
 	"bufio"
 	"fmt"
+	"m7s.live/pro/pkg"
 	"net"
 	"net/url"
 	"os"
@@ -191,7 +192,10 @@ func (t *Transformer) Run() error {
 		defer close(rBuf)
 		return live.Run()
 	} else {
-		return t.ffmpeg.Wait()
+		if err := t.ffmpeg.Wait(); err != nil {
+			return err
+		}
+		return pkg.ErrRestart
 	}
 }
 

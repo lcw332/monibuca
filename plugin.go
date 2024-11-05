@@ -59,7 +59,7 @@ type (
 		OnInit() error
 		OnStop()
 		Pull(string, config.Pull)
-		Transform(string, config.Transform)
+		Transform(*Publisher, config.Transform)
 		OnPublish(*Publisher)
 	}
 
@@ -388,7 +388,7 @@ func (p *Plugin) OnPublish(pub *Publisher) {
 					}
 					tranConf.Output[j] = to
 				}
-				p.Transform(pub.StreamPath, tranConf)
+				p.Transform(pub, tranConf)
 			}
 		}
 	}
@@ -500,9 +500,10 @@ func (p *Plugin) Record(streamPath string, conf config.Record) {
 	recorder.GetRecordJob().Init(recorder, p, streamPath, conf)
 }
 
-func (p *Plugin) Transform(streamPath string, conf config.Transform) {
+func (p *Plugin) Transform(pub *Publisher, conf config.Transform) {
 	transformer := p.Meta.Transformer()
-	transformer.GetTransformJob().Init(transformer, p, streamPath, conf)
+	job := transformer.GetTransformJob().Init(transformer, p, pub.StreamPath, conf)
+	job.Depend(pub)
 }
 
 func (p *Plugin) registerHandler(handlers map[string]http.HandlerFunc) {

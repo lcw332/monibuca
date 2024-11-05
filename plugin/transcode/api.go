@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"google.golang.org/protobuf/types/known/emptypb"
+	m7s "m7s.live/pro"
 	"net/url"
 	"os"
 	"path"
@@ -135,7 +136,16 @@ func parseCrop(cropString string) (string, error) {
 }
 
 func (t *TranscodePlugin) Launch(ctx context.Context, transReq *pb.TransRequest) (response *globalPB.SuccessResponse, err error) {
-
+	var publisher *m7s.Publisher
+	var ok bool
+	t.Server.Server.Call(func() error {
+		publisher, ok = t.Server.Streams.Get(transReq.SrcStream)
+		return nil
+	})
+	if !ok {
+		err = fmt.Errorf("src stream not found")
+		return
+	}
 	response = &globalPB.SuccessResponse{}
 	defer func() {
 		if err != nil {
@@ -289,7 +299,7 @@ func (t *TranscodePlugin) Launch(ctx context.Context, transReq *pb.TransRequest)
 		Codec: transReq.Decodec,
 	}
 
-	t.Transform(transReq.SrcStream, cfg)
+	t.Transform(publisher, cfg)
 	return
 }
 
