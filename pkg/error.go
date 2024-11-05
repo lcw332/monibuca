@@ -20,7 +20,7 @@ var (
 	ErrNoTrack                  = errors.New("no track")
 	ErrNoDB                     = errors.New("no db")
 	ErrLost                     = errors.New("lost")
-
-	ErrRecordSamePath = errors.New("record same path")
-	ErrTransformSame  = errors.New("transform same")
+	ErrSeek                     = errors.New("seek")
+	ErrRecordSamePath           = errors.New("record same path")
+	ErrTransformSame            = errors.New("transform same")
 )

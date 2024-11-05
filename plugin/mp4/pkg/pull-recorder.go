@@ -1,8 +1,8 @@
 package mp4
 
 import (
-	"errors"
 	"io"
+	"m7s.live/pro/pkg"
 	"os"
 	"strings"
 	"time"
@@ -34,17 +34,15 @@ func NewPuller(conf config.Pull) m7s.IPuller {
 
 func (p *RecordReader) Run() (err error) {
 	pullJob := &p.PullJob
+	pullStartTime := p.PullStartTime
 	publisher := pullJob.Publisher
 	publisher.Type = m7s.PublishTypeVod
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	var ts, tsOffset int64
 	defer allocator.Recycle()
 	publisher.OnSeek = func(seekTime time.Duration) {
-		targetTime := p.PullStartTime.Add(time.Duration(ts) * time.Millisecond).Add(seekTime)
-		p.Stop(errors.New("seek"))
-		pullJob.Args.Set(m7s.StartKey, targetTime.Local().Format("2006-01-02T15:04:05"))
-		newRecordReader := &RecordReader{}
-		pullJob.AddTask(newRecordReader)
+		pullStartTime = pullStartTime.Add(seekTime)
+		pullJob.Args.Set(m7s.StartKey, pullStartTime.Local().Format("2006-01-02T15:04:05"))
 	}
 	for i, stream := range p.Streams {
 		tsOffset = ts
@@ -79,7 +77,7 @@ func (p *RecordReader) Run() (err error) {
 					err = publisher.WriteAudio(&sequence)
 				}
 			}
-			startTimestamp := p.PullStartTime.Sub(stream.StartTime).Milliseconds()
+			startTimestamp := pullStartTime.Sub(stream.StartTime).Milliseconds()
 			if _, err = p.demuxer.SeekTime(uint64(startTimestamp)); err != nil {
 				tsOffset = 0
 				continue
@@ -93,6 +91,10 @@ func (p *RecordReader) Run() (err error) {
 			}
 			if publisher.Paused != nil {
 				publisher.Paused.Await()
+			}
+			if pullStartTime != p.PullStartTime {
+				p.SetRetry(1, 0)
+				return pkg.ErrSeek
 			}
 			if _, err = p.demuxer.reader.Seek(sample.Offset, io.SeekStart); err != nil {
 				return

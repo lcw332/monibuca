@@ -678,6 +678,7 @@ func (p *Publisher) Resume() {
 }
 
 func (p *Publisher) Seek(ts time.Duration) {
+	p.Info("seek", "offset", ts)
 	if p.OnSeek != nil {
 		p.OnSeek(ts)
 	}
