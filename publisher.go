@@ -313,8 +313,18 @@ func (p *Publisher) RemoveSubscriber(subscriber *Subscriber) {
 }
 
 func (p *Publisher) AddSubscriber(subscriber *Subscriber) {
+	oldPublisher := subscriber.Publisher
 	subscriber.Publisher = p
-	subscriber.waitPublishDone.Resolve()
+	if oldPublisher == nil {
+		close(subscriber.waitPublishDone)
+	} else {
+		if subscriber.waitingPublish() {
+			subscriber.Info("publisher recover", "pid", p.ID)
+		} else {
+			subscriber.Info("publisher changed", "prePid", oldPublisher.ID, "pid", p.ID)
+		}
+	}
+	subscriber.waitStartTime = time.Time{}
 	if p.Subscribers.AddUnique(subscriber) {
 		p.Info("subscriber +1", "count", p.Subscribers.Length)
 		if subscriber.BufferTime > p.BufferTime {
@@ -559,16 +569,10 @@ func (p *Publisher) GetVideoTrack(dataType reflect.Type) (t *AVTrack) {
 }
 
 func (p *Publisher) HasAudioTrack() bool {
-	if p == nil {
-		return false
-	}
 	return p.AudioTrack.Length > 0
 }
 
 func (p *Publisher) HasVideoTrack() bool {
-	if p == nil {
-		return false
-	}
 	return p.VideoTrack.Length > 0
 }
 

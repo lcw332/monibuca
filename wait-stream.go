@@ -2,6 +2,7 @@ package m7s
 
 import (
 	"log/slog"
+	"time"
 
 	. "m7s.live/pro/pkg"
 	"m7s.live/pro/pkg/util"
@@ -13,7 +14,10 @@ type WaitManager struct {
 }
 
 func (w *WaitManager) Wait(subscriber *Subscriber) *WaitStream {
-	subscriber.Publisher = nil
+	subscriber.waitStartTime = time.Now()
+	if subscriber.Publisher != nil {
+		subscriber.Info("publisher gone", "pid", subscriber.Publisher.ID)
+	}
 	if waiting, ok := w.Get(subscriber.StreamPath); ok {
 		waiting.Add(subscriber)
 		return waiting
@@ -39,10 +43,8 @@ func (w *WaitManager) WakeUp(streamPath string, publisher *Publisher) {
 func (w *WaitManager) checkTimeout() {
 	for waits := range w.Range {
 		for sub := range waits.Range {
-			select {
-			case <-sub.TimeoutTimer.C:
+			if time.Since(sub.waitStartTime) > sub.WaitTimeout {
 				sub.Stop(ErrSubscribeTimeout)
-			default:
 			}
 		}
 	}
