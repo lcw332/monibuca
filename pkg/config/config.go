@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mcuadros/go-defaults"
 	"log/slog"
+	"maps"
 	"os"
 	"reflect"
 	"regexp"
@@ -382,5 +383,5 @@ func (config *Config) assign(k string, v any) (target reflect.Value) {
 func Parse(target any, conf map[string]any) {
 	var c Config
 	c.Parse(target)
-	c.ParseModifyFile(conf)
+	c.ParseModifyFile(maps.Clone(conf))
 }
