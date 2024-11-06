@@ -655,7 +655,12 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 		return
 	}
 	s.DB.Delete(&Device{}, req.Id)
-	s.Devices.RemoveByKey(uint(req.Id))
+	s.Devices.Call(func() error {
+		if device, ok := s.Devices.Get(uint(req.Id)); ok {
+			device.Stop(pkg.ErrStopFromAPI)
+		}
+		return nil
+	})
 	res = &pb.SuccessResponse{}
 	return
 

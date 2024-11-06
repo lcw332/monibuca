@@ -2,11 +2,13 @@ package m7s
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/go-ping/ping"
+	"m7s.live/pro/pkg"
+
 	"gorm.io/gorm"
 	"m7s.live/pro/pkg/config"
 	"m7s.live/pro/pkg/task"
@@ -51,7 +53,8 @@ type (
 	}
 	HTTPDevice struct {
 		DeviceTask
-		url *url.URL
+		tcpAddr *net.TCPAddr
+		url     *url.URL
 	}
 )
 
@@ -121,6 +124,22 @@ func (d *Device) Update() {
 
 func (d *HTTPDevice) Start() (err error) {
 	d.url, err = url.Parse(d.Device.URL)
+	if err != nil {
+		return
+	}
+	if ips, err := net.LookupIP(d.url.Hostname()); err != nil {
+		return err
+	} else if len(ips) == 0 {
+		return fmt.Errorf("no IP found for host: %s", d.url.Hostname())
+	} else {
+		d.tcpAddr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ips[0].String(), d.url.Port()))
+		if err != nil {
+			return err
+		}
+		if d.tcpAddr.Port == 0 {
+			d.tcpAddr.Port = 80
+		}
+	}
 	return d.DeviceTask.Start()
 }
 
@@ -129,26 +148,26 @@ func (d *HTTPDevice) GetTickInterval() time.Duration {
 }
 
 func (d *HTTPDevice) Tick(any) {
-	pinger, err := ping.NewPinger(d.url.Hostname())
-	pinger.SetPrivileged(true)
+	startTime := time.Now()
+	conn, err := net.DialTCP("tcp", nil, d.tcpAddr)
 	if err != nil {
 		d.Device.ChangeStatus(DeviceStatusOffline)
 		return
 	}
-	pinger.Count = 1
-	err = pinger.Run() // Blocks until finished.
-	if err != nil {
-		d.Device.ChangeStatus(DeviceStatusOffline)
-		return
-	}
-	stats := pinger.Statistics()
-	d.Device.RTT = stats.AvgRtt
+	conn.Close()
+	d.Device.RTT = time.Since(startTime)
 	d.Device.ChangeStatus(DeviceStatusOnline)
 }
 
 func (d *DeviceTask) Dispose() {
 	d.Device.ChangeStatus(DeviceStatusOffline)
 	d.TickTask.Dispose()
+	d.Plugin.Server.Streams.Call(func() error {
+		if stream, ok := d.Plugin.Server.Streams.Get(d.Device.GetStreamPath()); ok {
+			stream.Stop(pkg.ErrStopFromAPI)
+		}
+		return nil
+	})
 }
 
 func (d *DeviceTask) Pull() {

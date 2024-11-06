@@ -21,6 +21,7 @@ const OwnerTypeKey = "ownerType"
 var (
 	ErrAutoStop     = errors.New("auto stop")
 	ErrRetryRunOut  = errors.New("retry out")
+	ErrStopByUser   = errors.New("stop by user")
 	ErrTaskComplete = errors.New("complete")
 	ErrExit         = errors.New("exit")
 	ErrPanic        = errors.New("panic")
@@ -245,7 +246,7 @@ func (task *Task) GetSignal() any {
 }
 
 func (task *Task) checkRetry(err error) bool {
-	if errors.Is(err, ErrTaskComplete) || errors.Is(err, ErrExit) {
+	if errors.Is(err, ErrTaskComplete) || errors.Is(err, ErrExit) || errors.Is(err, ErrStopByUser) {
 		return false
 	}
 	if task.parent.IsStopped() {
@@ -256,9 +257,9 @@ func (task *Task) checkRetry(err error) bool {
 		task.SetDescription("retryCount", task.retry.RetryCount)
 		if task.Logger != nil {
 			if task.retry.MaxRetry < 0 {
-				task.Warn(fmt.Sprintf("retry %d/∞", task.retry.RetryCount))
+				task.Warn(fmt.Sprintf("retry %d/∞", task.retry.RetryCount), "taskId", task.ID)
 			} else {
-				task.Warn(fmt.Sprintf("retry %d/%d", task.retry.RetryCount, task.retry.MaxRetry))
+				task.Warn(fmt.Sprintf("retry %d/%d", task.retry.RetryCount, task.retry.MaxRetry), "taskId", task.ID)
 			}
 		}
 		if delta := time.Since(task.StartTime); delta < task.retry.RetryInterval {
