@@ -31,7 +31,7 @@ $ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```go
 package plugin_myplugin
 import (
-    "m7s.live/m7s/v5"
+    "m7s.live/pro"
 )
 
 var _ = m7s.InstallPlugin[MyPlugin]()
@@ -152,7 +152,7 @@ syntax = "proto3";
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 package myplugin;
-option go_package="m7s.live/m7s/v5/plugin/myplugin/pb";
+option go_package="m7s.live/pro/plugin/myplugin/pb";
 
 service api {
     rpc MyMethod (MyRequest) returns (MyResponse) {
@@ -217,8 +217,8 @@ func (config *MyPlugin) MyMethod(ctx context.Context, req *pb.MyRequest) (*pb.My
 ```go
 package plugin_myplugin
 import (
-    "m7s.live/m7s/v5"
-	"m7s.live/m7s/v5/plugin/myplugin/pb"
+    "m7s.live/pro"
+	"m7s.live/pro/plugin/myplugin/pb"
 )
 
 var _ = m7s.InstallPlugin[MyPlugin](&pb.Api_ServiceDesc, pb.RegisterApiHandler)

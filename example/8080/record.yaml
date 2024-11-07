@@ -11,5 +11,5 @@ mp4:
   onpub:
     record:
       ^live/.+:
-        fragment: 10s
+        fragment: 1m
         filepath: record/$0

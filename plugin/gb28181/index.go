@@ -50,8 +50,10 @@ type GB28181Plugin struct {
 	Sip        SipConfig
 	MediaPort  util.Range[uint16] `default:"10000-20000" desc:"媒体端口范围"` //媒体端口范围
 	Position   PositionConfig
+	Parent     string `desc:"父级设备"`
 	ua         *sipgo.UserAgent
 	server     *sipgo.Server
+	client     *sipgo.Client
 	devices    util.Collection[string, *Device]
 	dialogs    util.Collection[uint32, *Dialog]
 	tcpPorts   chan uint16
@@ -68,37 +70,51 @@ func (gb *GB28181Plugin) OnInit() (err error) {
 	logger := zerolog.New(os.Stdout)
 	gb.ua, err = sipgo.NewUA(sipgo.WithUserAgent("M7S/" + m7s.Version)) // Build user agent
 	// Creating client handle for ua
-	gb.server, _ = sipgo.NewServer(gb.ua, sipgo.WithServerLogger(logger)) // Creating server handle for ua
-	gb.server.OnRegister(gb.OnRegister)
-	gb.server.OnMessage(gb.OnMessage)
-	gb.server.OnBye(gb.OnBye)
-	gb.devices.L = new(sync.RWMutex)
+	if len(gb.Sip.ListenAddr) > 0 {
+		gb.server, _ = sipgo.NewServer(gb.ua, sipgo.WithServerLogger(logger)) // Creating server handle for ua
+		gb.server.OnRegister(gb.OnRegister)
+		gb.server.OnMessage(gb.OnMessage)
+		gb.server.OnBye(gb.OnBye)
+		gb.devices.L = new(sync.RWMutex)
 
-	if gb.MediaPort.Valid() {
-		gb.tcpPorts = make(chan uint16, gb.MediaPort.Size())
-		for i := range gb.MediaPort.Size() {
-			gb.tcpPorts <- gb.MediaPort[0] + i
-		}
-	} else {
-		tcpConfig := &gb.GetCommonConf().TCP
-		tcpConfig.ListenAddr = fmt.Sprintf(":%d", gb.MediaPort[0])
-	}
-	for _, addr := range gb.Sip.ListenAddr {
-		netWork, addr, _ := strings.Cut(addr, ":")
-		go gb.server.ListenAndServe(gb, netWork, addr)
-	}
-	if len(gb.Sip.ListenTLSAddr) > 0 {
-		if tslConfig, err := config.GetTLSConfig(gb.Sip.CertFile, gb.Sip.KeyFile); err == nil {
-			for _, addr := range gb.Sip.ListenTLSAddr {
-				netWork, addr, _ := strings.Cut(addr, ":")
-				go gb.server.ListenAndServeTLS(gb, netWork, addr, tslConfig)
+		if gb.MediaPort.Valid() {
+			gb.tcpPorts = make(chan uint16, gb.MediaPort.Size())
+			for i := range gb.MediaPort.Size() {
+				gb.tcpPorts <- gb.MediaPort[0] + i
 			}
 		} else {
-			return err
+			tcpConfig := &gb.GetCommonConf().TCP
+			tcpConfig.ListenAddr = fmt.Sprintf(":%d", gb.MediaPort[0])
+		}
+		for _, addr := range gb.Sip.ListenAddr {
+			netWork, addr, _ := strings.Cut(addr, ":")
+			go gb.server.ListenAndServe(gb, netWork, addr)
+		}
+		if len(gb.Sip.ListenTLSAddr) > 0 {
+			if tslConfig, err := config.GetTLSConfig(gb.Sip.CertFile, gb.Sip.KeyFile); err == nil {
+				for _, addr := range gb.Sip.ListenTLSAddr {
+					netWork, addr, _ := strings.Cut(addr, ":")
+					go gb.server.ListenAndServeTLS(gb, netWork, addr, tslConfig)
+				}
+			} else {
+				return err
+			}
+		}
+		if gb.DB != nil {
+			gb.DB.AutoMigrate(&Device{})
 		}
 	}
-	if gb.DB != nil {
-		gb.DB.AutoMigrate(&Device{})
+	if gb.Parent != "" {
+		host, portStr, _ := net.SplitHostPort(gb.Parent)
+		if portStr != "" {
+			portStr = "5060"
+		}
+		port, _ := strconv.Atoi(portStr)
+		gb.client, _ = sipgo.NewClient(gb.ua, sipgo.WithClientLogger(logger), sipgo.WithClientHostname(host), sipgo.WithClientPort(port))
+		gb.client.Do(gb, sip.NewRequest("REGISTER", sip.Uri{
+			Host: host,
+			Port: port,
+		}))
 	}
 	return
 }

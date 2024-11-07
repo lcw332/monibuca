@@ -3,7 +3,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 package monitor;
-option go_package="m7s.live/m7s/v5/plugin/monitor/pb";
+option go_package="m7s.live/pro/plugin/monitor/pb";
 
 service api {
   rpc SearchTask (SearchTaskRequest) returns (SearchTaskResponse) {

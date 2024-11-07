@@ -3,6 +3,7 @@ package mp4
 import (
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,7 +44,11 @@ func (p *RecordReader) Run() (err error) {
 	defer allocator.Recycle()
 	publisher.OnSeek = func(seekTime time.Time) {
 		pullStartTime = seekTime
-		pullJob.Args.Set(util.StartKey, pullStartTime.Local().Format(util.LocalTimeFormat))
+		if util.UnixTimeReg.MatchString(pullJob.Args.Get(util.EndKey)) {
+			pullJob.Args.Set(util.StartKey, strconv.FormatInt(pullStartTime.Unix(), 10))
+		} else {
+			pullJob.Args.Set(util.EndKey, pullStartTime.Local().Format(util.LocalTimeFormat))
+		}
 	}
 	for i, stream := range p.Streams {
 		tsOffset = ts

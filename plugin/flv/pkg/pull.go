@@ -48,6 +48,9 @@ func (p *Puller) Run() (err error) {
 	}
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	for offsetTs := absTS; err == nil; _, err = reader.ReadBE(4) {
+		if p.IsStopped() {
+			return p.StopReason()
+		}
 		t, err := reader.ReadByte()
 		if err != nil {
 			return err
@@ -83,9 +86,17 @@ func (p *Puller) Run() (err error) {
 		//fmt.Println(t, offsetTs, timestamp, startTs, puller.absTS)
 		switch t {
 		case FLV_TAG_TYPE_AUDIO:
-			err = publisher.WriteAudio(frame.WrapAudio())
+			if publisher.PubAudio {
+				if err = publisher.WriteAudio(frame.WrapAudio()); err != nil {
+					return err
+				}
+			}
 		case FLV_TAG_TYPE_VIDEO:
-			err = publisher.WriteVideo(frame.WrapVideo())
+			if publisher.PubVideo {
+				if err = publisher.WriteVideo(frame.WrapVideo()); err != nil {
+					return err
+				}
+			}
 		case FLV_TAG_TYPE_SCRIPT:
 			r := frame.NewReader()
 			amf := &rtmp.AMF{

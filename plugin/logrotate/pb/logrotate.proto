@@ -2,7 +2,7 @@ syntax = "proto3";
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 package logrotate;
-option go_package="m7s.live/m7s/v5/plugin/logrotate/pb";
+option go_package="m7s.live/pro/plugin/logrotate/pb";
 
 service api {
   rpc List (google.protobuf.Empty) returns (ResponseFileInfo) {

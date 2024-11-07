@@ -19,9 +19,9 @@ const (
 )
 
 var (
-	unixTimeReg      = regexp.MustCompile(`^\d+$`)
-	unixTimeRangeReg = regexp.MustCompile(`^(\d+)(~|-)(\d+)$`)
-	timeStrRangeReg  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})~(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})$`)
+	UnixTimeReg      = regexp.MustCompile(`^\d+$`)
+	UnixTimeRangeReg = regexp.MustCompile(`^(\d+)(~|-)(\d+)$`)
+	TimeStrRangeReg  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})~(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})$`)
 )
 
 func TimeRangeQueryParse(query url.Values) (startTime, endTime time.Time, err error) {
@@ -29,9 +29,21 @@ func TimeRangeQueryParse(query url.Values) (startTime, endTime time.Time, err er
 	if rangeStr == "" {
 		startTimeStr := query.Get(StartKey)
 		endTimeStr := query.Get(EndKey)
-		if endTimeStr == "" {
+		if startTimeStr == "" {
+			startTime = time.Time{}
+			if endTimeStr == "" {
+				endTime = time.Now()
+			} else {
+				if UnixTimeReg.MatchString(endTimeStr) {
+					endTime, err = UnixTimeQueryParse(endTimeStr)
+				} else {
+					endTime, err = TimeQueryParse(endTimeStr)
+				}
+			}
+			return
+		} else if endTimeStr == "" {
 			endTime = time.Now()
-			if unixTimeReg.MatchString(startTimeStr) {
+			if UnixTimeReg.MatchString(startTimeStr) {
 				startTime, err = UnixTimeQueryParse(startTimeStr)
 			} else {
 				startTime, err = TimeQueryParse(startTimeStr)
@@ -40,13 +52,13 @@ func TimeRangeQueryParse(query url.Values) (startTime, endTime time.Time, err er
 		}
 		rangeStr = startTimeStr + "~" + endTimeStr
 	}
-	if match := unixTimeRangeReg.FindStringSubmatch(rangeStr); len(match) == 4 {
+	if match := UnixTimeRangeReg.FindStringSubmatch(rangeStr); len(match) == 4 {
 		startTime, err = UnixTimeQueryParse(match[1])
 		if err != nil {
 			return
 		}
 		endTime, err = UnixTimeQueryParseRefer(match[3], startTime)
-	} else if match := timeStrRangeReg.FindStringSubmatch(rangeStr); len(match) == 3 {
+	} else if match := TimeStrRangeReg.FindStringSubmatch(rangeStr); len(match) == 3 {
 		startTime, err = TimeQueryParse(match[1])
 		if err != nil {
 			return

@@ -396,6 +396,46 @@ func (s *Server) StopSubscribe(ctx context.Context, req *pb.RequestWithId) (res 
 	return &pb.SuccessResponse{}, err
 }
 
+func (s *Server) PauseStream(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.SuccessResponse, err error) {
+	s.Streams.Call(func() error {
+		if s, ok := s.Streams.Get(req.StreamPath); ok {
+			s.Pause()
+		}
+		return nil
+	})
+	return &pb.SuccessResponse{}, err
+}
+
+func (s *Server) ResumeStream(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.SuccessResponse, err error) {
+	s.Streams.Call(func() error {
+		if s, ok := s.Streams.Get(req.StreamPath); ok {
+			s.Resume()
+		}
+		return nil
+	})
+	return &pb.SuccessResponse{}, err
+}
+
+func (s *Server) SetStreamSpeed(ctx context.Context, req *pb.SetStreamSpeedRequest) (res *pb.SuccessResponse, err error) {
+	s.Streams.Call(func() error {
+		if s, ok := s.Streams.Get(req.StreamPath); ok {
+			s.Speed = float64(req.Speed)
+		}
+		return nil
+	})
+	return &pb.SuccessResponse{}, err
+}
+
+func (s *Server) SeekStream(ctx context.Context, req *pb.SeekStreamRequest) (res *pb.SuccessResponse, err error) {
+	s.Streams.Call(func() error {
+		if s, ok := s.Streams.Get(req.StreamPath); ok {
+			s.Seek(time.Unix(int64(req.TimeStamp), 0))
+		}
+		return nil
+	})
+	return &pb.SuccessResponse{}, err
+}
+
 func (s *Server) StopPublish(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.SuccessResponse, err error) {
 	s.Streams.Call(func() error {
 		if s, ok := s.Streams.Get(req.StreamPath); ok {
