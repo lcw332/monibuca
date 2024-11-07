@@ -41,6 +41,7 @@ func (p *RecordReader) Run() (err error) {
 	publisher.Type = m7s.PublishTypeVod
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	var ts, tsOffset int64
+	var realTime time.Time
 	defer allocator.Recycle()
 	publisher.OnSeek = func(seekTime time.Time) {
 		pullStartTime = seekTime
@@ -49,6 +50,9 @@ func (p *RecordReader) Run() (err error) {
 		} else {
 			pullJob.Args.Set(util.EndKey, pullStartTime.Local().Format(util.LocalTimeFormat))
 		}
+	}
+	publisher.OnGetPosition = func() time.Time {
+		return realTime
 	}
 	for i, stream := range p.Streams {
 		tsOffset = ts
@@ -111,6 +115,7 @@ func (p *RecordReader) Run() (err error) {
 				return
 			}
 			ts = int64(sample.DTS + uint64(tsOffset))
+			realTime = stream.StartTime.Add(time.Duration(sample.DTS) * time.Millisecond)
 			if p.MaxTS > 0 && ts > p.MaxTS {
 				return
 			}

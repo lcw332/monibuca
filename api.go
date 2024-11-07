@@ -483,6 +483,19 @@ func (s *Server) Api_Summary_SSE(rw http.ResponseWriter, r *http.Request) {
 	}, rw, r)
 }
 
+func (s *Server) Api_Stream_Position_SSE(rw http.ResponseWriter, r *http.Request) {
+	streamPath := r.URL.Query().Get("streamPath")
+	util.ReturnFetchValue(func() (t time.Time) {
+		s.Streams.Call(func() error {
+			if pub, ok := s.Streams.Get(streamPath); ok {
+				t = pub.GetPosition()
+			}
+			return nil
+		})
+		return
+	}, rw, r)
+}
+
 func (s *Server) Summary(context.Context, *emptypb.Empty) (res *pb.SummaryResponse, err error) {
 	dur := time.Since(s.lastSummaryTime)
 	if dur < time.Second {
@@ -694,7 +707,8 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 		err = pkg.ErrNoDB
 		return
 	}
-	s.DB.Delete(&Device{}, req.Id)
+	tx := s.DB.Delete(&Device{}, req.Id)
+	err = tx.Error
 	s.Devices.Call(func() error {
 		if device, ok := s.Devices.Get(uint(req.Id)); ok {
 			device.Stop(pkg.ErrStopFromAPI)
@@ -703,7 +717,6 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 	})
 	res = &pb.SuccessResponse{}
 	return
-
 }
 
 func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasRequest) (res *pb.SuccessResponse, err error) {

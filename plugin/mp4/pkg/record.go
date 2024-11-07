@@ -241,7 +241,6 @@ func (r *Recorder) Run() (err error) {
 				return nil
 			}
 		}
-
 		return r.muxer.WriteSample(videoTrack, box.Sample{
 			KeyFrame: sub.VideoReader.Value.IDR,
 			Data:     bytes[offset:],

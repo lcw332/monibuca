@@ -140,6 +140,7 @@ type Publisher struct {
 	Subscribers            SubscriberCollection
 	GOP                    int
 	OnSeek                 func(time.Time)
+	OnGetPosition          func() time.Time
 	Device                 *Device
 	dumpFile               *os.File
 }
@@ -686,4 +687,11 @@ func (p *Publisher) Seek(ts time.Time) {
 	if p.OnSeek != nil {
 		p.OnSeek(ts)
 	}
+}
+
+func (p *Publisher) GetPosition() (t time.Time) {
+	if p.OnGetPosition != nil {
+		return p.OnGetPosition()
+	}
+	return
 }
