@@ -139,7 +139,7 @@ type Publisher struct {
 	DataTrack              *DataTrack
 	Subscribers            SubscriberCollection
 	GOP                    int
-	OnSeek                 func(time.Duration)
+	OnSeek                 func(time.Time)
 	Device                 *Device
 	dumpFile               *os.File
 }
@@ -681,7 +681,7 @@ func (p *Publisher) Resume() {
 	p.AudioTrack.pausedTime += time.Since(p.pauseTime)
 }
 
-func (p *Publisher) Seek(ts time.Duration) {
+func (p *Publisher) Seek(ts time.Time) {
 	p.Info("seek", "offset", ts)
 	if p.OnSeek != nil {
 		p.OnSeek(ts)

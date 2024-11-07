@@ -4,36 +4,86 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-var unixTimeReg = regexp.MustCompile(`^\d+$`)
+const (
+	StartKey        = "start"
+	EndKey          = "end"
+	RangeKey        = "range"
+	LocalTimeFormat = "2006-01-02T15:04:05"
+)
+
+var (
+	unixTimeReg      = regexp.MustCompile(`^\d+$`)
+	unixTimeRangeReg = regexp.MustCompile(`^(\d+)(~|-)(\d+)$`)
+	timeStrRangeReg  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})~(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})$`)
+)
+
+func TimeRangeQueryParse(query url.Values) (startTime, endTime time.Time, err error) {
+	rangeStr := query.Get(RangeKey)
+	if rangeStr == "" {
+		startTimeStr := query.Get(StartKey)
+		endTimeStr := query.Get(EndKey)
+		if endTimeStr == "" {
+			endTime = time.Now()
+			if unixTimeReg.MatchString(startTimeStr) {
+				startTime, err = UnixTimeQueryParse(startTimeStr)
+			} else {
+				startTime, err = TimeQueryParse(startTimeStr)
+			}
+			return
+		}
+		rangeStr = startTimeStr + "~" + endTimeStr
+	}
+	if match := unixTimeRangeReg.FindStringSubmatch(rangeStr); len(match) == 4 {
+		startTime, err = UnixTimeQueryParse(match[1])
+		if err != nil {
+			return
+		}
+		endTime, err = UnixTimeQueryParseRefer(match[3], startTime)
+	} else if match := timeStrRangeReg.FindStringSubmatch(rangeStr); len(match) == 3 {
+		startTime, err = TimeQueryParse(match[1])
+		if err != nil {
+			return
+		}
+		endTime, err = TimeQueryParseRefer(match[2], startTime)
+	} else {
+		err = errors.New("invalid time range")
+	}
+	return
+}
+
+func UnixTimeQueryParse(query string) (time.Time, error) {
+	return UnixTimeQueryParseRefer(query, time.Now())
+}
 
 func TimeQueryParse(query string) (time.Time, error) {
-	if unixTimeReg.MatchString(query) {
-		unixTime, err := strconv.ParseInt(query, 10, 64)
-		if err != nil {
-			return time.Time{}, err
-		}
-		return time.Unix(unixTime, 0), nil
+	return TimeQueryParseRefer(query, time.Now())
+}
+
+func UnixTimeQueryParseRefer(query string, refer time.Time) (t time.Time, err error) {
+	var unixTime int64
+	unixTime, err = strconv.ParseInt(query, 10, 64)
+	if err != nil {
+		return
 	}
-	if !strings.Contains(query, "T") {
-		query = time.Now().Format("2006-01-02") + "T" + query
+	switch len(query) {
+	case 10:
+		t = time.Unix(unixTime, 0)
+	case 13:
+		t = time.UnixMilli(unixTime)
+	default:
+		err = errors.New("invalid time")
 	}
-	return time.ParseInLocation("2006-01-02T15:04:05", query, time.Local)
+	return
 }
 
 func TimeQueryParseRefer(query string, refer time.Time) (time.Time, error) {
-	if unixTimeReg.MatchString(query) {
-		unixTime, err := strconv.ParseInt(query, 10, 64)
-		if err != nil {
-			return time.Time{}, err
-		}
-		return time.Unix(unixTime, 0), nil
-	}
 	if !strings.Contains(query, "T") {
 		query = refer.Format("2006-01-02") + "T" + query
 	}

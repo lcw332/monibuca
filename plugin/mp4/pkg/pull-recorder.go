@@ -2,10 +2,11 @@ package mp4
 
 import (
 	"io"
-	"m7s.live/pro/pkg"
 	"os"
 	"strings"
 	"time"
+
+	"m7s.live/pro/pkg"
 
 	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg/codec"
@@ -26,7 +27,7 @@ func NewPuller(conf config.Pull) m7s.IPuller {
 	if strings.HasPrefix(conf.URL, "http") || strings.HasSuffix(conf.URL, ".mp4") {
 		return &HTTPReader{}
 	}
-	if conf.Args.Get(m7s.StartKey) != "" {
+	if conf.Args.Get(util.StartKey) != "" {
 		return &RecordReader{}
 	}
 	return nil
@@ -40,9 +41,9 @@ func (p *RecordReader) Run() (err error) {
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	var ts, tsOffset int64
 	defer allocator.Recycle()
-	publisher.OnSeek = func(seekTime time.Duration) {
-		pullStartTime = pullStartTime.Add(seekTime)
-		pullJob.Args.Set(m7s.StartKey, pullStartTime.Local().Format("2006-01-02T15:04:05"))
+	publisher.OnSeek = func(seekTime time.Time) {
+		pullStartTime = seekTime
+		pullJob.Args.Set(util.StartKey, pullStartTime.Local().Format(util.LocalTimeFormat))
 	}
 	for i, stream := range p.Streams {
 		tsOffset = ts

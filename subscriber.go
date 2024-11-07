@@ -153,7 +153,7 @@ func (pc *PlayController) Go() (err error) {
 			case 2: // resume
 				pc.Subscriber.Publisher.Resume()
 			case 3: // seek
-				pc.Subscriber.Publisher.Seek(time.Duration(int32(binary.BigEndian.Uint32(b[4:8]))) * time.Millisecond)
+				pc.Subscriber.Publisher.Seek(time.Unix(int64(binary.BigEndian.Uint32(b[4:8])), 0))
 			case 4: // speed
 				pc.Subscriber.Publisher.Speed = float64(binary.BigEndian.Uint32(b[4:8])) / 100
 			}

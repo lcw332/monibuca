@@ -19,7 +19,7 @@ import (
 	"github.com/icholy/digest"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"m7s.live/pro"
+	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg/config"
 	"m7s.live/pro/pkg/task"
 	"m7s.live/pro/pkg/util"
@@ -204,7 +204,12 @@ func (gb *GB28181Plugin) OnRegister(req *sip.Request, tx sip.ServerTransaction) 
 			return
 		}
 	}
-	if err = tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
+	response := sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)
+	response.AppendHeader(sip.NewHeader("Expires", fmt.Sprintf("%d", expSec)))
+	response.AppendHeader(sip.NewHeader("Date", time.Now().Local().Format(util.LocalTimeFormat)))
+	response.AppendHeader(sip.NewHeader("Server", "M7S/"+m7s.Version))
+	response.AppendHeader(sip.NewHeader("Allow", "INVITE,ACK,CANCEL,BYE,NOTIFY,OPTIONS,PRACK,UPDATE,REFER"))
+	if err = tx.Respond(response); err != nil {
 		gb.Error("respond OK", "error", err.Error())
 	}
 	if isUnregister {

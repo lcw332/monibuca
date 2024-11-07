@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/deepch/vdk/codec/h265parser"
-	"m7s.live/pro"
+	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg/codec"
 	"m7s.live/pro/pkg/util"
 	"m7s.live/pro/plugin/mp4/pkg/box"
@@ -35,15 +35,15 @@ func (p *HTTPReader) Run() (err error) {
 	if err = demuxer.Demux(); err != nil {
 		return
 	}
-	publisher.OnSeek = func(seekTime time.Duration) {
+	publisher.OnSeek = func(seekTime time.Time) {
 		p.Stop(errors.New("seek"))
-		pullJob.Args.Set(m7s.StartKey, seekTime.String())
+		pullJob.Args.Set(util.StartKey, seekTime.Local().Format(util.LocalTimeFormat))
 		newHTTPReader := &HTTPReader{}
 		pullJob.AddTask(newHTTPReader)
 	}
-	if pullJob.Args.Get(m7s.StartKey) != "" {
-		seekTime, _ := time.ParseDuration(pullJob.Args.Get(m7s.StartKey))
-		demuxer.SeekTime(uint64(seekTime.Milliseconds()))
+	if pullJob.Args.Get(util.StartKey) != "" {
+		seekTime, _ := time.Parse(util.LocalTimeFormat, pullJob.Args.Get(util.StartKey))
+		demuxer.SeekTime(uint64(seekTime.UnixMilli()))
 	}
 	for _, track := range demuxer.Tracks {
 		switch track.Cid {

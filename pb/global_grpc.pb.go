@@ -31,6 +31,10 @@ type ApiClient interface {
 	StreamList(ctx context.Context, in *StreamListRequest, opts ...grpc.CallOption) (*StreamListResponse, error)
 	WaitList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StreamWaitListResponse, error)
 	StreamInfo(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*StreamInfoResponse, error)
+	PauseStream(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	ResumeStream(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	SetStreamSpeed(ctx context.Context, in *SetStreamSpeedRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	SeekStream(ctx context.Context, in *SeekStreamRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetSubscribers(ctx context.Context, in *SubscribersRequest, opts ...grpc.CallOption) (*SubscribersResponse, error)
 	AudioTrackSnap(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*TrackSnapShotResponse, error)
 	VideoTrackSnap(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*TrackSnapShotResponse, error)
@@ -121,6 +125,42 @@ func (c *apiClient) WaitList(ctx context.Context, in *emptypb.Empty, opts ...grp
 func (c *apiClient) StreamInfo(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*StreamInfoResponse, error) {
 	out := new(StreamInfoResponse)
 	err := c.cc.Invoke(ctx, "/global.api/StreamInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) PauseStream(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/PauseStream", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) ResumeStream(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/ResumeStream", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) SetStreamSpeed(ctx context.Context, in *SetStreamSpeedRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/SetStreamSpeed", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) SeekStream(ctx context.Context, in *SeekStreamRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/SeekStream", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +305,10 @@ type ApiServer interface {
 	StreamList(context.Context, *StreamListRequest) (*StreamListResponse, error)
 	WaitList(context.Context, *emptypb.Empty) (*StreamWaitListResponse, error)
 	StreamInfo(context.Context, *StreamSnapRequest) (*StreamInfoResponse, error)
+	PauseStream(context.Context, *StreamSnapRequest) (*SuccessResponse, error)
+	ResumeStream(context.Context, *StreamSnapRequest) (*SuccessResponse, error)
+	SetStreamSpeed(context.Context, *SetStreamSpeedRequest) (*SuccessResponse, error)
+	SeekStream(context.Context, *SeekStreamRequest) (*SuccessResponse, error)
 	GetSubscribers(context.Context, *SubscribersRequest) (*SubscribersResponse, error)
 	AudioTrackSnap(context.Context, *StreamSnapRequest) (*TrackSnapShotResponse, error)
 	VideoTrackSnap(context.Context, *StreamSnapRequest) (*TrackSnapShotResponse, error)
@@ -309,6 +353,18 @@ func (UnimplementedApiServer) WaitList(context.Context, *emptypb.Empty) (*Stream
 }
 func (UnimplementedApiServer) StreamInfo(context.Context, *StreamSnapRequest) (*StreamInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StreamInfo not implemented")
+}
+func (UnimplementedApiServer) PauseStream(context.Context, *StreamSnapRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PauseStream not implemented")
+}
+func (UnimplementedApiServer) ResumeStream(context.Context, *StreamSnapRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResumeStream not implemented")
+}
+func (UnimplementedApiServer) SetStreamSpeed(context.Context, *SetStreamSpeedRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetStreamSpeed not implemented")
+}
+func (UnimplementedApiServer) SeekStream(context.Context, *SeekStreamRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SeekStream not implemented")
 }
 func (UnimplementedApiServer) GetSubscribers(context.Context, *SubscribersRequest) (*SubscribersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSubscribers not implemented")
@@ -505,6 +561,78 @@ func _Api_StreamInfo_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ApiServer).StreamInfo(ctx, req.(*StreamSnapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_PauseStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StreamSnapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).PauseStream(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/PauseStream",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).PauseStream(ctx, req.(*StreamSnapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_ResumeStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StreamSnapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).ResumeStream(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/ResumeStream",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).ResumeStream(ctx, req.(*StreamSnapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_SetStreamSpeed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetStreamSpeedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).SetStreamSpeed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/SetStreamSpeed",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).SetStreamSpeed(ctx, req.(*SetStreamSpeedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_SeekStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SeekStreamRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).SeekStream(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/SeekStream",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).SeekStream(ctx, req.(*SeekStreamRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -799,6 +927,22 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StreamInfo",
 			Handler:    _Api_StreamInfo_Handler,
+		},
+		{
+			MethodName: "PauseStream",
+			Handler:    _Api_PauseStream_Handler,
+		},
+		{
+			MethodName: "ResumeStream",
+			Handler:    _Api_ResumeStream_Handler,
+		},
+		{
+			MethodName: "SetStreamSpeed",
+			Handler:    _Api_SetStreamSpeed_Handler,
+		},
+		{
+			MethodName: "SeekStream",
+			Handler:    _Api_SeekStream_Handler,
 		},
 		{
 			MethodName: "GetSubscribers",

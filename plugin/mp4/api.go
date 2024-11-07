@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -31,20 +32,9 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 		err = fmt.Errorf("db not init")
 		return
 	}
-	var startTime, endTime time.Time
-	r := strings.Split(req.Range, "~")
-	if len(r) != 2 {
-		startTime = time.Unix(0, 0)
-		endTime = time.Now()
-	} else {
-		startTime, err = util.TimeQueryParse(r[0])
-		if err != nil {
-			return
-		}
-		endTime, err = util.TimeQueryParseRefer(r[1], startTime)
-		if err != nil {
-			return
-		}
+	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
+	if err != nil {
+		return
 	}
 	if req.StreamPath == "" {
 		p.DB.Find(&streams, "end_time>? AND start_time<?", startTime, endTime)
@@ -91,28 +81,11 @@ func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.R
 
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	streamPath := r.PathValue("streamPath")
-	query := r.URL.Query()
-	rangeStr := strings.Split(query.Get("range"), "~")
-	var startTime, endTime time.Time
-	if len(rangeStr) != 2 {
-		rangeStr = []string{query.Get(m7s.StartKey), query.Get(m7s.EndKey)}
-		if rangeStr[0] == "" || rangeStr[1] == "" {
-			http.NotFound(w, r)
-			return
-		}
-	}
-	var err error
-	startTime, err = util.TimeQueryParse(rangeStr[0])
+	startTime, endTime, err := util.TimeRangeQueryParse(r.URL.Query())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	endTime, err = util.TimeQueryParseRefer(rangeStr[1], startTime)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	//timeRange := endTime.Sub(startTime)
 	p.Info("download", "streamPath", streamPath, "start", startTime, "end", endTime)
 	var streams []m7s.RecordStream
 	p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path=?", startTime, endTime, streamPath)
@@ -129,6 +102,7 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	mdatOffset := sampleOffset
 	var audioTrack, videoTrack *mp4.Track
 	var file *os.File
+	streamCount := len(streams)
 	for i, stream := range streams {
 		tsOffset = lastTs
 		file, err = os.Open(stream.FilePath)
@@ -166,7 +140,7 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 		}
 		var part *ContentPart
 		for track, sample := range demuxer.RangeSample {
-			if endTime.After(stream.StartTime) && int64(sample.DTS) > endTime.Sub(stream.StartTime).Milliseconds() {
+			if i == streamCount-1 && int64(sample.DTS) > endTime.Sub(stream.StartTime).Milliseconds() {
 				break
 			}
 			if part == nil {

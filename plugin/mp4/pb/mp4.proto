@@ -21,8 +21,10 @@ service api {
 message ReqRecordList {
   string streamPath = 1;
   string range = 2;
-  uint32 page = 3;
-  uint32 pageSize = 4;
+  string start = 3;
+  string end = 4;
+  uint32 page = 5;
+  uint32 pageSize = 6;
 }
 
 message RecordFile {

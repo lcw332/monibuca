@@ -48,6 +48,30 @@ service api {
       get: "/api/stream/info/{streamPath=**}"
     };
   }
+  rpc PauseStream(StreamSnapRequest) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/pause/{streamPath=**}"
+      body: "*"
+    };
+  }
+  rpc ResumeStream(StreamSnapRequest) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/resume/{streamPath=**}"
+      body: "*"
+    };
+  }
+  rpc SetStreamSpeed(SetStreamSpeedRequest) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/speed/{streamPath=**}"
+      body: "*"
+    };
+  }
+  rpc SeekStream(SeekStreamRequest) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/seek/{streamPath=**}"
+      body: "*"
+    };
+  }
   rpc GetSubscribers(SubscribersRequest) returns (SubscribersResponse) {
     option (google.api.http) = {
       get: "/api/subscribers/{streamPath=**}"
@@ -394,4 +418,14 @@ message SetStreamAliasRequest {
   string streamPath = 1;
   string alias = 2;
   bool autoRemove = 3;
+}
+
+message SetStreamSpeedRequest {
+  string streamPath = 1;
+  float speed = 2;
+}
+
+message SeekStreamRequest {
+  string streamPath = 1;
+  uint32 timeStamp = 2;
 }
