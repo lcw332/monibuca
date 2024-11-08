@@ -248,7 +248,7 @@ func (c *NetConnection) ReadResponse() (res *util.Response, err error) {
 	return
 }
 
-func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte), onRTCP func(byte, []byte)) (err error) {
+func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte) error, onRTCP func(byte, []byte) error) (err error) {
 	for err == nil {
 		ts := time.Now()
 		if err = c.conn.SetReadDeadline(ts.Add(util.Conditional(sendMode, time.Second*60, time.Second*15))); err != nil {
@@ -371,11 +371,15 @@ func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte), onR
 			}
 			if channelID&1 == 0 {
 				if onReceive != nil {
-					onReceive(channelID, buf)
+					if onReceive(channelID, buf) != nil {
+						c.MemoryAllocator.Free(buf)
+					}
 					continue
 				}
 			} else if onRTCP != nil {
-				onRTCP(channelID, buf)
+				if onRTCP(channelID, buf) != nil {
+					c.MemoryAllocator.Free(buf)
+				}
 				continue
 			}
 			c.MemoryAllocator.Free(buf)

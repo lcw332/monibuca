@@ -6,6 +6,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"m7s.live/pro"
+	"m7s.live/pro/pkg"
 	mrtp "m7s.live/pro/plugin/rtp/pkg"
 	"reflect"
 )
@@ -137,44 +138,47 @@ func (r *Receiver) Receive() (err error) {
 	audioFrame.RTPCodecParameters = r.AudioCodecParameters
 	videoFrame.SetAllocator(r.MemoryAllocator)
 	videoFrame.RTPCodecParameters = r.VideoCodecParameters
-	return r.NetConnection.Receive(false, func(channelID byte, buf []byte) {
+	return r.NetConnection.Receive(false, func(channelID byte, buf []byte) error {
 		switch int(channelID) {
 		case r.AudioChannelID:
 			if !r.PubAudio {
-				return
+				return pkg.ErrMuted
 			}
 			packet := &rtp.Packet{}
 			if err = packet.Unmarshal(buf); err != nil {
-				return
+				return err
 			}
 			if len(audioFrame.Packets) == 0 || packet.Timestamp == audioFrame.Packets[0].Timestamp {
 				audioFrame.AddRecycleBytes(buf)
 				audioFrame.Packets = append(audioFrame.Packets, packet)
+				return nil
 			} else {
 				if err = r.WriteAudio(audioFrame); err != nil {
-					return
+					return err
 				}
 				audioFrame = &mrtp.Audio{}
 				audioFrame.AddRecycleBytes(buf)
 				audioFrame.Packets = []*rtp.Packet{packet}
 				audioFrame.RTPCodecParameters = r.AudioCodecParameters
 				audioFrame.SetAllocator(r.MemoryAllocator)
+				return nil
 			}
 		case r.VideoChannelID:
 			if !r.PubVideo {
-				return
+				return pkg.ErrMuted
 			}
 			packet := &rtp.Packet{}
 			if err = packet.Unmarshal(buf); err != nil {
-				return
+				return err
 			}
 			if len(videoFrame.Packets) == 0 || packet.Timestamp == videoFrame.Packets[0].Timestamp {
 				videoFrame.AddRecycleBytes(buf)
 				videoFrame.Packets = append(videoFrame.Packets, packet)
+				return nil
 			} else {
 				// t := time.Now()
 				if err = r.WriteVideo(videoFrame); err != nil {
-					return
+					return err
 				}
 				// fmt.Println("write video", time.Since(t))
 				videoFrame = &mrtp.Video{}
@@ -182,20 +186,22 @@ func (r *Receiver) Receive() (err error) {
 				videoFrame.Packets = []*rtp.Packet{packet}
 				videoFrame.RTPCodecParameters = r.VideoCodecParameters
 				videoFrame.SetAllocator(r.MemoryAllocator)
+				return nil
 			}
 		default:
 
 		}
-	}, func(channelID byte, buf []byte) {
+		return pkg.ErrUnsupportCodec
+	}, func(channelID byte, buf []byte) error {
 		msg := &RTCP{Channel: channelID}
-		r.MemoryAllocator.Free(buf)
 		if err = msg.Header.Unmarshal(buf); err != nil {
-			return
+			return err
 		}
 		if msg.Packets, err = rtcp.Unmarshal(buf); err != nil {
-			return
+			return err
 		}
 		r.Stream.Debug("rtcp", "type", msg.Header.Type, "length", msg.Header.Length)
 		// TODO: rtcp msg
+		return pkg.ErrDiscard
 	})
 }
