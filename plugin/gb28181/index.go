@@ -53,7 +53,6 @@ type GB28181Plugin struct {
 	Parent     string `desc:"父级设备"`
 	ua         *sipgo.UserAgent
 	server     *sipgo.Server
-	client     *sipgo.Client
 	devices    util.Collection[string, *Device]
 	dialogs    util.Collection[uint32, *Dialog]
 	tcpPorts   chan uint16
@@ -105,16 +104,10 @@ func (gb *GB28181Plugin) OnInit() (err error) {
 		}
 	}
 	if gb.Parent != "" {
-		host, portStr, _ := net.SplitHostPort(gb.Parent)
-		if portStr != "" {
-			portStr = "5060"
-		}
-		port, _ := strconv.Atoi(portStr)
-		gb.client, _ = sipgo.NewClient(gb.ua, sipgo.WithClientLogger(logger), sipgo.WithClientHostname(host), sipgo.WithClientPort(port))
-		gb.client.Do(gb, sip.NewRequest("REGISTER", sip.Uri{
-			Host: host,
-			Port: port,
-		}))
+		var client Client
+		client.conf = gb
+		client.SetRetry(-1, time.Second*5)
+		gb.AddTask(&client)
 	}
 	return
 }

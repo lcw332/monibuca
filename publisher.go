@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"m7s.live/pro/pkg"
 	"m7s.live/pro/pkg/task"
 
 	. "m7s.live/pro/pkg"
@@ -660,7 +661,7 @@ func (p *Publisher) takeOver(old *Publisher) {
 }
 
 func (p *Publisher) WaitTrack() (err error) {
-	var v, a error
+	var v, a error = pkg.ErrNoTrack, pkg.ErrNoTrack
 	if p.PubVideo {
 		v = p.videoReady.Await()
 	}
