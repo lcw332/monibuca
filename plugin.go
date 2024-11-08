@@ -359,14 +359,14 @@ func (p *Plugin) OnPublish(pub *Publisher) {
 	if p.Meta.Pusher != nil {
 		for r, pushConf := range onPublish.Push {
 			if pushConf.URL = r.Replace(pub.StreamPath, pushConf.URL); pushConf.URL != "" {
-				p.Push(pub.StreamPath, pushConf)
+				p.Push(pub, pushConf)
 			}
 		}
 	}
 	if p.Meta.Recorder != nil {
 		for r, recConf := range onPublish.Record {
 			if recConf.FilePath = r.Replace(pub.StreamPath, recConf.FilePath); recConf.FilePath != "" {
-				p.Record(pub.StreamPath, recConf)
+				p.Record(pub, recConf)
 			}
 		}
 	}
@@ -490,14 +490,16 @@ func (p *Plugin) Pull(streamPath string, conf config.Pull) {
 	puller.GetPullJob().Init(puller, p, streamPath, conf)
 }
 
-func (p *Plugin) Push(streamPath string, conf config.Push) {
+func (p *Plugin) Push(pub *Publisher, conf config.Push) {
 	pusher := p.Meta.Pusher()
-	pusher.GetPushJob().Init(pusher, p, streamPath, conf)
+	job := pusher.GetPushJob().Init(pusher, p, pub.StreamPath, conf)
+	job.Depend(pub)
 }
 
-func (p *Plugin) Record(streamPath string, conf config.Record) {
+func (p *Plugin) Record(pub *Publisher, conf config.Record) {
 	recorder := p.Meta.Recorder()
-	recorder.GetRecordJob().Init(recorder, p, streamPath, conf)
+	job := recorder.GetRecordJob().Init(recorder, p, pub.StreamPath, conf)
+	job.Depend(pub)
 }
 
 func (p *Plugin) Transform(pub *Publisher, conf config.Transform) {

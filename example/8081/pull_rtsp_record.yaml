@@ -7,7 +7,13 @@ rtsp:
   enable: true
   tcp: :8554
   pull:
-    live/test: rtsp://localhost/live/test
+    live/test: rtsp://63e873d485.vicp.fun:12686/main
+flv:
+  enable: true
+preview:
+  enable: true
+console:
+  enable: true
 mp4:
   enable: true
   onsub:

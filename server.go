@@ -342,6 +342,7 @@ func (s *Server) Start() (err error) {
 			s.DB.Find(&devices)
 			for _, d := range devices {
 				d.server = s
+				d.ChangeStatus(DeviceStatusOffline)
 				if d.PubConf == nil {
 					d.PubConf = config.NewPublish()
 				}
@@ -401,16 +402,19 @@ func (s *Server) OnSubscribe(streamPath string, args url.Values) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
-	// if r.URL.Path == "/favicon.ico" {
-	// 	http.ServeFile(w, r, "favicon.ico")
-	// 	return
-	// }
-	// _, _ = fmt.Fprintf(w, "visit:%s\nMonibuca Engine %s StartTime:%s\n", r.URL.Path, Version, s.StartTime)
-	// for plugin := range s.Plugins.Range {
-	// 	_, _ = fmt.Fprintf(w, "Plugin %s Version:%s\n", plugin.Meta.Name, plugin.Meta.Version)
-	// }
-	// for _, api := range s.apiList {
-	// 	_, _ = fmt.Fprintf(w, "%s\n", api)
-	// }
+	if _, ok := s.Plugins.Get("Admin"); ok {
+		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
+		return
+	}
+	if r.URL.Path == "/favicon.ico" {
+		http.ServeFile(w, r, "favicon.ico")
+		return
+	}
+	_, _ = fmt.Fprintf(w, "visit:%s\nMonibuca Engine %s StartTime:%s\n", r.URL.Path, Version, s.StartTime)
+	for plugin := range s.Plugins.Range {
+		_, _ = fmt.Fprintf(w, "Plugin %s Version:%s\n", plugin.Meta.Name, plugin.Meta.Version)
+	}
+	for _, api := range s.apiList {
+		_, _ = fmt.Fprintf(w, "%s\n", api)
+	}
 }

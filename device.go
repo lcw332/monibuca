@@ -107,12 +107,6 @@ func (d *Device) ChangeStatus(status byte) {
 		if d.PullOnStart && from == DeviceStatusOffline {
 			d.Handler.Pull()
 		}
-	case DeviceStatusPulling:
-		if from == DeviceStatusOnline && d.FilePath != "" {
-			if mp4Plugin, ok := d.server.Plugins.Get("MP4"); ok {
-				mp4Plugin.Record(d.GetStreamPath(), d.Record)
-			}
-		}
 	}
 }
 

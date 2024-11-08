@@ -7,10 +7,10 @@ package main
 import (
 	"context"
 
-	"m7s.live/m7s/v5"
-	_ "m7s.live/m7s/v5/plugin/debug"
-	_ "m7s.live/m7s/v5/plugin/flv"
-	_ "m7s.live/m7s/v5/plugin/rtmp"
+	"m7s.live/pro"
+	_ "m7s.live/pro/plugin/debug"
+	_ "m7s.live/pro/plugin/flv"
+	_ "m7s.live/pro/plugin/rtmp"
 )
 
 func main() {
@@ -20,27 +20,19 @@ func main() {
 ```
 ## 构建标签
 
-| 标签 | 描述 |
-|-----------|-------------|
-| disable_rm | 禁用内存池 |
-| sqlite | 启用 sqlite |
-| duckdb | 启用 duckdb |
-| taskpanic | 抛出 panic，用于测试 |
+| 标签 | 描述              |
+|-----------|-----------------|
+| disable_rm | 禁用内存池           |
+| sqlite | 启用 sqlite       |
+|sqliteCGO | 启用 sqlite cgo版本 |
+| duckdb | 启用 duckdb       |
+| taskpanic | 抛出 panic，用于测试   |
+
+
 ## 更多示例
 
 查看 example 目录
 
 # 创建插件
 
-```go
-
-import (
-	"m7s.live/m7s/v5"
-)
-
-type MyPlugin struct {
-	m7s.Plugin
-}
-
-var _ = m7s.InstallPlugin[MyPlugin]()
-```
+到 plugin 目录下查看 README_CN.md
