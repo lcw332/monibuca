@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"m7s.live/pro/pkg"
+	"m7s.live/pro/pkg/filerotate"
 	"net"
 	"net/url"
 	"os"
@@ -56,7 +57,7 @@ type Transformer struct {
 	m7s.DefaultTransformer
 	TransRule
 	logFileName string
-	logFile     *os.File
+	logFile     *filerotate.File
 	ffmpeg      *exec.Cmd
 }
 
@@ -143,11 +144,11 @@ func (t *Transformer) Start() (err error) {
 	t.SetDescription("cmd", args)
 	t.SetDescription("config", t.TransRule)
 	//t.BufReader.Dump, err = os.OpenFile("dump.flv", os.O_CREATE|os.O_WRONLY, 0644)
-	t.logFileName = fmt.Sprintf("logs/transcode_%s_%s.log", strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"), time.Now().Format("20060102"))
+	t.logFileName = fmt.Sprintf("transcode_%s_$T.log", strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"))
 	t.ffmpeg = exec.CommandContext(t, "ffmpeg", args...)
 	if t.logFileName != "" {
 		t.SetDescription("log", t.logFileName)
-		t.logFile, err = os.OpenFile(t.logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		t.logFile, err = filerotate.NewDaily("logs", t.logFileName, nil)
 		if err != nil {
 			t.Error("Could not create transcode log", "err", err)
 			return err
