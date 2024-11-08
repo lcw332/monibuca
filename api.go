@@ -323,26 +323,26 @@ func (s *Server) VideoTrackSnap(ctx context.Context, req *pb.StreamSnapRequest) 
 				res.Reader[sub.ID] = sub.VideoReader.Value.Sequence
 			}
 			pub.VideoTrack.Ring.Do(func(v *pkg.AVFrame) {
-				if v.TryRLock() {
-					if len(v.Wraps) > 0 {
-						var snap pb.TrackSnapShot
-						snap.Sequence = v.Sequence
-						snap.Timestamp = uint32(v.Timestamp / time.Millisecond)
-						snap.WriteTime = timestamppb.New(v.WriteTime)
-						snap.Wrap = make([]*pb.Wrap, len(v.Wraps))
-						snap.KeyFrame = v.IDR
-						res.RingDataSize += uint32(v.Wraps[0].GetSize())
-						for i, wrap := range v.Wraps {
-							snap.Wrap[i] = &pb.Wrap{
-								Timestamp: uint32(wrap.GetTimestamp() / time.Millisecond),
-								Size:      uint32(wrap.GetSize()),
-								Data:      wrap.String(),
-							}
+				//if v.TryRLock() {
+				if len(v.Wraps) > 0 {
+					var snap pb.TrackSnapShot
+					snap.Sequence = v.Sequence
+					snap.Timestamp = uint32(v.Timestamp / time.Millisecond)
+					snap.WriteTime = timestamppb.New(v.WriteTime)
+					snap.Wrap = make([]*pb.Wrap, len(v.Wraps))
+					snap.KeyFrame = v.IDR
+					res.RingDataSize += uint32(v.Wraps[0].GetSize())
+					for i, wrap := range v.Wraps {
+						snap.Wrap[i] = &pb.Wrap{
+							Timestamp: uint32(wrap.GetTimestamp() / time.Millisecond),
+							Size:      uint32(wrap.GetSize()),
+							Data:      wrap.String(),
 						}
-						res.Ring = append(res.Ring, &snap)
 					}
-					v.RUnlock()
+					res.Ring = append(res.Ring, &snap)
 				}
+				//v.RUnlock()
+				//}
 			})
 		} else {
 			err = pkg.ErrNotFound

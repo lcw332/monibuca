@@ -143,7 +143,7 @@ func (t *Transformer) Start() (err error) {
 	t.SetDescription("cmd", args)
 	t.SetDescription("config", t.TransRule)
 	//t.BufReader.Dump, err = os.OpenFile("dump.flv", os.O_CREATE|os.O_WRONLY, 0644)
-	t.logFileName = fmt.Sprintf("logs/transcode_%s_%s.log", strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"), time.Now().Format("20060102150405"))
+	t.logFileName = fmt.Sprintf("logs/transcode_%s_%s.log", strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"), time.Now().Format("20060102"))
 	t.ffmpeg = exec.CommandContext(t, "ffmpeg", args...)
 	if t.logFileName != "" {
 		t.SetDescription("log", t.logFileName)
