@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"m7s.live/pro"
+	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg"
 	"m7s.live/pro/pkg/codec"
 	"m7s.live/pro/pkg/task"
@@ -30,42 +30,47 @@ func (task *writeTrailerTask) Start() (err error) {
 	err = task.muxer.WriteTrailer()
 	if err != nil {
 		task.Error("write trailer", "err", err)
-		return task.muxer.File.Close()
-	} else {
-		task.Info("write trailer")
-		var temp *os.File
-		temp, err = os.CreateTemp("", "*.mp4")
-		if err != nil {
-			task.Error("create temp file", "err", err)
-			return
+		if errClose := task.muxer.File.Close(); errClose != nil {
+			return errClose
 		}
-		defer os.Remove(temp.Name())
-		err = task.muxer.ReWriteWithMoov(temp)
-		if err != nil {
-			task.Error("rewrite with moov", "err", err)
-			return
-		}
-		if _, err = task.muxer.File.Seek(0, io.SeekStart); err != nil {
-			task.Error("seek file", "err", err)
-			return
-		}
-		if _, err = temp.Seek(0, io.SeekStart); err != nil {
-			task.Error("seek temp file", "err", err)
-			return
-		}
-		if _, err = io.Copy(task.muxer.File, temp); err != nil {
-			task.Error("copy file", "err", err)
-			return
-		}
-		if err = task.muxer.File.Close(); err != nil {
-			task.Error("close file", "err", err)
-			return
-		}
-		if err = temp.Close(); err != nil {
-			task.Error("close temp file", "err", err)
-		}
+	}
+	return
+}
+
+func (task *writeTrailerTask) Run() (err error) {
+	task.Info("write trailer")
+	var temp *os.File
+	temp, err = os.CreateTemp("", "*.mp4")
+	if err != nil {
+		task.Error("create temp file", "err", err)
 		return
 	}
+	defer os.Remove(temp.Name())
+	err = task.muxer.ReWriteWithMoov(temp)
+	if err != nil {
+		task.Error("rewrite with moov", "err", err)
+		return
+	}
+	if _, err = task.muxer.File.Seek(0, io.SeekStart); err != nil {
+		task.Error("seek file", "err", err)
+		return
+	}
+	if _, err = temp.Seek(0, io.SeekStart); err != nil {
+		task.Error("seek temp file", "err", err)
+		return
+	}
+	if _, err = io.Copy(task.muxer.File, temp); err != nil {
+		task.Error("copy file", "err", err)
+		return
+	}
+	if err = task.muxer.File.Close(); err != nil {
+		task.Error("close file", "err", err)
+		return
+	}
+	if err = temp.Close(); err != nil {
+		task.Error("close temp file", "err", err)
+	}
+	return
 }
 
 func init() {

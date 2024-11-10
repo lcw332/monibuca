@@ -250,6 +250,9 @@ func (c *NetConnection) ReadResponse() (res *util.Response, err error) {
 
 func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte) error, onRTCP func(byte, []byte) error) (err error) {
 	for err == nil {
+		if err = c.StopReason(); err != nil {
+			return
+		}
 		ts := time.Now()
 		if err = c.conn.SetReadDeadline(ts.Add(util.Conditional(sendMode, time.Second*60, time.Second*15))); err != nil {
 			return

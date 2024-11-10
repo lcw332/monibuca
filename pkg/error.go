@@ -4,7 +4,6 @@ import "errors"
 
 var (
 	ErrNotFound                 = errors.New("not found")
-	ErrStopFromAPI              = errors.New("stop from api")
 	ErrStreamExist              = errors.New("stream exist")
 	ErrKick                     = errors.New("kick")
 	ErrDiscard                  = errors.New("discard")

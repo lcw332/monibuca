@@ -160,9 +160,9 @@ func (s *Server) StreamInfo(ctx context.Context, req *pb.StreamSnapRequest) (res
 }
 
 func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResponse, err error) {
-	var fillData func(m task.ITask) *pb.TaskTreeResponse
-	fillData = func(m task.ITask) (res *pb.TaskTreeResponse) {
-		res = &pb.TaskTreeResponse{Id: m.GetTaskID(), State: uint32(m.GetState()), Type: uint32(m.GetTaskType()), Owner: m.GetOwnerType(), StartTime: timestamppb.New(m.GetTask().StartTime), Description: m.GetDescriptions()}
+	var fillData func(m task.ITask) *pb.TaskTreeData
+	fillData = func(m task.ITask) (res *pb.TaskTreeData) {
+		res = &pb.TaskTreeData{Id: m.GetTaskID(), State: uint32(m.GetState()), Type: uint32(m.GetTaskType()), Owner: m.GetOwnerType(), StartTime: timestamppb.New(m.GetTask().StartTime), Description: m.GetDescriptions()}
 		if job, ok := m.(task.IJob); ok {
 			if blockedTask := job.Blocked(); blockedTask != nil {
 				res.Blocked = fillData(blockedTask)
@@ -173,7 +173,7 @@ func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResp
 		}
 		return
 	}
-	res = fillData(&Servers)
+	res = &pb.TaskTreeResponse{Data: fillData(&Servers)}
 	return
 }
 
@@ -361,7 +361,7 @@ func (s *Server) Restart(ctx context.Context, req *pb.RequestWithId) (res *empty
 
 func (s *Server) Shutdown(ctx context.Context, req *pb.RequestWithId) (res *emptypb.Empty, err error) {
 	if s, ok := Servers.Get(req.Id); ok {
-		s.Stop(pkg.ErrStopFromAPI)
+		s.Stop(task.ErrStopByUser)
 	} else {
 		return nil, pkg.ErrNotFound
 	}
@@ -439,7 +439,7 @@ func (s *Server) SeekStream(ctx context.Context, req *pb.SeekStreamRequest) (res
 func (s *Server) StopPublish(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.SuccessResponse, err error) {
 	s.Streams.Call(func() error {
 		if s, ok := s.Streams.Get(req.StreamPath); ok {
-			s.Stop(pkg.ErrStopFromAPI)
+			s.Stop(task.ErrStopByUser)
 		}
 		return nil
 	})
@@ -711,7 +711,7 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 	err = tx.Error
 	s.Devices.Call(func() error {
 		if device, ok := s.Devices.Get(uint(req.Id)); ok {
-			device.Stop(pkg.ErrStopFromAPI)
+			device.Stop(task.ErrStopByUser)
 		}
 		return nil
 	})

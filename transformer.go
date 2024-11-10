@@ -80,8 +80,10 @@ func (p *TransformJob) Publish(streamPath string) (err error) {
 	p.Publisher.Type = PublishTypeTransform
 	if err == nil {
 		p.Publisher.OnDispose(func() {
-			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, pkg.ErrStopFromAPI) {
+			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, task.ErrStopByUser) {
 				p.Stop(p.Publisher.StopReason())
+			} else {
+				p.Transformer.Stop(p.Publisher.StopReason())
 			}
 		})
 	}

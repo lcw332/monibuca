@@ -231,15 +231,21 @@ message SysInfoResponse {
   SysInfoData data = 3;
 }
 
-message TaskTreeResponse {
+message TaskTreeData {
   uint32 id = 1;
   uint32 type = 2;
   string owner = 3;
   google.protobuf.Timestamp startTime = 4;
   map<string, string> description = 5;
-  repeated TaskTreeResponse children = 6;
+  repeated TaskTreeData children = 6;
   uint32 state = 7;
-  TaskTreeResponse blocked = 8;
+  TaskTreeData blocked = 8;
+}
+
+message TaskTreeResponse {
+  int32 code = 1;
+  string message = 2;
+  TaskTreeData data = 3;
 }
 
 message StreamListRequest {

@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"m7s.live/pro/pkg"
-
 	"gorm.io/gorm"
 	"m7s.live/pro/pkg/config"
 	"m7s.live/pro/pkg/task"
@@ -158,7 +156,7 @@ func (d *DeviceTask) Dispose() {
 	d.TickTask.Dispose()
 	d.Plugin.Server.Streams.Call(func() error {
 		if stream, ok := d.Plugin.Server.Streams.Get(d.Device.GetStreamPath()); ok {
-			stream.Stop(pkg.ErrStopFromAPI)
+			stream.Stop(task.ErrStopByUser)
 		}
 		return nil
 	})

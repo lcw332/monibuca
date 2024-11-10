@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"m7s.live/pro/pkg/config"
+	"m7s.live/pro/pkg/task"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 	"m7s.live/pro"
 	gpb "m7s.live/pro/pb"
-	"m7s.live/pro/pkg"
 	hdl "m7s.live/pro/plugin/flv/pkg"
 	rtmp "m7s.live/pro/plugin/rtmp/pkg"
 	rtsp "m7s.live/pro/plugin/rtsp/pkg"
@@ -31,7 +31,7 @@ func (r *StressPlugin) pull(count int, format, url string, puller m7s.Puller) (e
 		}
 	} else if count < i {
 		for j := i; j > count; j-- {
-			r.pullers.Items[j-1].Stop(pkg.ErrStopFromAPI)
+			r.pullers.Items[j-1].Stop(task.ErrStopByUser)
 			r.pullers.Remove(r.pullers.Items[j-1])
 		}
 	}
@@ -53,7 +53,7 @@ func (r *StressPlugin) push(count int, streamPath, format, remoteHost string, pu
 		}
 	} else if count < i {
 		for j := i; j > count; j-- {
-			r.pushers.Items[j-1].Stop(pkg.ErrStopFromAPI)
+			r.pushers.Items[j-1].Stop(task.ErrStopByUser)
 			r.pushers.Remove(r.pushers.Items[j-1])
 		}
 	}
@@ -82,7 +82,7 @@ func (r *StressPlugin) PullHDL(ctx context.Context, req *pb.PullRequest) (res *g
 
 func (r *StressPlugin) StopPush(ctx context.Context, req *emptypb.Empty) (res *gpb.SuccessResponse, err error) {
 	for pusher := range r.pushers.Range {
-		pusher.Stop(pkg.ErrStopFromAPI)
+		pusher.Stop(task.ErrStopByUser)
 	}
 	r.pushers.Clear()
 	return &gpb.SuccessResponse{}, nil
@@ -90,7 +90,7 @@ func (r *StressPlugin) StopPush(ctx context.Context, req *emptypb.Empty) (res *g
 
 func (r *StressPlugin) StopPull(ctx context.Context, req *emptypb.Empty) (res *gpb.SuccessResponse, err error) {
 	for puller := range r.pullers.Range {
-		puller.Stop(pkg.ErrStopFromAPI)
+		puller.Stop(task.ErrStopByUser)
 	}
 	r.pullers.Clear()
 	return &gpb.SuccessResponse{}, nil
