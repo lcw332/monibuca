@@ -3,8 +3,6 @@ package transcode
 import (
 	"bufio"
 	"fmt"
-	"m7s.live/pro/pkg"
-	"m7s.live/pro/pkg/filerotate"
 	"net"
 	"net/url"
 	"os"
@@ -12,7 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"m7s.live/pro"
+	"m7s.live/pro/pkg"
+	"m7s.live/pro/pkg/filerotate"
+
+	m7s "m7s.live/pro"
 	"m7s.live/pro/pkg/config"
 	"m7s.live/pro/pkg/task"
 	"m7s.live/pro/pkg/util"
@@ -21,18 +22,20 @@ import (
 
 // / 定义传输模式的常量
 const (
-	TRANS_MODE_PIPE TransMode = "pipe"
-	TRANS_MODE_RTSP TransMode = "rtsp"
-	TRANS_MODE_RTMP TransMode = "rtmp"
-	TRANS_MODE_LIB  TransMode = "lib"
+	TRANS_MODE_PIPE   TransMode = "pipe"
+	TRANS_MODE_RTSP   TransMode = "rtsp"
+	TRANS_MODE_RTMP   TransMode = "rtmp"
+	TRANS_MODE_LIB    TransMode = "lib"
+	TRANS_MODE_REMOTE TransMode = "remote"
 )
 
 type (
 	TransMode    string
 	DecodeConfig struct {
-		Mode  TransMode `default:"pipe" json:"mode" desc:"转码模式"` //转码模式
-		Codec string    `json:"codec" desc:"解码器"`
-		Args  string    `json:"args" desc:"解码参数"`
+		Mode   TransMode `default:"pipe" json:"mode" desc:"转码模式"` //转码模式
+		Codec  string    `json:"codec" desc:"解码器"`
+		Args   string    `json:"args" desc:"解码参数"`
+		Remote string    `json:"remote" desc:"远程地址"`
 	}
 	EncodeConfig struct {
 		Codec string `json:"codec" desc:"编码器"`
@@ -81,13 +84,13 @@ func (t *Transformer) Start() (err error) {
 		args = append(args, "-c:v", t.From.Codec)
 	}
 	switch t.From.Mode {
-	case "pipe":
+	case TRANS_MODE_PIPE:
 		err = t.TransformJob.Subscribe()
 		if err != nil {
 			return
 		}
 		args = append(args, "-f", "flv", "-i", "pipe:0")
-	case "rtsp":
+	case TRANS_MODE_RTSP:
 		if rtspPlugin, ok := t.TransformJob.Plugin.Server.Plugins.Get("RTSP"); ok {
 			listenAddr := rtspPlugin.GetCommonConf().TCP.ListenAddr
 			if strings.HasPrefix(listenAddr, ":") {
@@ -95,7 +98,7 @@ func (t *Transformer) Start() (err error) {
 			}
 			args = append(args, "-i", "rtsp://"+listenAddr+"/"+t.TransformJob.StreamPath)
 		}
-	case "rtmp":
+	case TRANS_MODE_RTMP:
 		if rtmpPlugin, ok := t.TransformJob.Plugin.Server.Plugins.Get("RTMP"); ok {
 			listenAddr := rtmpPlugin.GetCommonConf().TCP.ListenAddr
 			if strings.HasPrefix(listenAddr, ":") {
@@ -103,6 +106,8 @@ func (t *Transformer) Start() (err error) {
 			}
 			args = append(args, "-i", "rtmp://"+listenAddr+"/"+t.TransformJob.StreamPath)
 		}
+	case TRANS_MODE_REMOTE:
+		args = append(args, "-i", t.From.Remote)
 	}
 	t.To = make([]EncodeConfig, len(t.TransformJob.Config.Output))
 	for i, to := range t.TransformJob.Config.Output {

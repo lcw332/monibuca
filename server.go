@@ -142,6 +142,9 @@ func exit() {
 
 func init() {
 	Servers.Init()
+	Servers.OnBeforeDispose(func() {
+		time.AfterFunc(3*time.Second, exit)
+	})
 	Servers.OnDispose(exit)
 	for k, v := range myip.LocalAndInternalIPs() {
 		Routes[k] = v
@@ -299,6 +302,12 @@ func (s *Server) Start() (err error) {
 					plugin.handler.Pull(streamPath, conf)
 				}
 			}
+			if plugin.Meta.Transformer != nil {
+				for streamPath, conf := range plugin.config.Transform {
+					transformer := plugin.Meta.Transformer()
+					transformer.GetTransformJob().Init(transformer, plugin, streamPath.String(), conf)
+				}
+			}
 		}
 		if s.DB != nil {
 			s.DB.AutoMigrate(&Device{})
@@ -342,11 +351,12 @@ func (s *Server) Start() (err error) {
 			s.DB.Find(&devices)
 			for _, d := range devices {
 				d.server = s
+				d.Logger = s.Logger.With("device", d.ID, "type", d.Type, "name", d.Name)
 				d.ChangeStatus(DeviceStatusOffline)
 				if d.PubConf == nil {
 					d.PubConf = config.NewPublish()
 				}
-				s.Devices.Add(d, s.Logger.With("device", d.ID, "type", d.Type, "name", d.Name))
+				s.Devices.Add(d)
 			}
 		}
 		return nil

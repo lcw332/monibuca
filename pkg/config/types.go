@@ -94,9 +94,10 @@ type (
 		Quic
 		TCP
 		UDP
-		Pull  map[string]Pull
-		OnSub OnSubscribe
-		OnPub OnPublish
+		Pull      map[string]Pull
+		Transform map[Regexp]Transform
+		OnSub     OnSubscribe
+		OnPub     OnPublish
 		DB
 	}
 	ICommonConf interface {
