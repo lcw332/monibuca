@@ -131,3 +131,11 @@ func (v HTTPValus) Value() (driver.Value, error) {
 func (v HTTPValus) Get(key string) string {
 	return url.Values(v).Get(key)
 }
+
+func (v HTTPValus) DeepClone() (ret HTTPValus) {
+	ret = make(HTTPValus)
+	for k, v := range v {
+		ret[k] = append([]string(nil), v...)
+	}
+	return
+}

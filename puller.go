@@ -82,7 +82,7 @@ func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf c
 	} else {
 		p.publishConfig = &plugin.config.Publish
 	}
-	p.Args = url.Values(conf.Args)
+	p.Args = url.Values(conf.Args.DeepClone())
 	p.conf = &conf
 	remoteURL := conf.URL
 	u, err := url.Parse(remoteURL)

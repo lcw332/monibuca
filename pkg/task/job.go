@@ -45,8 +45,8 @@ func (mt *Job) Blocked() ITask {
 }
 
 func (mt *Job) waitChildrenDispose() {
-	if mt.blocked != nil {
-		mt.blocked.Stop(mt.StopReason())
+	if blocked := mt.blocked; blocked != nil {
+		blocked.Stop(mt.StopReason())
 	}
 	mt.addSub <- nil
 	<-mt.childrenDisposed
@@ -165,13 +165,15 @@ func (mt *Job) Post(callback func() error, args ...any) *Task {
 func (mt *Job) run() {
 	mt.cases = []reflect.SelectCase{{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(mt.addSub)}}
 	defer func() {
-		if !ThrowPanic {
-			err := recover()
-			if err != nil {
-				if mt.Logger != nil {
-					mt.Logger.Error("job panic", "err", err, "stack", string(debug.Stack()))
-				}
+		err := recover()
+		if err != nil {
+			if mt.Logger != nil {
+				mt.Logger.Error("job panic", "err", err, "stack", string(debug.Stack()))
+			}
+			if !ThrowPanic {
 				mt.Stop(errors.Join(err.(error), ErrPanic))
+			} else {
+				panic(err)
 			}
 		}
 		stopReason := mt.StopReason()
