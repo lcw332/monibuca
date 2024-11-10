@@ -27,7 +27,7 @@ type (
 		Transformer ITransformer
 	}
 	DefaultTransformer struct {
-		task.Job
+		task.Task
 		TransformJob TransformJob
 	}
 	TransformedMap struct {

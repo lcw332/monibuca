@@ -661,7 +661,7 @@ func (p *Publisher) takeOver(old *Publisher) {
 }
 
 func (p *Publisher) WaitTrack() (err error) {
-	var v, a error = pkg.ErrNoTrack, pkg.ErrNoTrack
+	var v, a = pkg.ErrNoTrack, pkg.ErrNoTrack
 	if p.PubVideo {
 		v = p.videoReady.Await()
 	}

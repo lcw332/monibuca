@@ -166,7 +166,7 @@ func (t *Transformer) Start() (err error) {
 	return t.ffmpeg.Start()
 }
 
-func (t *Transformer) Run() error {
+func (t *Transformer) Go() error {
 	t.SetDescription("pid", t.ffmpeg.Process.Pid)
 	if t.From.Mode == "pipe" {
 		rBuf := make(chan []byte, 100)
