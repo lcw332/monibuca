@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"m7s.live/pro/pkg"
 	"m7s.live/pro/pkg/config"
 	"m7s.live/pro/pkg/task"
@@ -53,6 +54,10 @@ type (
 		Streams                    []RecordStream
 		File                       *os.File
 		MaxTS                      int64
+	}
+
+	wsReadCloser struct {
+		ws *websocket.Conn
 	}
 )
 
@@ -160,6 +165,15 @@ func (p *HTTPFilePuller) Start() (err error) {
 			}
 			p.ReadCloser = res.Body
 		}
+	} else if strings.HasPrefix(remoteURL, "ws") {
+		var ws *websocket.Conn
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 10 * time.Second,
+		}
+		if ws, _, err = dialer.Dial(remoteURL, nil); err == nil {
+			p.ReadCloser = &wsReadCloser{ws: ws}
+		}
+
 	} else {
 		var res *os.File
 		if res, err = os.Open(remoteURL); err == nil {
@@ -210,4 +224,16 @@ func (p *RecordFilePuller) Dispose() {
 	if p.File != nil {
 		p.File.Close()
 	}
+}
+
+func (w *wsReadCloser) Read(p []byte) (n int, err error) {
+	_, message, err := w.ws.ReadMessage()
+	if err != nil {
+		return 0, err
+	}
+	return copy(p, message), nil
+}
+
+func (w *wsReadCloser) Close() error {
+	return w.ws.Close()
 }

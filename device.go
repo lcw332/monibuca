@@ -114,6 +114,21 @@ func (d *Device) Update() {
 	}
 }
 
+func (d *DeviceTask) Dispose() {
+	d.Device.ChangeStatus(DeviceStatusOffline)
+	d.TickTask.Dispose()
+	d.Plugin.Server.Streams.Call(func() error {
+		if stream, ok := d.Plugin.Server.Streams.Get(d.Device.GetStreamPath()); ok {
+			stream.Stop(task.ErrStopByUser)
+		}
+		return nil
+	})
+}
+
+func (d *DeviceTask) Pull() {
+	d.Plugin.handler.Pull(d.Device.GetStreamPath(), d.Device.Pull)
+}
+
 func (d *HTTPDevice) Start() (err error) {
 	d.url, err = url.Parse(d.Device.URL)
 	if err != nil {
@@ -129,7 +144,11 @@ func (d *HTTPDevice) Start() (err error) {
 			return err
 		}
 		if d.tcpAddr.Port == 0 {
-			d.tcpAddr.Port = 80
+			if d.url.Scheme == "https" || d.url.Scheme == "wss" {
+				d.tcpAddr.Port = 443
+			} else {
+				d.tcpAddr.Port = 80
+			}
 		}
 	}
 	return d.DeviceTask.Start()
@@ -149,19 +168,4 @@ func (d *HTTPDevice) Tick(any) {
 	conn.Close()
 	d.Device.RTT = time.Since(startTime)
 	d.Device.ChangeStatus(DeviceStatusOnline)
-}
-
-func (d *DeviceTask) Dispose() {
-	d.Device.ChangeStatus(DeviceStatusOffline)
-	d.TickTask.Dispose()
-	d.Plugin.Server.Streams.Call(func() error {
-		if stream, ok := d.Plugin.Server.Streams.Get(d.Device.GetStreamPath()); ok {
-			stream.Stop(task.ErrStopByUser)
-		}
-		return nil
-	})
-}
-
-func (d *DeviceTask) Pull() {
-	d.Plugin.handler.Pull(d.Device.GetStreamPath(), d.Device.Pull)
 }

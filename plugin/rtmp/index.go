@@ -178,3 +178,11 @@ func (task *RTMPServer) Go() (err error) {
 	}
 	return
 }
+
+func (p *RTMPPlugin) OnDeviceAdd(device *m7s.Device) any {
+	ret := &RTMPDevice{}
+	ret.Device = device
+	ret.Plugin = &p.Plugin
+	ret.Logger = p.With("device", device.Name)
+	return ret
+}
