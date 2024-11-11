@@ -589,24 +589,27 @@ func (p *Publisher) Dispose() {
 	if p.Paused != nil {
 		p.Paused.Reject(p.StopReason())
 	}
+	var relatedAlias []*AliasStream
 	for alias := range s.AliasStreams.Range {
 		if alias.StreamPath == p.StreamPath {
 			if alias.AutoRemove {
-				s.AliasStreams.Remove(alias)
+				defer s.AliasStreams.Remove(alias)
 			}
-			for subscriber := range p.SubscriberRange {
-				if subscriber.StreamPath == alias.Alias {
-					if originStream, ok := s.Streams.Get(alias.Alias); ok {
-						p.Subscribers.Remove(subscriber)
-						originStream.AddSubscriber(subscriber)
-					}
-				}
-			}
+			relatedAlias = append(relatedAlias, alias)
 		}
 	}
 
 	if p.Subscribers.Length > 0 {
+	SUBSCRIBER:
 		for subscriber := range p.SubscriberRange {
+			for _, alias := range relatedAlias {
+				if subscriber.StreamPath == alias.Alias {
+					if originStream, ok := s.Streams.Get(alias.Alias); ok {
+						originStream.AddSubscriber(subscriber)
+						continue SUBSCRIBER
+					}
+				}
+			}
 			s.Waiting.Wait(subscriber)
 		}
 		p.Subscribers.Clear()
