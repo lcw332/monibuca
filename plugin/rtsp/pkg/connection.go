@@ -22,7 +22,7 @@ const Timeout = time.Second * 10
 
 func NewNetConnection(conn net.Conn) *NetConnection {
 	return &NetConnection{
-		conn:            conn,
+		Conn:            conn,
 		BufReader:       util.NewBufReader(conn),
 		MemoryAllocator: util.NewScalableMemoryAllocator(1 << 12),
 		UserAgent:       "monibuca" + m7s.Version,
@@ -45,7 +45,7 @@ type NetConnection struct {
 	// internal
 
 	auth        *util.Auth
-	conn        net.Conn
+	Conn        net.Conn
 	keepalive   int
 	sequence    int
 	Session     string
@@ -69,7 +69,7 @@ func (c *NetConnection) StopWrite() {
 }
 
 func (c *NetConnection) Dispose() {
-	c.conn.Close()
+	c.Conn.Close()
 	c.BufReader.Recycle()
 	c.MemoryAllocator.Recycle()
 	c.Info("destroy connection")
@@ -135,7 +135,7 @@ func (c *NetConnection) Connect(remoteURL string) (err error) {
 	if err != nil {
 		return
 	}
-	c.conn = conn
+	c.Conn = conn
 	c.BufReader = util.NewBufReader(conn)
 	c.URL = rtspURL
 	c.UserAgent = "monibuca" + m7s.Version
@@ -172,17 +172,17 @@ func (c *NetConnection) WriteRequest(req *util.Request) (err error) {
 		req.Header.Set("Content-Length", val)
 	}
 
-	if err = c.conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
+	if err = c.Conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
 		return err
 	}
 	reqStr := req.String()
 	c.Debug("->", "req", reqStr)
-	_, err = c.conn.Write([]byte(reqStr))
+	_, err = c.Conn.Write([]byte(reqStr))
 	return
 }
 
 func (c *NetConnection) ReadRequest() (req *util.Request, err error) {
-	if err = c.conn.SetReadDeadline(time.Now().Add(Timeout)); err != nil {
+	if err = c.Conn.SetReadDeadline(time.Now().Add(Timeout)); err != nil {
 		return
 	}
 	req, err = util.ReadRequest(c.BufReader)
@@ -227,18 +227,18 @@ func (c *NetConnection) WriteResponse(res *util.Response) (err error) {
 		res.Header.Set("Content-Length", val)
 	}
 
-	if err = c.conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
+	if err = c.Conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
 		return err
 	}
 	resStr := res.String()
 	c.SetDescription("lastRes", res.Request.Method)
 	c.Debug("->", "res", resStr)
-	_, err = c.conn.Write([]byte(resStr))
+	_, err = c.Conn.Write([]byte(resStr))
 	return
 }
 
 func (c *NetConnection) ReadResponse() (res *util.Response, err error) {
-	if err := c.conn.SetReadDeadline(time.Now().Add(Timeout)); err != nil {
+	if err := c.Conn.SetReadDeadline(time.Now().Add(Timeout)); err != nil {
 		return nil, err
 	}
 	res, err = util.ReadResponse(c.BufReader)
@@ -254,7 +254,7 @@ func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte) erro
 			return
 		}
 		ts := time.Now()
-		if err = c.conn.SetReadDeadline(ts.Add(util.Conditional(sendMode, time.Second*60, time.Second*15))); err != nil {
+		if err = c.Conn.SetReadDeadline(ts.Add(util.Conditional(sendMode, time.Second*60, time.Second*15))); err != nil {
 			return
 		}
 		var magic []byte
@@ -400,8 +400,8 @@ func (c *NetConnection) Receive(sendMode bool, onReceive func(byte, []byte) erro
 }
 
 func (c *NetConnection) Write(chunk []byte) (int, error) {
-	if err := c.conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
+	if err := c.Conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
 		return 0, err
 	}
-	return c.conn.Write(chunk)
+	return c.Conn.Write(chunk)
 }

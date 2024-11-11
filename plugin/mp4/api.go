@@ -79,6 +79,10 @@ func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.R
 	return
 }
 
+func (p *MP4Plugin) Delete(ctx context.Context, req *pb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
+	return
+}
+
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	streamPath := r.PathValue("streamPath")
 	startTime, endTime, err := util.TimeRangeQueryParse(r.URL.Query())

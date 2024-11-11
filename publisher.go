@@ -137,6 +137,7 @@ type Publisher struct {
 	pauseTime              time.Time
 	AudioTrack, VideoTrack AVTracks
 	audioReady, videoReady *util.Promise
+	TimeoutTimer           *time.Timer
 	DataTrack              *DataTrack
 	Subscribers            SubscriberCollection
 	GOP                    int

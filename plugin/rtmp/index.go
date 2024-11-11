@@ -143,6 +143,7 @@ func (task *RTMPServer) Go() (err error) {
 						err = ns.Response(cmd.TransactionId, NetStream_Publish_BadName, Level_Error)
 					} else {
 						ns.Receivers[cmd.StreamId] = publisher
+						publisher.RemoteAddr = ns.RemoteAddr().String()
 						err = ns.BeginPublish(cmd.TransactionId)
 					}
 					if err != nil {
@@ -157,11 +158,11 @@ func (task *RTMPServer) Go() (err error) {
 						StreamID:      cmd.StreamId,
 					}
 					var suber *m7s.Subscriber
-					// sender.ID = fmt.Sprintf("%s|%d", conn.RemoteAddr().String(), sender.StreamID)
 					suber, err = task.conf.Subscribe(task.Context, streamPath)
 					if err != nil {
 						err = ns.Response(cmd.TransactionId, NetStream_Play_Failed, Level_Error)
 					} else {
+						suber.RemoteAddr = ns.RemoteAddr().String()
 						err = ns.BeginPlay(cmd.TransactionId)
 						ns.Subscribe(suber)
 					}

@@ -81,6 +81,7 @@ func (task *RTSPServer) Go() (err error) {
 				})
 				return
 			}
+			receiver.Publisher.RemoteAddr = task.Conn.RemoteAddr().String()
 			if err = receiver.SetMedia(medias); err != nil {
 				return
 			}
@@ -103,6 +104,7 @@ func (task *RTSPServer) Go() (err error) {
 				_ = task.WriteResponse(res)
 				return
 			}
+			sender.Subscriber.RemoteAddr = task.Conn.RemoteAddr().String()
 			res := &util.Response{
 				Header: map[string][]string{
 					"Content-Type": {"application/sdp"},

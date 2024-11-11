@@ -16,6 +16,12 @@ service api {
       get: "/mp4/api/catalog"
     };
   }
+  rpc Delete (ReqRecordDelete) returns (ResponseDelete) {
+    option (google.api.http) = {
+      post: "/mp4/api/delete/{streamPath=**}"
+      body: "*"
+    };
+  }
 }
 
 message ReqRecordList {
@@ -55,4 +61,16 @@ message ResponseCatalog {
   int32 code = 1;
   string message = 2;
   repeated Catalog data = 3;
+}
+
+message ReqRecordDelete {
+  string streamPath = 1;
+  repeated uint32 ids = 2;
+  google.protobuf.Timestamp startTime = 3;
+  google.protobuf.Timestamp endTime = 4;
+}
+
+message ResponseDelete {
+  int32 code = 1;
+  string message = 2;
 }

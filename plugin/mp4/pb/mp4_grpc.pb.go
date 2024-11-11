@@ -25,6 +25,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ApiClient interface {
 	List(ctx context.Context, in *ReqRecordList, opts ...grpc.CallOption) (*ResponseList, error)
 	Catalog(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ResponseCatalog, error)
+	Delete(ctx context.Context, in *ReqRecordDelete, opts ...grpc.CallOption) (*ResponseDelete, error)
 }
 
 type apiClient struct {
@@ -53,12 +54,22 @@ func (c *apiClient) Catalog(ctx context.Context, in *emptypb.Empty, opts ...grpc
 	return out, nil
 }
 
+func (c *apiClient) Delete(ctx context.Context, in *ReqRecordDelete, opts ...grpc.CallOption) (*ResponseDelete, error) {
+	out := new(ResponseDelete)
+	err := c.cc.Invoke(ctx, "/mp4.api/Delete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
 type ApiServer interface {
 	List(context.Context, *ReqRecordList) (*ResponseList, error)
 	Catalog(context.Context, *emptypb.Empty) (*ResponseCatalog, error)
+	Delete(context.Context, *ReqRecordDelete) (*ResponseDelete, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -71,6 +82,9 @@ func (UnimplementedApiServer) List(context.Context, *ReqRecordList) (*ResponseLi
 }
 func (UnimplementedApiServer) Catalog(context.Context, *emptypb.Empty) (*ResponseCatalog, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Catalog not implemented")
+}
+func (UnimplementedApiServer) Delete(context.Context, *ReqRecordDelete) (*ResponseDelete, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -121,6 +135,24 @@ func _Api_Catalog_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReqRecordDelete)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/mp4.api/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).Delete(ctx, req.(*ReqRecordDelete))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -135,6 +167,10 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Catalog",
 			Handler:    _Api_Catalog_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _Api_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
