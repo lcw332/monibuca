@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/deepch/vdk/codec/aacparser"
-	. "m7s.live/pro/pkg"
-	"m7s.live/pro/pkg/codec"
-	"m7s.live/pro/pkg/util"
+	. "m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/codec"
+	"m7s.live/v5/pkg/util"
 )
 
 type RTMPAudio struct {

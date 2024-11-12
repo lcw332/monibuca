@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	m7s "m7s.live/pro"
+	"m7s.live/v5"
 )
 
 type RTMPDevice struct {

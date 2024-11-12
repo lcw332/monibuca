@@ -4,9 +4,9 @@ import (
 	"net/url"
 
 	srt "github.com/datarhei/gosrt"
-	"m7s.live/pro"
-	"m7s.live/pro/pkg/config"
-	"m7s.live/pro/pkg/task"
+	"m7s.live/v5"
+	"m7s.live/v5/pkg/config"
+	"m7s.live/v5/pkg/task"
 )
 
 type Client struct {

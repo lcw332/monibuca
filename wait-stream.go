@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"time"
 
-	. "m7s.live/pro/pkg"
-	"m7s.live/pro/pkg/util"
+	. "m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/util"
 )
 
 type WaitManager struct {

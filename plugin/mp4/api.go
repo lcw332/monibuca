@@ -12,12 +12,12 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"m7s.live/pro/plugin/mp4/pb"
+	"m7s.live/v5/plugin/mp4/pb"
 
-	m7s "m7s.live/pro"
-	"m7s.live/pro/pkg/util"
-	mp4 "m7s.live/pro/plugin/mp4/pkg"
-	"m7s.live/pro/plugin/mp4/pkg/box"
+	m7s "m7s.live/v5"
+	"m7s.live/v5/pkg/util"
+	mp4 "m7s.live/v5/plugin/mp4/pkg"
+	"m7s.live/v5/plugin/mp4/pkg/box"
 )
 
 type ContentPart struct {

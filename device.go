@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"m7s.live/pro/pkg/config"
-	"m7s.live/pro/pkg/task"
+	"m7s.live/v5/pkg/config"
+	"m7s.live/v5/pkg/task"
 )
 
 const (

@@ -8,10 +8,10 @@ import (
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
-	m7s "m7s.live/pro"
+	m7s "m7s.live/v5"
 
-	"m7s.live/pro/pkg/util"
-	. "m7s.live/pro/plugin/flv/pkg"
+	"m7s.live/v5/pkg/util"
+	. "m7s.live/v5/plugin/flv/pkg"
 )
 
 type FLVPlugin struct {

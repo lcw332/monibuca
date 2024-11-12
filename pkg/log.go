@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sync"
 
-	"m7s.live/pro/pkg/task"
+	"m7s.live/v5/pkg/task"
 )
 
 var _ slog.Handler = (*MultiLogHandler)(nil)

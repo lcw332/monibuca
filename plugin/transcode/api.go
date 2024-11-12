@@ -5,18 +5,18 @@ import (
 	"encoding/base64"
 	"fmt"
 	"google.golang.org/protobuf/types/known/emptypb"
-	m7s "m7s.live/pro"
+	m7s "m7s.live/v5"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
-	globalPB "m7s.live/pro/pb"
-	"m7s.live/pro/plugin/transcode/pb"
-	transcode "m7s.live/pro/plugin/transcode/pkg"
+	globalPB "m7s.live/v5/pb"
+	"m7s.live/v5/plugin/transcode/pb"
+	transcode "m7s.live/v5/plugin/transcode/pkg"
 
-	"m7s.live/pro/pkg/config"
+	"m7s.live/v5/pkg/config"
 )
 
 func createTmpImage(image string) (string, error) {

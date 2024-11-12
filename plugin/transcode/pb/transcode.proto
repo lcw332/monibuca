@@ -4,7 +4,7 @@ import "google/protobuf/empty.proto";
 import "global.proto";
 
 package transcode;
-option go_package="m7s.live/pro/plugin/transcode/pb";
+option go_package="m7s.live/v5/plugin/transcode/pb";
 
 service api {
   rpc launch (TransRequest) returns (global.SuccessResponse) {

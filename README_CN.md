@@ -7,10 +7,10 @@ package main
 import (
 	"context"
 
-	"m7s.live/pro"
-	_ "m7s.live/pro/plugin/debug"
-	_ "m7s.live/pro/plugin/flv"
-	_ "m7s.live/pro/plugin/rtmp"
+	"m7s.live/v5"
+	_ "m7s.live/v5/plugin/debug"
+	_ "m7s.live/v5/plugin/flv"
+	_ "m7s.live/v5/plugin/rtmp"
 )
 
 func main() {

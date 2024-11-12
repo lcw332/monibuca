@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"m7s.live/pro"
+	"m7s.live/v5"
 )
 
 //go:embed ui

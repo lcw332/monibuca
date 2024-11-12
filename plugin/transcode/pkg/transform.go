@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"m7s.live/pro/pkg"
-	"m7s.live/pro/pkg/filerotate"
+	"m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/filerotate"
 
-	m7s "m7s.live/pro"
-	"m7s.live/pro/pkg/config"
-	"m7s.live/pro/pkg/task"
-	"m7s.live/pro/pkg/util"
-	flv "m7s.live/pro/plugin/flv/pkg"
+	m7s "m7s.live/v5"
+	"m7s.live/v5/pkg/config"
+	"m7s.live/v5/pkg/task"
+	"m7s.live/v5/pkg/util"
+	flv "m7s.live/v5/plugin/flv/pkg"
 )
 
 // / 定义传输模式的常量

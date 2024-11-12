@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	"m7s.live/pro"
+	"m7s.live/v5"
 )
 
 const (

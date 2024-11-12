@@ -9,7 +9,7 @@ import (
 
 	"github.com/mcuadros/go-defaults"
 	"gopkg.in/yaml.v3"
-	"m7s.live/pro/pkg/util"
+	"m7s.live/v5/pkg/util"
 )
 
 type (
