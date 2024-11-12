@@ -92,6 +92,7 @@ func (p *MP4Plugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	sub.RemoteAddr = r.RemoteAddr
 	var ctx MediaContext
 	ctx.conn, err = sub.CheckWebSocket(w, r)
 	if err != nil {

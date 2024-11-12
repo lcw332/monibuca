@@ -41,6 +41,7 @@ func (plugin *FLVPlugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	live.Subscriber.RemoteAddr = r.RemoteAddr
 	conn, err = live.Subscriber.CheckWebSocket(w, r)
 	if err != nil {
 		return
