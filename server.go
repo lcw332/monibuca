@@ -305,7 +305,7 @@ func (s *Server) Start() (err error) {
 			if plugin.Meta.Transformer != nil {
 				for streamPath, conf := range plugin.config.Transform {
 					transformer := plugin.Meta.Transformer()
-					transformer.GetTransformJob().Init(transformer, plugin, streamPath.String(), conf)
+					transformer.GetTransformJob().Init(transformer, plugin, streamPath, conf)
 				}
 			}
 		}

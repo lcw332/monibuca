@@ -45,8 +45,7 @@ type (
 	TransRule struct {
 		From      DecodeConfig   `json:"from"`
 		To        []EncodeConfig `json:"to" desc:"编码配置"`            //目标
-		LogToFile bool           `json:"logtofile" desc:"转码是否写入日志"` //转码日志写入文件
-		PreStart  bool           `json:"prestart" desc:"是否预转码"`     //预转码
+		LogToFile string         `json:"logtofile" desc:"转码是否写入日志"` //转码日志写入文件
 	}
 )
 
@@ -59,12 +58,14 @@ func NewTransform() m7s.ITransformer {
 type Transformer struct {
 	m7s.DefaultTransformer
 	TransRule
-	logFileName string
-	logFile     *filerotate.File
-	ffmpeg      *exec.Cmd
+	logFile *filerotate.File
+	ffmpeg  *exec.Cmd
 }
 
 func (t *Transformer) Start() (err error) {
+	if t.TransformJob.Plugin.Config.Has("LogToFile") {
+		t.TransRule.LogToFile = t.TransformJob.Plugin.Config.Get("LogToFile").GetValue().(string)
+	}
 	if t.TransformJob.Config.Input != nil {
 		switch v := t.TransformJob.Config.Input.(type) {
 		case DecodeConfig:
@@ -149,11 +150,11 @@ func (t *Transformer) Start() (err error) {
 	t.SetDescription("cmd", args)
 	t.SetDescription("config", t.TransRule)
 	//t.BufReader.Dump, err = os.OpenFile("dump.flv", os.O_CREATE|os.O_WRONLY, 0644)
-	t.logFileName = fmt.Sprintf("transcode_%s_$T.log", strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"))
 	t.ffmpeg = exec.CommandContext(t, "ffmpeg", args...)
-	if t.logFileName != "" {
-		t.SetDescription("log", t.logFileName)
-		t.logFile, err = filerotate.NewDaily("logs", t.logFileName, nil)
+	if t.TransRule.LogToFile != "" {
+		logFileName := fmt.Sprintf(t.TransRule.LogToFile, strings.ReplaceAll(t.TransformJob.StreamPath, "/", "_"))
+		t.SetDescription("log", logFileName)
+		t.logFile, err = filerotate.NewDaily("logs", logFileName, nil)
 		if err != nil {
 			t.Error("Could not create transcode log", "err", err)
 			return err

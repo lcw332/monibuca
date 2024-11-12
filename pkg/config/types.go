@@ -95,7 +95,7 @@ type (
 		TCP
 		UDP
 		Pull      map[string]Pull
-		Transform map[Regexp]Transform
+		Transform map[string]Transform
 		OnSub     OnSubscribe
 		OnPub     OnPublish
 		DB
