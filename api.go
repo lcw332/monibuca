@@ -191,6 +191,7 @@ func (s *Server) GetSubscribers(context.Context, *pb.SubscribersRequest) (res *p
 				SubMode:    int32(subscriber.SubMode),
 				SyncMode:   int32(subscriber.SyncMode),
 				BufferTime: durationpb.New(subscriber.BufferTime),
+				RemoteAddr: subscriber.RemoteAddr,
 			}
 			if ar := subscriber.AudioReader; ar != nil {
 				snap.AudioReader = &pb.RingReaderSnapShot{

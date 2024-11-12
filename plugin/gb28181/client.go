@@ -3,9 +3,7 @@ package plugin_gb28181
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,37 +12,58 @@ import (
 	"github.com/icholy/digest"
 	"github.com/rs/zerolog"
 	"m7s.live/v5/pkg/task"
+	gb28181 "m7s.live/v5/plugin/gb28181/pkg"
 )
 
 type Client struct {
-	*sipgo.Client
 	task.Job
-	conf *GB28181Plugin
+	*sipgo.Client
+	srv       *sipgo.Server
+	conf      *GB28181Plugin
+	recipient sip.Uri
+	tp        string
+	sn        int
 }
 
 type KeepAlive struct {
-	task.Task
+	task.TickTask
 	client *Client
+}
+
+func (k *KeepAlive) GetTickInterval() time.Duration {
+	return time.Second * 60
+}
+
+func (k *KeepAlive) Tick(any) {
+	req := sip.NewRequest("OnMessage", k.client.recipient)
+	req.SetTransport(k.client.tp)
+	req.SetBody(gb28181.BuildKeepAliveXML(k.client.sn, k.client.recipient.User))
+	k.client.sn++
+	_, err := k.client.Do(k.client.conf, req)
+	if err != nil {
+		k.client.conf.Error("keepalive", "error", err.Error())
+	}
 }
 
 func (c *Client) Start() (err error) {
 	netWork, parent, _ := strings.Cut(c.conf.Parent, ":")
-	host, portStr, _ := net.SplitHostPort(parent)
-	if portStr != "" {
-		portStr = "5060"
-	}
-	port, _ := strconv.Atoi(portStr)
-	c.Client, err = sipgo.NewClient(c.conf.ua, sipgo.WithClientLogger(zerolog.New(os.Stdout)), sipgo.WithClientHostname(host), sipgo.WithClientPort(port))
+	c.Client, err = sipgo.NewClient(c.conf.ua, sipgo.WithClientLogger(zerolog.New(os.Stdout)))
 	if err != nil {
 		return
 	}
-	recipient := sip.Uri{}
-	sip.ParseUri(fmt.Sprintf("sip:%s@%s", c.conf.Serial, c.conf.Realm), &recipient)
-	req := sip.NewRequest("REGISTER", recipient)
-	req.AppendHeader(
-		sip.NewHeader("Contact", fmt.Sprintf("<sip:%s@%s>", c.conf.Serial, c.conf.Realm)),
-	)
-	req.SetTransport(strings.ToUpper(netWork))
+	c.srv, _ = sipgo.NewServer(c.conf.ua, sipgo.WithServerLogger(zerolog.New(os.Stdout)))
+	contactHDR := sip.ContactHeader{
+		Address: sip.Uri{
+			User: c.conf.Serial,
+			Host: c.conf.Realm,
+		},
+	}
+	// sipgo.NewDialogServer(c.Client, contactHDR)
+	sip.ParseUri(fmt.Sprintf("sip:%s", parent), &c.recipient)
+	req := sip.NewRequest("REGISTER", c.recipient)
+	req.AppendHeader(&contactHDR)
+	c.tp = strings.ToUpper(netWork)
+	req.SetTransport(c.tp)
 	var res *sip.Response
 	res, err = c.Do(c.conf, req)
 	if err != nil {
@@ -63,7 +82,7 @@ func (c *Client) Start() (err error) {
 			// Reply with digest
 			cred, _ := digest.Digest(chal, digest.Options{
 				Method:   req.Method.String(),
-				URI:      recipient.Host,
+				URI:      c.recipient.Host,
 				Username: c.conf.Username,
 				Password: c.conf.Password,
 			})
@@ -88,7 +107,6 @@ func (c *Client) Start() (err error) {
 		}
 		var ka KeepAlive
 		ka.client = c
-		ka.SetRetry(-1, time.Second*10)
 		c.AddTask(&ka)
 	}
 	return

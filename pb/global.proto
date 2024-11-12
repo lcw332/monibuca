@@ -383,6 +383,7 @@ message SubscriberSnapShot {
   int32 syncMode = 8;
   string pluginName = 9;
   string type = 10;
+  string remoteAddr = 11;
 }
 
 message SubscribersResponse {
