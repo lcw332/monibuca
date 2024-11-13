@@ -25,9 +25,11 @@ const _ = grpc.SupportPackageIsVersion7
 type ApiClient interface {
 	SysInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SysInfoResponse, error)
 	Summary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SummaryResponse, error)
-	Shutdown(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Restart(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Shutdown(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
+	Restart(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	TaskTree(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TaskTreeResponse, error)
+	StopTask(ctx context.Context, in *RequestWithId64, opts ...grpc.CallOption) (*SuccessResponse, error)
+	RestartTask(ctx context.Context, in *RequestWithId64, opts ...grpc.CallOption) (*SuccessResponse, error)
 	StreamList(ctx context.Context, in *StreamListRequest, opts ...grpc.CallOption) (*StreamListResponse, error)
 	WaitList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StreamWaitListResponse, error)
 	StreamInfo(ctx context.Context, in *StreamSnapRequest, opts ...grpc.CallOption) (*StreamInfoResponse, error)
@@ -78,8 +80,8 @@ func (c *apiClient) Summary(ctx context.Context, in *emptypb.Empty, opts ...grpc
 	return out, nil
 }
 
-func (c *apiClient) Shutdown(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *apiClient) Shutdown(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, "/global.api/Shutdown", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -87,8 +89,8 @@ func (c *apiClient) Shutdown(ctx context.Context, in *RequestWithId, opts ...grp
 	return out, nil
 }
 
-func (c *apiClient) Restart(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *apiClient) Restart(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, "/global.api/Restart", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -99,6 +101,24 @@ func (c *apiClient) Restart(ctx context.Context, in *RequestWithId, opts ...grpc
 func (c *apiClient) TaskTree(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TaskTreeResponse, error) {
 	out := new(TaskTreeResponse)
 	err := c.cc.Invoke(ctx, "/global.api/TaskTree", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) StopTask(ctx context.Context, in *RequestWithId64, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/StopTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) RestartTask(ctx context.Context, in *RequestWithId64, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/RestartTask", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -309,9 +329,11 @@ func (c *apiClient) GetRecording(ctx context.Context, in *emptypb.Empty, opts ..
 type ApiServer interface {
 	SysInfo(context.Context, *emptypb.Empty) (*SysInfoResponse, error)
 	Summary(context.Context, *emptypb.Empty) (*SummaryResponse, error)
-	Shutdown(context.Context, *RequestWithId) (*emptypb.Empty, error)
-	Restart(context.Context, *RequestWithId) (*emptypb.Empty, error)
+	Shutdown(context.Context, *RequestWithId) (*SuccessResponse, error)
+	Restart(context.Context, *RequestWithId) (*SuccessResponse, error)
 	TaskTree(context.Context, *emptypb.Empty) (*TaskTreeResponse, error)
+	StopTask(context.Context, *RequestWithId64) (*SuccessResponse, error)
+	RestartTask(context.Context, *RequestWithId64) (*SuccessResponse, error)
 	StreamList(context.Context, *StreamListRequest) (*StreamListResponse, error)
 	WaitList(context.Context, *emptypb.Empty) (*StreamWaitListResponse, error)
 	StreamInfo(context.Context, *StreamSnapRequest) (*StreamInfoResponse, error)
@@ -347,14 +369,20 @@ func (UnimplementedApiServer) SysInfo(context.Context, *emptypb.Empty) (*SysInfo
 func (UnimplementedApiServer) Summary(context.Context, *emptypb.Empty) (*SummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Summary not implemented")
 }
-func (UnimplementedApiServer) Shutdown(context.Context, *RequestWithId) (*emptypb.Empty, error) {
+func (UnimplementedApiServer) Shutdown(context.Context, *RequestWithId) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
-func (UnimplementedApiServer) Restart(context.Context, *RequestWithId) (*emptypb.Empty, error) {
+func (UnimplementedApiServer) Restart(context.Context, *RequestWithId) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Restart not implemented")
 }
 func (UnimplementedApiServer) TaskTree(context.Context, *emptypb.Empty) (*TaskTreeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TaskTree not implemented")
+}
+func (UnimplementedApiServer) StopTask(context.Context, *RequestWithId64) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopTask not implemented")
+}
+func (UnimplementedApiServer) RestartTask(context.Context, *RequestWithId64) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestartTask not implemented")
 }
 func (UnimplementedApiServer) StreamList(context.Context, *StreamListRequest) (*StreamListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StreamList not implemented")
@@ -521,6 +549,42 @@ func _Api_TaskTree_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ApiServer).TaskTree(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_StopTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithId64)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).StopTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/StopTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).StopTask(ctx, req.(*RequestWithId64))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_RestartTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithId64)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).RestartTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/RestartTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).RestartTask(ctx, req.(*RequestWithId64))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -947,6 +1011,14 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TaskTree",
 			Handler:    _Api_TaskTree_Handler,
+		},
+		{
+			MethodName: "StopTask",
+			Handler:    _Api_StopTask_Handler,
+		},
+		{
+			MethodName: "RestartTask",
+			Handler:    _Api_RestartTask_Handler,
 		},
 		{
 			MethodName: "StreamList",

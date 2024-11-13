@@ -22,6 +22,7 @@ var (
 	ErrAutoStop     = errors.New("auto stop")
 	ErrRetryRunOut  = errors.New("retry out")
 	ErrStopByUser   = errors.New("stop by user")
+	ErrRestart      = errors.New("restart")
 	ErrTaskComplete = errors.New("complete")
 	ErrExit         = errors.New("exit")
 	ErrPanic        = errors.New("panic")
@@ -274,7 +275,7 @@ func (task *Task) checkRetry(err error) bool {
 			return false
 		}
 	}
-	return false
+	return errors.Is(err, ErrRestart)
 }
 
 func (task *Task) start() bool {

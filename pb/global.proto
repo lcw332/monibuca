@@ -18,12 +18,12 @@ service api {
       get: "/api/summary"
     };
   }
-  rpc Shutdown (RequestWithId) returns (google.protobuf.Empty) {
+  rpc Shutdown (RequestWithId) returns (SuccessResponse) {
     option (google.api.http) = {
       post: "/api/shutdown/{id}"
     };
   }
-  rpc Restart (RequestWithId) returns (google.protobuf.Empty) {
+  rpc Restart (RequestWithId) returns (SuccessResponse) {
     option (google.api.http) = {
       post: "/api/restart/{id}"
     };
@@ -31,6 +31,16 @@ service api {
   rpc TaskTree (google.protobuf.Empty) returns (TaskTreeResponse) {
     option (google.api.http) = {
       get: "/api/task/tree"
+    };
+  }
+  rpc StopTask (RequestWithId64) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/task/stop/{id}"
+    };
+  }
+  rpc RestartTask (RequestWithId64) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/task/restart/{id}"
     };
   }
   rpc StreamList (StreamListRequest) returns (StreamListResponse) {
@@ -245,6 +255,7 @@ message TaskTreeData {
   repeated TaskTreeData children = 6;
   uint32 state = 7;
   TaskTreeData blocked = 8;
+  uint64 pointer = 9;
 }
 
 message TaskTreeResponse {
@@ -357,6 +368,10 @@ message SuccessResponse {
 
 message RequestWithId {
   uint32 id = 1;
+}
+
+message RequestWithId64 {
+  uint64 id = 1;
 }
 
 message ChangeSubscribeRequest {
