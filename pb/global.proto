@@ -150,6 +150,11 @@ service api {
       body: "*"
     };
   }
+  rpc GetRecording (google.protobuf.Empty) returns (RecordingListResponse) {
+    option (google.api.http) = {
+      get: "/api/record/list"
+    };
+  }
 }
 
 message GetConfigRequest {
@@ -435,4 +440,16 @@ message SetStreamSpeedRequest {
 message SeekStreamRequest {
   string streamPath = 1;
   uint32 timeStamp = 2;
+}
+
+message Recording {
+  string streamPath = 1;
+  google.protobuf.Timestamp startTime = 2;
+  string type = 3;
+}
+
+message RecordingListResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated Recording data = 3;
 }

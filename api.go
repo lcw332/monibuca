@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -174,6 +175,25 @@ func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResp
 		return
 	}
 	res = &pb.TaskTreeResponse{Data: fillData(&Servers)}
+	return
+}
+
+func (s *Server) GetRecording(ctx context.Context, req *emptypb.Empty) (resp *pb.RecordingListResponse, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	s.Records.Call(func() error {
+		resp = &pb.RecordingListResponse{}
+		for record := range s.Records.Range {
+			resp.Data = append(resp.Data, &pb.Recording{
+				StreamPath: record.StreamPath,
+				StartTime:  timestamppb.New(record.StartTime),
+				Type:       reflect.TypeOf(record.recorder).String(),
+			})
+		}
+		return nil
+	})
 	return
 }
 

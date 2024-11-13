@@ -23,7 +23,7 @@ import (
 	sysruntime "runtime"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	myip "github.com/husanpao/ip"
+
 	"github.com/phsym/console-slog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -47,7 +47,6 @@ var (
 		Version: Version,
 	}
 	Servers           task.RootManager[uint32, *Server]
-	Routes            = map[string]string{}
 	defaultLogHandler = console.NewHandler(os.Stdout, &console.HandlerOptions{TimeFormat: "15:04:05.000000"})
 )
 
@@ -146,13 +145,6 @@ func init() {
 		time.AfterFunc(3*time.Second, exit)
 	})
 	Servers.OnDispose(exit)
-	for k, v := range myip.LocalAndInternalIPs() {
-		Routes[k] = v
-		fmt.Println(k, v)
-		if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
-			Routes[k[0:lastdot]] = k
-		}
-	}
 }
 
 func (s *Server) GetKey() uint32 {

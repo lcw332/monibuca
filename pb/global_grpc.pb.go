@@ -49,6 +49,7 @@ type ApiClient interface {
 	AddDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
 	RemoveDevice(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	UpdateDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
+	GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error)
 }
 
 type apiClient struct {
@@ -293,6 +294,15 @@ func (c *apiClient) UpdateDevice(ctx context.Context, in *DeviceInfo, opts ...gr
 	return out, nil
 }
 
+func (c *apiClient) GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error) {
+	out := new(RecordingListResponse)
+	err := c.cc.Invoke(ctx, "/global.api/GetRecording", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
@@ -323,6 +333,7 @@ type ApiServer interface {
 	AddDevice(context.Context, *DeviceInfo) (*SuccessResponse, error)
 	RemoveDevice(context.Context, *RequestWithId) (*SuccessResponse, error)
 	UpdateDevice(context.Context, *DeviceInfo) (*SuccessResponse, error)
+	GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -407,6 +418,9 @@ func (UnimplementedApiServer) RemoveDevice(context.Context, *RequestWithId) (*Su
 }
 func (UnimplementedApiServer) UpdateDevice(context.Context, *DeviceInfo) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateDevice not implemented")
+}
+func (UnimplementedApiServer) GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRecording not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -889,6 +903,24 @@ func _Api_UpdateDevice_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_GetRecording_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetRecording(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetRecording",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetRecording(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -999,6 +1031,10 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateDevice",
 			Handler:    _Api_UpdateDevice_Handler,
+		},
+		{
+			MethodName: "GetRecording",
+			Handler:    _Api_GetRecording_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

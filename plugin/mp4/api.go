@@ -2,7 +2,6 @@ package plugin_mp4
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"m7s.live/v5/pkg"
 	"m7s.live/v5/plugin/mp4/pb"
 
 	m7s "m7s.live/v5"
@@ -29,7 +29,7 @@ type ContentPart struct {
 func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.ResponseList, err error) {
 	var streams []m7s.RecordStream
 	if p.DB == nil {
-		err = fmt.Errorf("db not init")
+		err = pkg.ErrNoDB
 		return
 	}
 	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
@@ -80,6 +80,42 @@ func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.R
 }
 
 func (p *MP4Plugin) Delete(ctx context.Context, req *pb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
+	if p.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	ids := req.GetIds()
+	var result []*m7s.RecordStream
+	if len(ids) > 0 {
+		p.DB.Find(&result, "stream_path=? AND id IN ?", req.StreamPath, ids)
+	} else {
+		startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.StartTime}, "end": []string{req.EndTime}})
+		if err != nil {
+			return nil, err
+		}
+		p.DB.Find(&result, "stream_path=? AND start_time>=? AND end_time<=?", req.StreamPath, startTime, endTime)
+	}
+	err = p.DB.Delete(result).Error
+	if err != nil {
+		return
+	}
+	var apiResult []*pb.RecordFile
+	for _, recordFile := range result {
+		apiResult = append(apiResult, &pb.RecordFile{
+			Id:         uint32(recordFile.ID),
+			StartTime:  timestamppb.New(recordFile.StartTime),
+			EndTime:    timestamppb.New(recordFile.EndTime),
+			FilePath:   recordFile.FilePath,
+			StreamPath: recordFile.StreamPath,
+		})
+		err = os.Remove(recordFile.FilePath)
+		if err != nil {
+			return
+		}
+	}
+	resp = &pb.ResponseDelete{
+		Data: apiResult,
+	}
 	return
 }
 

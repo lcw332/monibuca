@@ -243,11 +243,11 @@ func (p *Plugin) GetPublicIP(netcardIP string) string {
 	if p.config.PublicIP != "" {
 		return p.config.PublicIP
 	}
-	if publicIP, ok := Routes[netcardIP]; ok { //根据网卡ip获取对应的公网ip
+	if publicIP, ok := util.Routes[netcardIP]; ok { //根据网卡ip获取对应的公网ip
 		return publicIP
 	}
 	localIp := myip.InternalIPv4()
-	if publicIP, ok := Routes[localIp]; ok {
+	if publicIP, ok := util.Routes[localIp]; ok {
 		return publicIP
 	}
 	return localIp

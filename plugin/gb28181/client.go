@@ -9,6 +9,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	myip "github.com/husanpao/ip"
 	"github.com/icholy/digest"
 	"github.com/rs/zerolog"
 	"m7s.live/v5/pkg/task"
@@ -47,7 +48,15 @@ func (k *KeepAlive) Tick(any) {
 
 func (c *Client) Start() (err error) {
 	netWork, parent, _ := strings.Cut(c.conf.Parent, ":")
-	c.Client, err = sipgo.NewClient(c.conf.ua, sipgo.WithClientLogger(zerolog.New(os.Stdout)))
+	sip.ParseUri(fmt.Sprintf("sip:%s", parent), &c.recipient)
+
+	// Check if host is private/internal network IP
+	//if util.IsPrivateIP(c.recipient.Host) {
+	c.Client, err = sipgo.NewClient(c.conf.ua, sipgo.WithClientLogger(zerolog.New(os.Stdout)), sipgo.WithClientHostname(myip.InternalIPv4()), sipgo.WithClientPort(5061))
+	//} else {
+	//	c.Client, err = sipgo.NewClient(c.conf.ua, sipgo.WithClientLogger(zerolog.New(os.Stdout)), sipgo.WithClientHostname(util.Routes[myip.InternalIPv4()]), sipgo.WithClientPort(5061))
+	//}
+
 	if err != nil {
 		return
 	}
@@ -59,7 +68,6 @@ func (c *Client) Start() (err error) {
 		},
 	}
 	// sipgo.NewDialogServer(c.Client, contactHDR)
-	sip.ParseUri(fmt.Sprintf("sip:%s", parent), &c.recipient)
 	req := sip.NewRequest("REGISTER", c.recipient)
 	req.AppendHeader(&contactHDR)
 	c.tp = strings.ToUpper(netWork)
