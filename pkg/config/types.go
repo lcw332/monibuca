@@ -12,21 +12,28 @@ import (
 	"m7s.live/v5/pkg/util"
 )
 
+const (
+	RelayModeRemux = "remux"
+	RelayModeRelay = "relay"
+	RelayModeMix   = "mix"
+)
+
 type (
 	Publish struct {
 		MaxCount          int             `default:"0" desc:"最大发布者数量"` // 最大发布者数量
 		PubAudio          bool            `default:"true" desc:"是否发布音频"`
 		PubVideo          bool            `default:"true" desc:"是否发布视频"`
-		KickExist         bool            `desc:"是否踢掉已经存在的发布者"`                 // 是否踢掉已经存在的发布者
-		PublishTimeout    time.Duration   `default:"10s" desc:"发布无数据超时"`        // 发布无数据超时
-		WaitCloseTimeout  time.Duration   `desc:"延迟自动关闭（等待重连）"`                 // 延迟自动关闭（等待重连）
-		DelayCloseTimeout time.Duration   `desc:"延迟自动关闭（无订阅时）"`                 // 延迟自动关闭（无订阅时）
-		IdleTimeout       time.Duration   `desc:"空闲(无订阅)超时"`                    // 空闲(无订阅)超时
-		PauseTimeout      time.Duration   `default:"30s" desc:"暂停超时时间"`         // 暂停超时
-		BufferTime        time.Duration   `desc:"缓冲时长，0代表取最近关键帧"`               // 缓冲长度(单位：秒)，0代表取最近关键帧
-		Speed             float64         `default:"0" desc:"倍速"`               // 倍速，0 为不限速
-		Key               string          `desc:"发布鉴权key"`                      // 发布鉴权key
-		RingSize          util.Range[int] `default:"20-1024" desc:"RingSize范围"` // 缓冲区大小范围
+		KickExist         bool            `desc:"是否踢掉已经存在的发布者"`                                             // 是否踢掉已经存在的发布者
+		PublishTimeout    time.Duration   `default:"10s" desc:"发布无数据超时"`                                    // 发布无数据超时
+		WaitCloseTimeout  time.Duration   `desc:"延迟自动关闭（等待重连）"`                                             // 延迟自动关闭（等待重连）
+		DelayCloseTimeout time.Duration   `desc:"延迟自动关闭（无订阅时）"`                                             // 延迟自动关闭（无订阅时）
+		IdleTimeout       time.Duration   `desc:"空闲(无订阅)超时"`                                                // 空闲(无订阅)超时
+		PauseTimeout      time.Duration   `default:"30s" desc:"暂停超时时间"`                                     // 暂停超时
+		BufferTime        time.Duration   `desc:"缓冲时长，0代表取最近关键帧"`                                           // 缓冲长度(单位：秒)，0代表取最近关键帧
+		Speed             float64         `default:"0" desc:"倍速"`                                           // 倍速，0 为不限速
+		Key               string          `desc:"发布鉴权key"`                                                  // 发布鉴权key
+		RingSize          util.Range[int] `default:"20-1024" desc:"RingSize范围"`                             // 缓冲区大小范围
+		RelayMode         string          `default:"remux" desc:"转发模式" enum:"remux:转格式,relay:纯转发,mix:混合转发"` // 转发模式
 		Dump              bool
 	}
 	Subscribe struct {

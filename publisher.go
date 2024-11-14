@@ -60,9 +60,9 @@ func (s *SpeedControl) speedControl(speed float64, ts time.Duration) {
 		}
 		should := time.Duration(float64(ts-s.beginTimestamp) / speed)
 		s.Delta = should - elapsed
-		// fmt.Println(speed, elapsed, should, s.Delta)
+		//fmt.Println(speed, elapsed, should, s.Delta)
 		if s.Delta > threshold {
-			time.Sleep(s.Delta)
+			time.Sleep(min(s.Delta, time.Millisecond*500))
 		}
 	}
 }
@@ -200,8 +200,14 @@ func (p *Publisher) Start() (err error) {
 			}
 		}
 	}
-	p.audioReady = util.NewPromise(p)
-	p.videoReady = util.NewPromise(p)
+	p.audioReady = util.NewPromiseWithTimeout(p, p.PublishTimeout)
+	if !p.PubAudio {
+		p.audioReady.Reject(ErrMuted)
+	}
+	p.videoReady = util.NewPromiseWithTimeout(p, p.PublishTimeout)
+	if !p.PubVideo {
+		p.videoReady.Reject(ErrMuted)
+	}
 	if p.Dump {
 		f := filepath.Join("./dump", p.StreamPath)
 		os.MkdirAll(filepath.Dir(f), 0666)
@@ -362,16 +368,16 @@ func (p *Publisher) writeAV(t *AVTrack, data IAVFrame) {
 	if t.FPS > 0 {
 		frameDur := float64(time.Second) / float64(t.FPS)
 		if math.Abs(float64(frame.Timestamp-t.LastTs)) > 10*frameDur { //时间戳突变
-			p.Warn("timestamp mutation", "fps", t.FPS, "lastTs", t.LastTs, "ts", frame.Timestamp, "frameDur", time.Duration(frameDur))
-			frame.Timestamp = t.LastTs + time.Duration(frameDur)
+			p.Warn("timestamp mutation", "fps", t.FPS, "lastTs", uint32(t.LastTs/time.Millisecond), "ts", uint32(frame.Timestamp/time.Millisecond), "frameDur", time.Duration(frameDur))
 			t.BaseTs = frame.Timestamp - ts
+			frame.Timestamp = t.LastTs + time.Duration(frameDur)
 		}
 	}
 	t.LastTs = frame.Timestamp
 	if p.Enabled(p, task.TraceLevel) {
 		codec := t.FourCC().String()
 		data := frame.Wraps[0].String()
-		p.Trace("write", "seq", frame.Sequence, "ts0", ts, "ts", uint32(frame.Timestamp/time.Millisecond), "codec", codec, "size", bytesIn, "data", data)
+		p.Trace("write", "seq", frame.Sequence, "baseTs", int32(t.BaseTs/time.Millisecond), "ts0", uint32(ts/time.Millisecond), "ts", uint32(frame.Timestamp/time.Millisecond), "codec", codec, "size", bytesIn, "data", data)
 	}
 }
 

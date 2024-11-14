@@ -24,7 +24,9 @@ func main() {
 |-----------|-----------------|
 | disable_rm | 禁用内存池           |
 | sqlite | 启用 sqlite       |
-|sqliteCGO | 启用 sqlite cgo版本 |
+| sqliteCGO | 启用 sqlite cgo版本 |
+| mysql | 启用 mysql       |
+| postgres | 启用 postgres       |
 | duckdb | 启用 duckdb       |
 | taskpanic | 抛出 panic，用于测试   |
 
@@ -36,3 +38,13 @@ func main() {
 # 创建插件
 
 到 plugin 目录下查看 README_CN.md
+
+# Prometheus
+
+```yaml
+scrape_configs:
+  - job_name: "monibuca"
+    metrics_path: "/api/metrics"
+    static_configs:
+      - targets: ["localhost:8080"]
+```

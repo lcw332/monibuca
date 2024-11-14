@@ -9,10 +9,10 @@ package main
 import (
 	"context"
 
-	"m7s.live/m7s/v5"
-	_ "m7s.live/m7s/v5/plugin/debug"
-	_ "m7s.live/m7s/v5/plugin/flv"
-	_ "m7s.live/m7s/v5/plugin/rtmp"
+	"m7s.live/v5"
+	_ "m7s.live/v5/plugin/debug"
+	_ "m7s.live/v5/plugin/flv"
+	_ "m7s.live/v5/plugin/rtmp"
 )
 
 func main() {
@@ -25,7 +25,10 @@ func main() {
 | Build Tag | Description |
 |-----------|-------------|
 | disable_rm | Disables the memory pool |
-| sqlite | Enables the sqlite DB |
+| sqlite | Enables the sqlite DB |  
+| sqliteCGO | Enables the sqlite cgo version DB |
+| mysql | Enables the mysql DB |
+| postgres | Enables the postgres DB |
 | duckdb | Enables the duckdb DB |
 | taskpanic | Throws panic, for testing |
 

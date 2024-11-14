@@ -36,7 +36,7 @@ type (
 	PullJob struct {
 		Connection
 		Publisher     *Publisher
-		publishConfig *config.Publish
+		PublishConfig *config.Publish
 		puller        IPuller
 		conf          *config.Pull
 	}
@@ -83,9 +83,9 @@ func (p *PullJob) GetPullJob() *PullJob {
 
 func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf config.Pull) *PullJob {
 	if conf.PubConf != nil {
-		p.publishConfig = conf.PubConf
+		p.PublishConfig = conf.PubConf
 	} else {
-		p.publishConfig = &plugin.config.Publish
+		p.PublishConfig = &plugin.config.Publish
 	}
 	p.Args = url.Values(conf.Args.DeepClone())
 	p.conf = &conf
@@ -129,7 +129,7 @@ func (p *PullJob) Publish() (err error) {
 	if len(p.Args) > 0 {
 		streamPath += "?" + p.Args.Encode()
 	}
-	p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.publishConfig)
+	p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.PublishConfig)
 	p.Publisher.Type = PublishTypePull
 	if err == nil && p.conf.MaxRetry != 0 {
 		p.Publisher.OnDispose(func() {

@@ -42,6 +42,7 @@ func (a *AnnexB) GetSize() int {
 func (a *AnnexB) GetTimestamp() time.Duration {
 	return a.DTS * time.Millisecond / 90
 }
+
 func (a *AnnexB) GetCTS() time.Duration {
 	return (a.PTS - a.DTS) * time.Millisecond / 90
 }

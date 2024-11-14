@@ -1,0 +1,5 @@
+global:
+  loglevel: debug
+hls:
+  pull:
+    live/test: http://live4.nbs.cn/channels/njtv/glgc/hd.m3u8

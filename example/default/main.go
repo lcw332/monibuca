@@ -10,6 +10,7 @@ import (
 	_ "m7s.live/v5/plugin/debug"
 	_ "m7s.live/v5/plugin/flv"
 	_ "m7s.live/v5/plugin/gb28181"
+	_ "m7s.live/v5/plugin/hls"
 	_ "m7s.live/v5/plugin/logrotate"
 	_ "m7s.live/v5/plugin/monitor"
 	_ "m7s.live/v5/plugin/mp4"
