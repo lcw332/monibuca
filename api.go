@@ -747,7 +747,9 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 		err = pkg.ErrNoDB
 		return
 	}
-	tx := s.DB.Delete(&Device{}, req.Id)
+	tx := s.DB.Delete(&Device{
+		ID: uint(req.Id),
+	})
 	err = tx.Error
 	s.Devices.Call(func() error {
 		if device, ok := s.Devices.Get(uint(req.Id)); ok {

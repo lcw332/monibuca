@@ -200,8 +200,8 @@ func (p *Publisher) Start() (err error) {
 			}
 		}
 	}
-	p.audioReady = util.NewPromiseWithTimeout(p, time.Second*5)
-	p.videoReady = util.NewPromiseWithTimeout(p, time.Second*5)
+	p.audioReady = util.NewPromise(p)
+	p.videoReady = util.NewPromise(p)
 	if p.Dump {
 		f := filepath.Join("./dump", p.StreamPath)
 		os.MkdirAll(filepath.Dir(f), 0666)

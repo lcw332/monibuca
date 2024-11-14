@@ -85,7 +85,7 @@ func (t *Track) AddBytesIn(n int) {
 }
 
 func (t *AVTrack) Ready(err error) {
-	if !t.IsReady() {
+	if t.ready.IsPending() {
 		if err != nil {
 			t.Error("ready", "err", err)
 		} else {
@@ -101,7 +101,7 @@ func (t *AVTrack) Ready(err error) {
 }
 
 func (t *Track) Ready(err error) {
-	if !t.IsReady() {
+	if t.ready.IsPending() {
 		if err != nil {
 			t.Error("ready", "err", err)
 		} else {
