@@ -51,14 +51,14 @@ func (p *Puller) Start() (err error) {
 	}
 	p.PullJob.Publisher.Speed = 1
 	if p.PullJob.PublishConfig.RelayMode != config.RelayModeRemux {
-		p.memoryTs.Store(p.PullJob.StreamPath, p)
+		MemoryTs.Store(p.PullJob.StreamPath, p)
 	}
 	return
 }
 
 func (p *Puller) Dispose() {
 	if p.PullJob.PublishConfig.RelayMode == config.RelayModeRelay {
-		memoryTs.Delete(p.PullJob.StreamPath)
+		MemoryTs.Delete(p.PullJob.StreamPath)
 	}
 }
 
@@ -310,7 +310,7 @@ func (p *Puller) pull(info *M3u8Info) (err error) {
 			if p.PullJob.PublishConfig.RelayMode != config.RelayModeRemux {
 				m3u8 := string(plBuffer)
 				p.Debug("write m3u8", "streamPath", p.PullJob.StreamPath, "m3u8", m3u8)
-				memoryM3u8.Store(p.PullJob.StreamPath, m3u8)
+				MemoryM3u8.Store(p.PullJob.StreamPath, m3u8)
 			}
 		} else {
 			p.Error("readM3u8", "streamPath", p.PullJob.StreamPath, "err", err2)

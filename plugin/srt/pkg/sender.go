@@ -64,14 +64,6 @@ func (s *Sender) sendADTS(audio *pkg.ADTS) (err error) {
 	return s.sendAudio(packet)
 }
 
-func (s *Sender) sendRawAudio(audio *pkg.RawAudio) (err error) {
-	var packet mpegts.MpegTsPESPacket
-	packet.Header.PesPacketLength = uint16(audio.Size + 8)
-	packet.Buffers = audio.Buffers
-	packet.Header.Pts = uint64(audio.Timestamp)
-	return s.sendAudio(packet)
-}
-
 func (s *Sender) sendVideo(video *pkg.AnnexB) (err error) {
 	var buffer net.Buffers
 	//需要对原始数据(ES),进行一些预处理,视频需要分割nalu(H264编码),并且打上sps,pps,nalu_aud信息.
@@ -101,12 +93,7 @@ func (s *Sender) sendVideo(video *pkg.AnnexB) (err error) {
 }
 
 func (s *Sender) Go() error {
-	if s.Subscriber.Publisher.HasAudioTrack() {
-		if s.Subscriber.Publisher.AudioTrack.FourCC() == codec.FourCC_MP4A {
-			return m7s.PlayBlock(s.Subscriber, s.sendADTS, s.sendVideo)
-		}
-	}
-	return m7s.PlayBlock(s.Subscriber, s.sendRawAudio, s.sendVideo)
+	return m7s.PlayBlock(s.Subscriber, s.sendADTS, s.sendVideo)
 }
 
 func (s *Sender) WritePESPacket(frame *mpegts.MpegtsPESFrame, pesPacket mpegts.MpegTsPESPacket) (err error) {

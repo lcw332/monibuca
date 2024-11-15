@@ -55,7 +55,12 @@ func (A *ADTS) Demux(ctx codec.ICodecCtx) (any, error) {
 }
 
 func (A *ADTS) Mux(ctx codec.ICodecCtx, frame *AVFrame) {
-	aacCtx := ctx.GetBase().(*codec.AACCtx)
+	A.DTS = frame.Timestamp * 90 / time.Millisecond
+	aacCtx, ok := ctx.GetBase().(*codec.AACCtx)
+	if !ok {
+		A.Append(frame.Raw.(util.Memory).Buffers...)
+		return
+	}
 	A.InitRecycleIndexes(1)
 	adts := A.NextN(7)
 	raw := frame.Raw.(util.Memory)

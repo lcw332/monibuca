@@ -11,9 +11,12 @@ import (
 	"github.com/quangngotan95/go-m3u8/m3u8"
 )
 
-var memoryM3u8 sync.Map
-var memoryTs sync.Map
+var MemoryM3u8 sync.Map
+var MemoryTs sync.Map
 
+type TsCacher interface {
+	GetTs(key string) (any, bool)
+}
 type M3u8Info struct {
 	Req       *http.Request
 	M3U8Count int    //一共拉取的m3u8文件数量

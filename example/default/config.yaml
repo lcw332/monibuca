@@ -17,3 +17,7 @@ mp4:
   onsub:
     pull:
       ^vod/(.+)$: $1
+hls:
+  onpub:
+    transform:
+      .* : 5s x 3
