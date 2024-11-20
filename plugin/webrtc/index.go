@@ -34,7 +34,7 @@ type WebRTCPlugin struct {
 	EnableOpus bool          `default:"true" desc:"是否启用opus编码"`       // 是否启用opus编码
 	EnableVP9  bool          `default:"false" desc:"是否启用vp9编码"`       // 是否启用vp9编码
 	EnableAv1  bool          `default:"false" desc:"是否启用av1编码"`       // 是否启用av1编码
-	EnableDC   bool          `default:"false" desc:"是否启用DataChannel"` // 在不支持编码格式的情况下是否启用DataChannel传输
+	EnableDC   bool          `default:"true" desc:"是否启用DataChannel"` // 在不支持编码格式的情况下是否启用DataChannel传输
 	m          MediaEngine
 	s          SettingEngine
 	api        *API

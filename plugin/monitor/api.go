@@ -55,7 +55,7 @@ func (cfg *MonitorPlugin) SessionList(context.Context, *emptypb.Empty) (res *pb.
 					Pid:       uint32(s.PID),
 					Args:      s.Args,
 					StartTime: timestamppb.New(s.StartTime),
-					EndTime:   timestamppb.New(s.EndTime),
+					EndTime:   timestamppb.New(s.EndTime.Time),
 				})
 			}
 		})

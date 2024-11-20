@@ -39,33 +39,33 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 	// 查询总记录数
 	countQuery := p.DB.Model(m7s.RecordStream{})
 	// 查询当前页的数据
-	query := p.DB.Model(m7s.RecordStream{}).Limit(int(req.PageSize)).Offset(int(offset))
+	query := countQuery
+	if req.PageSize > 0 {
+		query = query.Limit(int(req.PageSize)).Offset(int(offset))
+	}
 	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
 	if err != nil {
 		return
 	}
-	if req.StreamPath == "" {
-		countQuery = countQuery.Where("end_time>? AND start_time<?", startTime, endTime)
-		query = query.Where("end_time>? AND start_time<?", startTime, endTime)
-		//p.DB.Find(&streams, "end_time>? AND start_time<?", startTime, endTime)
-	} else if strings.Contains(req.StreamPath, "*") {
-		countQuery = countQuery.Where("end_time>? AND start_time<? AND stream_path like ?", startTime, endTime, strings.ReplaceAll(req.StreamPath, "*", "%"))
-		query = query.Where("end_time>? AND start_time<? AND stream_path like ?", startTime, endTime, strings.ReplaceAll(req.StreamPath, "*", "%"))
-		//p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path like ?", startTime, endTime, strings.ReplaceAll(req.StreamPath, "*", "%"))
-	} else {
-		countQuery = countQuery.Where("end_time>? AND start_time<? AND stream_path=?", startTime, endTime, req.StreamPath)
-		query = query.Where("end_time>? AND start_time<? AND stream_path=?", startTime, endTime, req.StreamPath)
-		//p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path=?", startTime, endTime, req.StreamPath)
+	var condition string = "end_time>? AND start_time<?"
+	var values []any = []any{startTime, endTime}
+	if strings.Contains(req.StreamPath, "*") {
+		condition += " AND stream_path like ?"
+		values = append(values, strings.ReplaceAll(req.StreamPath, "*", "%"))
+	} else if req.StreamPath != "" {
+		condition += " AND stream_path=?"
+		values = append(values, req.StreamPath)
 	}
 	if req.RecordMode != "" {
-		countQuery = countQuery.Where(" record_mode=?", req.RecordMode)
-		query = query.Where(" record_mode=?", req.RecordMode)
+		condition += " AND record_mode=?"
+		values = append(values, req.RecordMode)
 	}
+	values = append([]any{condition}, values...)
 	err = countQuery.Count(&totalCount).Error
 	if err != nil {
 		return
 	}
-	query.Find(&streams)
+	query.Find(&streams, values...)
 	resp = &pb.ResponseList{
 		PageSize:   req.PageSize,
 		PageNum:    req.PageNum,
