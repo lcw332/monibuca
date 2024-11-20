@@ -1,6 +1,7 @@
 package m7s
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
@@ -139,12 +140,15 @@ func exit() {
 	os.Exit(0)
 }
 
+var zipReader *zip.ReadCloser
+
 func init() {
 	Servers.Init()
 	Servers.OnBeforeDispose(func() {
 		time.AfterFunc(3*time.Second, exit)
 	})
 	Servers.OnDispose(exit)
+	zipReader, _ = zip.OpenReader("admin.zip")
 }
 
 func (s *Server) GetKey() uint32 {
@@ -404,8 +408,8 @@ func (s *Server) OnSubscribe(streamPath string, args url.Values) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.Plugins.Get("Admin"); ok {
-		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
+	if zipReader != nil {
+		http.ServeFileFS(w, r, zipReader, strings.TrimPrefix(r.URL.Path, "/admin"))
 		return
 	}
 	if r.URL.Path == "/favicon.ico" {

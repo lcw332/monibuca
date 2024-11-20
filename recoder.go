@@ -81,6 +81,7 @@ func (p *RecordJob) Init(recorder IRecorder, plugin *Plugin, streamPath string, 
 		"append":     conf.Append,
 		"fragment":   conf.Fragment,
 	})
+	recorder.SetRetry(-1, time.Second)
 	plugin.Server.Records.Add(p, plugin.Logger.With("filePath", conf.FilePath, "streamPath", streamPath))
 	return p
 }

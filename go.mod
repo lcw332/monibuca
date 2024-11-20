@@ -6,6 +6,7 @@ require (
 	github.com/Eyevinn/mp4ff v0.45.1
 	github.com/VictoriaMetrics/VictoriaMetrics v1.102.0
 	github.com/asavie/xdp v0.3.3
+	github.com/bluenviron/gohlslib v1.4.0
 	github.com/c0deltin/duckdb-driver v0.1.0
 	github.com/cilium/ebpf v0.15.0
 	github.com/cloudwego/goref v0.0.0-20240724113447-685d2a9523c8
@@ -37,6 +38,8 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
+	gorm.io/driver/mysql v1.5.7
+	gorm.io/driver/postgres v1.5.9
 	gorm.io/gorm v1.25.11
 )
 
@@ -45,6 +48,9 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/VictoriaMetrics/metrics v1.35.1 // indirect
 	github.com/VictoriaMetrics/metricsql v0.76.0 // indirect
+	github.com/abema/go-mp4 v1.2.0 // indirect
+	github.com/asticode/go-astikit v0.30.0 // indirect
+	github.com/asticode/go-astits v1.13.0 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -52,11 +58,16 @@ require (
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.5.5 // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -109,10 +120,9 @@ require (
 
 require (
 	github.com/alchemy/rotoslog v0.2.2
-	github.com/bluenviron/mediacommon v1.9.2
+	github.com/bluenviron/mediacommon v1.11.1-0.20240525122142-20163863aa75
 	github.com/chromedp/chromedp v0.9.5
 	github.com/datarhei/gosrt v0.7.0
-	github.com/go-ping/ping v1.1.0
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/pprof v0.0.0-20240409012703-83162a5b38cd // indirect
 	github.com/gorilla/websocket v1.5.1

@@ -449,7 +449,9 @@ func (handler *SubscribeHandler[A, V]) Run() (err error) {
 				if ar.DecConfChanged() {
 					ar.LastCodecCtx = ar.Track.ICodecCtx
 					if seqFrame := ar.Track.SequenceFrame; seqFrame != nil {
-						err = handler.OnAudio(seqFrame.(A))
+						if handler.awi >= 0 {
+							err = handler.OnAudio(seqFrame.(A))
+						}
 					}
 				}
 				if vr != nil && handler.videoFrame != nil {

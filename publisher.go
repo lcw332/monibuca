@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/codec"
 	"m7s.live/v5/pkg/task"
 
 	. "m7s.live/v5/pkg"
@@ -570,6 +571,20 @@ func (p *Publisher) WriteData(data IDataFrame) (err error) {
 	}
 	// TODO: Implement this function
 	return
+}
+
+func (p *Publisher) GetAudioCodecCtx() (ctx codec.ICodecCtx) {
+	if p.HasAudioTrack() {
+		return p.AudioTrack.ICodecCtx
+	}
+	return nil
+}
+
+func (p *Publisher) GetVideoCodecCtx() (ctx codec.ICodecCtx) {
+	if p.HasVideoTrack() {
+		return p.VideoTrack.ICodecCtx
+	}
+	return nil
 }
 
 func (p *Publisher) GetAudioTrack(dataType reflect.Type) (t *AVTrack) {

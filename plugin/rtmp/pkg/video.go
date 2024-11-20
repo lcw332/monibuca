@@ -47,6 +47,7 @@ func (avcc *RTMPVideo) Parse(t *AVTrack) (err error) {
 		case codec.FourCC_H264:
 			var ctx codec.H264Ctx
 			ctx.Record = cloneFrame.Buffers[0][reader.Offset():]
+			// fmt.Printf("record: %s", hex.Dump(ctx.Record))
 			if _, err = ctx.RecordInfo.Unmarshal(ctx.Record); err == nil {
 				t.SequenceFrame = &cloneFrame
 				t.ICodecCtx = &ctx

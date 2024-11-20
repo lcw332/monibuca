@@ -280,13 +280,14 @@ func (p *Puller) pull(info *M3u8Info) (err error) {
 					if tsBytes != nil {
 						tsFilename := fmt.Sprintf("%d_%d.ts", ts, i)
 						tsFilePath := p.PullJob.StreamPath + "/" + tsFilename
+						ss := strings.Split(p.PullJob.StreamPath, "/")
 						var plInfo = PlaylistInf{
-							Title:    p.PullJob.StreamPath + "/" + tsFilename,
+							Title:    fmt.Sprintf("%s/%s", ss[len(ss)-1], tsFilename),
 							Duration: v.dur,
 							FilePath: tsFilePath,
 						}
 						relayPlayList.WriteInf(plInfo)
-						p.memoryTs.Store(tsFilePath, tsBytes)
+						p.memoryTs.Store(tsFilePath, *tsBytes)
 						next := tsRing.Next()
 						if next.Value != "" {
 							item, _ := p.memoryTs.LoadAndDelete(next.Value)

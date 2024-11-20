@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"gorm.io/gorm"
 	m7s "m7s.live/v5"
 	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/codec"
@@ -73,6 +74,35 @@ func (task *writeTrailerTask) Run() (err error) {
 	return
 }
 
+type eventRecordCheck struct {
+	task.Task
+	DB         *gorm.DB
+	streamPath string
+}
+
+func (t *eventRecordCheck) Run() (err error) {
+	var eventRecordStreams []m7s.RecordStream
+	t.DB.Find(&eventRecordStreams, "record_mode=1 AND event_level=0 AND stream_path=?", t.streamPath) //搜索事件录像，且为重要事件（无法自动删除）
+	if len(eventRecordStreams) > 0 {
+		for _, recordStream := range eventRecordStreams {
+			t.Info("abc", recordStream.StartTime)
+			var unimportantEventRecordStreams []m7s.RecordStream
+			query := `(start_time BETWEEN ? AND ?)
+							OR (end_time BETWEEN ? AND ?) 
+							OR (? BETWEEN start_time AND end_time) 
+							OR (? BETWEEN start_time AND end_time) AND event_level=1 AND stream_path=? `
+			t.DB.Where(query, recordStream.StartTime, recordStream.EndTime, recordStream.StartTime, recordStream.EndTime, recordStream.StartTime, recordStream.EndTime, recordStream.StreamPath).Find(&unimportantEventRecordStreams)
+			if len(unimportantEventRecordStreams) > 0 {
+				for _, unimportantEventRecordStream := range unimportantEventRecordStreams {
+					unimportantEventRecordStream.EventLevel = "0"
+					t.DB.Save(&unimportantEventRecordStream)
+				}
+			}
+		}
+	}
+	return
+}
+
 func init() {
 	m7s.Servers.AddTask(&writeTrailerQueueTask)
 }
@@ -91,29 +121,10 @@ func (r *Recorder) writeTailer(end time.Time) {
 	r.stream.EndTime = end
 	if r.RecordJob.Plugin.DB != nil {
 		r.RecordJob.Plugin.DB.Save(&r.stream)
-		go func() {
-			//startTime := r.stream.StartTime
-			//endTime := end
-			var eventRecordStreams []m7s.RecordStream
-			r.RecordJob.Plugin.DB.Find(&eventRecordStreams, "record_mode=1 AND event_level=0 AND stream_path=?", r.stream.StreamPath) //搜索事件录像，且为重要事件（无法自动删除）
-			if len(eventRecordStreams) > 0 {
-				for _, recordStream := range eventRecordStreams {
-					r.Info("abc", recordStream.StartTime)
-					var unimportantEventRecordStreams []m7s.RecordStream
-					query := `(start_time BETWEEN ? AND ?)
-							OR (end_time BETWEEN ? AND ?) 
-							OR (? BETWEEN start_time AND end_time) 
-							OR (? BETWEEN start_time AND end_time) AND event_level=1 AND stream_path=? `
-					r.RecordJob.Plugin.DB.Where(query, recordStream.StartTime, recordStream.EndTime, recordStream.StartTime, recordStream.EndTime, recordStream.StartTime, recordStream.EndTime, recordStream.StreamPath).Find(&unimportantEventRecordStreams)
-					if len(unimportantEventRecordStreams) > 0 {
-						for _, unimportantEventRecordStream := range unimportantEventRecordStreams {
-							unimportantEventRecordStream.EventLevel = "0"
-							r.RecordJob.Plugin.DB.Save(&unimportantEventRecordStream)
-						}
-					}
-				}
-			}
-		}()
+		writeTrailerQueueTask.AddTask(&eventRecordCheck{
+			DB:         r.RecordJob.Plugin.DB,
+			streamPath: r.stream.StreamPath,
+		})
 	}
 	writeTrailerQueueTask.AddTask(&writeTrailerTask{
 		muxer: r.muxer,

@@ -2,6 +2,7 @@ package plugin_hls
 
 import (
 	"embed"
+	"m7s.live/v5/pkg/util"
 	"net/http"
 	"path"
 	"strings"
@@ -83,7 +84,7 @@ func (config *HLSPlugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					switch v := tsData.(type) {
 					case *hls.TsInMemory:
 						v.WriteTo(w)
-					case []byte:
+					case util.Buffer:
 						w.Write(v)
 					}
 					return

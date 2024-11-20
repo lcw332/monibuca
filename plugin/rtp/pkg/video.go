@@ -134,8 +134,10 @@ func (r *Video) Parse(t *AVTrack) (err error) {
 					return
 				}
 			}
-			if ctx.CodecData, err = h265parser.NewCodecDataFromVPSAndSPSAndPPS(vps, sps, pps); err != nil {
-				return
+			if len(vps) > 0 && len(sps) > 0 && len(pps) > 0 {
+				if ctx.CodecData, err = h265parser.NewCodecDataFromVPSAndSPSAndPPS(vps, sps, pps); err != nil {
+					return
+				}
 			}
 			if sprop_donl, ok := ctx.Fmtp["sprop-max-don-diff"]; ok {
 				if sprop_donl != "0" {
