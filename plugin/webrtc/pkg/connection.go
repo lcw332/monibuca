@@ -258,10 +258,20 @@ func (IO *Connection) Send() (err error) {
 	}
 	if actx != nil && !useDC {
 		audioCodec := actx.FourCC()
-		ctx := actx.(interface {
-			GetRTPCodecCapability() RTPCodecCapability
-		})
-		audioTLSRTP, err = NewTrackLocalStaticRTP(ctx.GetRTPCodecCapability(), audioCodec.String(), suber.StreamPath)
+		var rcc RTPCodecParameters
+		if ctx, ok := actx.(mrtp.IRTPCtx); ok {
+			rcc = ctx.GetRTPCodecParameter()
+		} else {
+			var rtpCtx mrtp.RTPData
+			var tmpAVTrack AVTrack
+			tmpAVTrack.ICodecCtx, _, err = rtpCtx.ConvertCtx(actx)
+			if err == nil {
+				rcc = tmpAVTrack.ICodecCtx.(mrtp.IRTPCtx).GetRTPCodecParameter()
+			} else {
+				return
+			}
+		}
+		audioTLSRTP, err = NewTrackLocalStaticRTP(rcc.RTPCodecCapability, audioCodec.String(), suber.StreamPath)
 		if err != nil {
 			return
 		}

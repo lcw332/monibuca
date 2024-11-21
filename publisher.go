@@ -648,9 +648,12 @@ func (p *Publisher) Dispose() {
 
 func (p *Publisher) TransferSubscribers(newPublisher *Publisher) {
 	for subscriber := range p.SubscriberRange {
+		if subscriber.Internal {
+			continue
+		}
 		newPublisher.AddSubscriber(subscriber)
+		p.Subscribers.Remove(subscriber)
 	}
-	p.Subscribers.Clear()
 	p.BufferTime = p.Plugin.GetCommonConf().Publish.BufferTime
 	p.AudioTrack.SetMinBuffer(p.BufferTime)
 	p.VideoTrack.SetMinBuffer(p.BufferTime)

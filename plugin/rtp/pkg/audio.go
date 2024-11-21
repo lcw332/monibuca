@@ -286,6 +286,9 @@ func (r *Audio) Demux(codexCtx codec.ICodecCtx) (any, error) {
 		var fragmentsExpected int
 		var fragmentsSize int
 		for _, packet := range r.Packets {
+			if packet.Padding {
+				packet.Padding = false
+			}
 			buf := packet.Payload
 			if fragments.Size == 0 {
 				pl, n, err := payloadLengthInfoDecode(buf)

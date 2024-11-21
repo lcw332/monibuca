@@ -64,6 +64,9 @@ func (p *RecordJob) GetKey() string {
 
 func (p *RecordJob) Subscribe() (err error) {
 	p.Subscriber, err = p.Plugin.Subscribe(p.recorder.GetTask().Context, p.StreamPath)
+	if p.Subscriber != nil {
+		p.Subscriber.Internal = true
+	}
 	return
 }
 
