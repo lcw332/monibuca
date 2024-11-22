@@ -2,7 +2,6 @@ package m7s
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -360,21 +359,9 @@ func (p *Publisher) writeAV(t *AVTrack, data IAVFrame) {
 	frame.Wraps = append(frame.Wraps, data)
 	ts := data.GetTimestamp()
 	frame.CTS = data.GetCTS()
-	if t.LastTs == 0 {
-		t.BaseTs -= ts
-	}
-	frame.Timestamp = max(1, t.BaseTs+ts)
 	bytesIn := frame.Wraps[0].GetSize()
 	t.AddBytesIn(bytesIn)
-	if t.FPS > 0 {
-		frameDur := float64(time.Second) / float64(t.FPS)
-		if math.Abs(float64(frame.Timestamp-t.LastTs)) > 10*frameDur { //时间戳突变
-			p.Warn("timestamp mutation", "fps", t.FPS, "lastTs", uint32(t.LastTs/time.Millisecond), "ts", uint32(frame.Timestamp/time.Millisecond), "frameDur", time.Duration(frameDur))
-			t.BaseTs = frame.Timestamp - ts
-			frame.Timestamp = t.LastTs + time.Duration(frameDur)
-		}
-	}
-	t.LastTs = frame.Timestamp
+	frame.Timestamp = t.Tame(ts, t.FPS)
 	if p.Enabled(p, task.TraceLevel) {
 		codec := t.FourCC().String()
 		data := frame.Wraps[0].String()

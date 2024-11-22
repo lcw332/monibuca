@@ -277,18 +277,25 @@ func BasicAuth(u, p string, next http.Handler) http.Handler {
 var ipReg = regexp.MustCompile(`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`)
 var privateIPReg = regexp.MustCompile(`^((10|192\.168|172\.(1[6-9]|2[0-9]|3[0-1]))\.){3}(10|192\.168|172\.(1[6-9]|2[0-9]|3[0-1]))$`)
 
-var Routes = map[string]string{}
+var routes map[string]string
 
 func IsPrivateIP(ip string) bool {
 	return privateIPReg.MatchString(ip)
 }
 
-func init() {
-	for k, v := range myip.LocalAndInternalIPs() {
-		Routes[k] = v
-		fmt.Println(k, v)
-		if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
-			Routes[k[0:lastdot]] = k
+// TODO: map race
+func GetPublicIP(ip string) string {
+	if routes == nil {
+		routes = make(map[string]string)
+		for k, v := range myip.LocalAndInternalIPs() {
+			routes[k] = v
+			if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
+				routes[k[0:lastdot]] = k
+			}
 		}
 	}
+	if publicIP, ok := routes[ip]; ok {
+		return publicIP
+	}
+	return ip
 }

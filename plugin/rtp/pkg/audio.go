@@ -212,10 +212,14 @@ func (r *Audio) Parse(t *AVTrack) (err error) {
 	case webrtc.MimeTypePCMA:
 		var ctx PCMACtx
 		ctx.parseFmtpLine(r.RTPCodecParameters)
+		ctx.AudioCtx.SampleRate = int(r.ClockRate)
+		ctx.AudioCtx.Channels = int(ctx.RTPCodecParameters.Channels)
 		t.ICodecCtx = &ctx
 	case webrtc.MimeTypePCMU:
 		var ctx PCMUCtx
 		ctx.parseFmtpLine(r.RTPCodecParameters)
+		ctx.AudioCtx.SampleRate = int(r.ClockRate)
+		ctx.AudioCtx.Channels = int(ctx.RTPCodecParameters.Channels)
 		t.ICodecCtx = &ctx
 	case "audio/MP4A-LATM":
 		var ctx *AACCtx

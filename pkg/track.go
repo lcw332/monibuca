@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"log/slog"
+	"math"
 	"reflect"
 	"time"
 
@@ -28,15 +29,17 @@ type (
 	DataTrack struct {
 		Track
 	}
-
+	TsTamer struct {
+		BaseTs, LastTs time.Duration
+	}
 	AVTrack struct {
 		Track
 		*RingWriter
 		codec.ICodecCtx
-		Allocator      *util.ScalableMemoryAllocator
-		SequenceFrame  IAVFrame
-		WrapIndex      int
-		BaseTs, LastTs time.Duration
+		Allocator     *util.ScalableMemoryAllocator
+		SequenceFrame IAVFrame
+		WrapIndex     int
+		TsTamer
 	}
 )
 
@@ -121,4 +124,21 @@ func (t *Track) WaitReady() error {
 
 func (t *Track) Trace(msg string, fields ...any) {
 	t.Log(context.TODO(), task.TraceLevel, msg, fields...)
+}
+
+func (t *TsTamer) Tame(ts time.Duration, fps int) (result time.Duration) {
+	if t.LastTs == 0 {
+		t.BaseTs -= ts
+	}
+	result = max(1*time.Millisecond, t.BaseTs+ts)
+	if fps > 0 {
+		frameDur := float64(time.Second) / float64(fps)
+		if math.Abs(float64(result-t.LastTs)) > 10*frameDur { //时间戳突变
+			// t.Warn("timestamp mutation", "fps", t.FPS, "lastTs", uint32(t.LastTs/time.Millisecond), "ts", uint32(frame.Timestamp/time.Millisecond), "frameDur", time.Duration(frameDur))
+			result = t.LastTs + time.Duration(frameDur)
+			t.BaseTs = result - ts
+		}
+	}
+	t.LastTs = result
+	return
 }
