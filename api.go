@@ -671,8 +671,8 @@ func (s *Server) GetDeviceList(ctx context.Context, req *emptypb.Empty) (res *pb
 			Status:         uint32(device.Status),
 			ID:             uint32(device.ID),
 			PullOnStart:    device.PullOnStart,
-			StopOnIdle:     device.PubConf.DelayCloseTimeout > 0,
-			Audio:          device.PubConf.PubAudio,
+			StopOnIdle:     device.StopOnIdle,
+			Audio:          device.Audio,
 			RecordPath:     device.Record.FilePath,
 			RecordFragment: durationpb.New(device.Record.Fragment),
 			Description:    device.Description,
@@ -693,12 +693,11 @@ func (s *Server) AddDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.Suc
 		Description: req.Description,
 		StreamPath:  req.StreamPath,
 	}
-	device.PubConf = config.NewPublish()
 	defaults.SetDefaults(&device.Pull)
 	defaults.SetDefaults(&device.Record)
 	device.URL = req.PullURL
-	device.PubConf.PubAudio = req.Audio
-	device.PubConf.DelayCloseTimeout = util.Conditional(req.StopOnIdle, 5*time.Second, 0)
+	device.Audio = req.Audio
+	device.StopOnIdle = req.StopOnIdle
 	device.Record.FilePath = req.RecordPath
 	device.Record.Fragment = req.RecordFragment.AsDuration()
 	if s.DB == nil {
@@ -722,10 +721,9 @@ func (s *Server) UpdateDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.
 	target.URL = req.PullURL
 	target.ParentID = uint(req.ParentID)
 	target.Type = req.Type
-	target.PubConf = config.NewPublish()
 	target.PullOnStart = req.PullOnStart
-	target.PubConf.DelayCloseTimeout = util.Conditional(req.StopOnIdle, 5*time.Second, 0)
-	target.PubConf.PubAudio = req.Audio
+	target.StopOnIdle = req.StopOnIdle
+	target.Audio = req.Audio
 	target.Description = req.Description
 	target.Record.FilePath = req.RecordPath
 	target.Record.Fragment = req.RecordFragment.AsDuration()

@@ -58,7 +58,7 @@ type (
 		task.IJob
 		OnInit() error
 		OnStop()
-		Pull(string, config.Pull)
+		Pull(string, config.Pull, *config.Publish)
 		Transform(*Publisher, config.Transform)
 		OnPublish(*Publisher)
 	}
@@ -408,7 +408,7 @@ func (p *Plugin) OnSubscribe(streamPath string, args url.Values) {
 		if p.Meta.Puller != nil {
 			conf.Args = config.HTTPValus(args)
 			conf.URL = reg.Replace(streamPath, conf.URL)
-			p.handler.Pull(streamPath, conf)
+			p.handler.Pull(streamPath, conf, nil)
 		}
 	}
 
@@ -482,12 +482,12 @@ func (p *Plugin) Subscribe(ctx context.Context, streamPath string) (subscriber *
 	return p.SubscribeWithConfig(ctx, streamPath, p.config.Subscribe)
 }
 
-func (p *Plugin) Pull(streamPath string, conf config.Pull) {
+func (p *Plugin) Pull(streamPath string, conf config.Pull, pubConf *config.Publish) {
 	puller := p.Meta.Puller(conf)
 	if puller == nil {
 		return
 	}
-	puller.GetPullJob().Init(puller, p, streamPath, conf)
+	puller.GetPullJob().Init(puller, p, streamPath, conf, pubConf)
 }
 
 func (p *Plugin) Push(pub *Publisher, conf config.Push) {

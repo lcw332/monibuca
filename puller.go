@@ -81,12 +81,8 @@ func (p *PullJob) GetPullJob() *PullJob {
 	return p
 }
 
-func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf config.Pull) *PullJob {
-	if conf.PubConf != nil {
-		p.PublishConfig = conf.PubConf
-	} else {
-		p.PublishConfig = &plugin.config.Publish
-	}
+func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf config.Pull, pubConf *config.Publish) *PullJob {
+	p.PublishConfig = pubConf
 	p.Args = url.Values(conf.Args.DeepClone())
 	p.conf = &conf
 	remoteURL := conf.URL
@@ -128,6 +124,9 @@ func (p *PullJob) Publish() (err error) {
 	streamPath := p.StreamPath
 	if len(p.Args) > 0 {
 		streamPath += "?" + p.Args.Encode()
+	}
+	if p.PublishConfig == nil {
+		p.Publisher, err = p.Plugin.Publish(p.puller.GetTask().Context, streamPath)
 	}
 	p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.PublishConfig)
 	p.Publisher.Type = PublishTypePull
