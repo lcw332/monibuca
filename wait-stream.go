@@ -43,7 +43,7 @@ func (w *WaitManager) WakeUp(streamPath string, publisher *Publisher) {
 func (w *WaitManager) checkTimeout() {
 	for waits := range w.Range {
 		for sub := range waits.Range {
-			if time.Since(sub.waitStartTime) > sub.WaitTimeout {
+			if time.Since(sub.waitStartTime) > max(sub.WaitTimeout, sub.BufferTime) {
 				sub.Stop(ErrSubscribeTimeout)
 			}
 		}

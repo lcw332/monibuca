@@ -24,7 +24,7 @@ func (h *LogRotatePlugin) List(context.Context, *emptypb.Empty) (*pb.ResponseFil
 					Name: info.Name(), Size: info.Size(),
 				})
 			}
-			return &pb.ResponseFileInfo{Files: fileInfos}, nil
+			return &pb.ResponseFileInfo{Data: fileInfos}, nil
 		}
 	}
 	return nil, err
@@ -37,7 +37,7 @@ func (h *LogRotatePlugin) Get(_ context.Context, req *pb.RequestFileInfo) (res *
 		res = &pb.ResponseOpen{}
 		content, err2 := io.ReadAll(file)
 		if err2 == nil {
-			res.Content = string(content)
+			res.Data = string(content)
 		} else {
 			err = err2
 		}

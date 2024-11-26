@@ -783,6 +783,27 @@ func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *
 	}
 }
 
+func (s *Server) GetStreamAlias(ctx context.Context, req *emptypb.Empty) (res *pb.StreamAliasListResponse, err error) {
+	res = &pb.StreamAliasListResponse{}
+	s.Streams.Call(func() error {
+		for alias := range s.AliasStreams.Range {
+			info := &pb.StreamAlias{
+				StreamPath: alias.StreamPath,
+				Alias:      alias.Alias,
+				AutoRemove: alias.AutoRemove,
+			}
+			if s.Streams.Has(alias.Alias) {
+				info.Status = 2
+			} else if alias.Publisher != nil {
+				info.Status = 1
+			}
+			res.Data = append(res.Data, info)
+		}
+		return nil
+	})
+	return
+}
+
 func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasRequest) (res *pb.SuccessResponse, err error) {
 	res = &pb.SuccessResponse{}
 	s.Streams.Call(func() error {

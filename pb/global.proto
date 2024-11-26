@@ -103,6 +103,11 @@ service api {
       body: "*"
     };
   }
+  rpc GetStreamAlias (google.protobuf.Empty) returns (StreamAliasListResponse) {
+    option (google.api.http) = {
+      get: "/api/stream/alias/list"
+    };
+  }
   rpc SetStreamAlias (SetStreamAliasRequest) returns (SuccessResponse) {
     option (google.api.http) = {
       post: "/api/stream/alias"
@@ -446,6 +451,19 @@ message SetStreamAliasRequest {
   string streamPath = 1;
   string alias = 2;
   bool autoRemove = 3;
+}
+
+message StreamAlias {
+  string streamPath = 1;
+  string alias = 2;
+  bool autoRemove = 3;
+  uint32 status = 4;
+}
+
+message StreamAliasListResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated StreamAlias data = 3;
 }
 
 message SetStreamSpeedRequest {

@@ -18,7 +18,9 @@ service api {
 }
 
 message ResponseOpen {
-  string content = 1;
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
 }
 
 message RequestFileInfo {
@@ -26,7 +28,9 @@ message RequestFileInfo {
 }
 
 message ResponseFileInfo {
-  repeated FileInfo files = 1;
+  int32 code = 1;
+  string message = 2;
+  repeated FileInfo data = 3;
 }
 
 message FileInfo {
