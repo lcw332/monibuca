@@ -176,7 +176,7 @@ func InstallPlugin[C iPlugin](options ...any) error {
 	if _, after, found := strings.Cut(configDir, "@"); found {
 		meta.Version = after
 	} else {
-		meta.Version = pluginFilePath
+		meta.Version = "dev"
 	}
 	for _, option := range options {
 		switch v := option.(type) {

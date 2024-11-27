@@ -127,8 +127,10 @@ func (p *PullJob) Publish() (err error) {
 	}
 	if p.PublishConfig == nil {
 		p.Publisher, err = p.Plugin.Publish(p.puller.GetTask().Context, streamPath)
+		p.PublishConfig = &p.Plugin.GetCommonConf().Publish
+	} else {
+		p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.PublishConfig)
 	}
-	p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.PublishConfig)
 	p.Publisher.Type = PublishTypePull
 	if err == nil && p.conf.MaxRetry != 0 {
 		p.Publisher.OnDispose(func() {
