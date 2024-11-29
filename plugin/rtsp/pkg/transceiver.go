@@ -165,6 +165,22 @@ func (r *Receiver) Receive() (err error) {
 		},
 	}
 	return r.NetConnection.Receive(false, func(channelID byte, buf []byte) error {
+		if time.Since(rtcpTS) > 5*time.Second {
+			rtcpTS = time.Now()
+			// Serialize RTCP packets
+			rawRR, err := rr.Marshal()
+			if err != nil {
+				return err
+			}
+			rawSDES, err := sdes.Marshal()
+			if err != nil {
+				return err
+			}
+			// Send RTCP packets
+			if _, err = r.NetConnection.Write(append(rawRR, rawSDES...)); err != nil {
+				return err
+			}
+		}
 		switch int(channelID) {
 		case r.AudioChannelID:
 			if !r.PubAudio {
@@ -224,25 +240,6 @@ func (r *Receiver) Receive() (err error) {
 		default:
 
 		}
-
-		if time.Now().After(rtcpTS) {
-			rtcpTS = time.Now().Add(5 * time.Second)
-			// Serialize RTCP packets
-			rawRR, err := rr.Marshal()
-			if err != nil {
-				return err
-			}
-			rawSDES, err := sdes.Marshal()
-			if err != nil {
-				return err
-			}
-			// Send RTCP packets
-			if _, err = r.NetConnection.Write(append(rawRR, rawSDES...)); err != nil {
-				return err
-			}
-
-		}
-
 		return pkg.ErrUnsupportCodec
 	}, func(channelID byte, buf []byte) error {
 		msg := &RTCP{Channel: channelID}

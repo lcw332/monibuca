@@ -196,7 +196,7 @@ func (p *Publisher) Start() (err error) {
 		if device.Status == DeviceStatusOnline {
 			device.ChangeStatus(DeviceStatusPulling)
 			if mp4Plugin, ok := s.Plugins.Get("MP4"); ok && device.FilePath != "" {
-				mp4Plugin.Record(p, device.Record)
+				mp4Plugin.Record(p, device.Record, nil)
 			}
 		}
 	}

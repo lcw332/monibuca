@@ -3,7 +3,6 @@ package m7s
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -366,7 +365,7 @@ func (p *Plugin) OnPublish(pub *Publisher) {
 	if p.Meta.Recorder != nil {
 		for r, recConf := range onPublish.Record {
 			if recConf.FilePath = r.Replace(pub.StreamPath, recConf.FilePath); recConf.FilePath != "" {
-				p.Record(pub, recConf)
+				p.Record(pub, recConf, nil)
 			}
 		}
 	}
@@ -496,9 +495,9 @@ func (p *Plugin) Push(pub *Publisher, conf config.Push) {
 	job.Depend(pub)
 }
 
-func (p *Plugin) Record(pub *Publisher, conf config.Record) {
+func (p *Plugin) Record(pub *Publisher, conf config.Record, subConf *config.Subscribe) {
 	recorder := p.Meta.Recorder()
-	job := recorder.GetRecordJob().Init(recorder, p, pub.StreamPath, conf)
+	job := recorder.GetRecordJob().Init(recorder, p, pub.StreamPath, conf, subConf)
 	job.Depend(pub)
 }
 
@@ -556,10 +555,6 @@ func (p *Plugin) handle(pattern string, handler http.Handler) {
 		p.Server.config.HTTP.Handle(pattern, handler, last)
 	}
 	p.Server.apiList = append(p.Server.apiList, pattern)
-}
-
-func (p *Plugin) AddLogHandler(handler slog.Handler) {
-	p.Server.LogHandler.Add(handler)
 }
 
 func (p *Plugin) SaveConfig() (err error) {
