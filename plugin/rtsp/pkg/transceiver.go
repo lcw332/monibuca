@@ -176,8 +176,11 @@ func (r *Receiver) Receive() (err error) {
 			if err != nil {
 				return err
 			}
+			length := len(rawRR) + len(rawSDES)
+			rtcp := append([]byte{'$', 0x03, byte(length >> 8), byte(length)}, rawRR...)
+			rtcp = append(rtcp, rawSDES...)
 			// Send RTCP packets
-			if _, err = r.NetConnection.Write(append(rawRR, rawSDES...)); err != nil {
+			if _, err = r.NetConnection.Write(rtcp); err != nil {
 				return err
 			}
 		}
