@@ -54,6 +54,7 @@ func (config *Config) Get(key string) (v *Config) {
 	if config.propsMap == nil {
 		config.propsMap = make(map[string]*Config)
 	}
+	key = strings.ToLower(key)
 	if v, ok := config.propsMap[key]; ok {
 		return v
 	} else {
