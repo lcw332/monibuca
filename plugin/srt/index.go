@@ -1,6 +1,7 @@
 package plugin_srt
 
 import (
+	"fmt"
 	"strings"
 
 	srt "github.com/datarhei/gosrt"
@@ -30,6 +31,14 @@ func (p *SRTPlugin) OnInit() error {
 	t.server.Addr = p.ListenAddr
 	t.plugin = p
 	p.AddTask(&t)
+	_, port, _ := strings.Cut(p.ListenAddr, ":")
+	if port == "6000" {
+		p.PushAddr = append(p.PushAddr, "srt://{hostName}?streamid=publish:/{streamPath}")
+		p.PlayAddr = append(p.PlayAddr, "srt://{hostName}?streamid=subscribe:/{streamPath}")
+	} else if port != "" {
+		p.PushAddr = append(p.PushAddr, fmt.Sprintf("srt://{hostName}:%s?streamid=publish:/{streamPath}", port))
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("srt://{hostName}:%s?streamid=subscribe:/{streamPath}", port))
+	}
 	return nil
 }
 

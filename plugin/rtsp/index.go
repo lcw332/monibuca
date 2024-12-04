@@ -1,7 +1,9 @@
 package plugin_rtsp
 
 import (
+	"fmt"
 	"net"
+	"strings"
 
 	"m7s.live/v5/pkg/task"
 
@@ -24,10 +26,32 @@ func (p *RTSPPlugin) OnTCPConnect(conn *net.TCPConn) task.ITask {
 	return ret
 }
 
-func (p *RTSPPlugin) OnDeviceAdd(device *m7s.Device) any {
-	ret := &RTSPDevice{}
-	ret.Device = device
+func (p *RTSPPlugin) OnPullProxyAdd(pullProxy *m7s.PullProxy) any {
+	ret := &RTSPPullProxy{}
+	ret.PullProxy = pullProxy
 	ret.Plugin = &p.Plugin
-	ret.Logger = p.With("device", device.Name)
+	ret.Logger = p.With("pullProxy", pullProxy.Name)
 	return ret
+}
+
+func (p *RTSPPlugin) OnPushProxyAdd(pushProxy *m7s.PushProxy) any {
+	ret := &RTSPPushProxy{}
+	ret.PushProxy = pushProxy
+	ret.Plugin = &p.Plugin
+	ret.Logger = p.With("pushProxy", pushProxy.Name)
+	return ret
+}
+
+func (p *RTSPPlugin) OnInit() (err error) {
+	if tcpAddr := p.GetCommonConf().TCP.ListenAddr; tcpAddr != "" {
+		_, port, _ := strings.Cut(tcpAddr, ":")
+		if port == "554" {
+			p.PlayAddr = append(p.PlayAddr, "rtsp://{hostName}/{streamPath}")
+			p.PushAddr = append(p.PushAddr, "rtsp://{hostName}/{streamPath}")
+		} else {
+			p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("rtsp://{hostName}:%s/{streamPath}", port))
+			p.PushAddr = append(p.PushAddr, fmt.Sprintf("rtsp://{hostName}:%s/{streamPath}", port))
+		}
+	}
+	return
 }

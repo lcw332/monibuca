@@ -19,6 +19,7 @@ type Pusher = func() IPusher
 type PushJob struct {
 	Connection
 	Subscriber *Subscriber
+	SubConf    *config.Subscribe
 	pusher     IPusher
 }
 
@@ -26,9 +27,10 @@ func (p *PushJob) GetKey() string {
 	return p.Connection.RemoteURL
 }
 
-func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf config.Push) *PushJob {
+func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf config.Push, subConf *config.Subscribe) *PushJob {
 	p.Connection.Init(plugin, streamPath, conf.URL, conf.Proxy, http.Header(conf.Header))
 	p.pusher = pusher
+	p.SubConf = subConf
 	p.SetDescriptions(task.Description{
 		"plugin":     plugin.Meta.Name,
 		"streamPath": streamPath,
@@ -41,7 +43,11 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 }
 
 func (p *PushJob) Subscribe() (err error) {
-	p.Subscriber, err = p.Plugin.Subscribe(p.pusher.GetTask().Context, p.StreamPath)
+	if p.SubConf != nil {
+		p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.pusher.GetTask().Context, p.StreamPath, *p.SubConf)
+	} else {
+		p.Subscriber, err = p.Plugin.Subscribe(p.pusher.GetTask().Context, p.StreamPath)
+	}
 	if p.Subscriber != nil {
 		p.Subscriber.Internal = true
 	}

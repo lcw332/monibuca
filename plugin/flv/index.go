@@ -1,6 +1,7 @@
 package plugin_flv
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -23,6 +24,22 @@ const defaultConfig m7s.DefaultYaml = `publish:
   speed: 1`
 
 var _ = m7s.InstallPlugin[FLVPlugin](defaultConfig, NewPuller, NewRecorder)
+
+func (plugin *FLVPlugin) OnInit() (err error) {
+	_, port, _ := strings.Cut(plugin.GetCommonConf().HTTP.ListenAddr, ":")
+	if port == "80" {
+		plugin.PlayAddr = append(plugin.PlayAddr, "http://{hostName}/flv/{streamPath}", "ws://{hostName}/flv/{streamPath}")
+	} else if port != "" {
+		plugin.PlayAddr = append(plugin.PlayAddr, fmt.Sprintf("http://{hostName}:%s/flv/{streamPath}", port), fmt.Sprintf("ws://{hostName}:%s/flv/{streamPath}", port))
+	}
+	_, port, _ = strings.Cut(plugin.GetCommonConf().HTTP.ListenAddrTLS, ":")
+	if port == "443" {
+		plugin.PlayAddr = append(plugin.PlayAddr, "https://{hostName}/flv/{streamPath}", "wss://{hostName}/flv/{streamPath}")
+	} else if port != "" {
+		plugin.PlayAddr = append(plugin.PlayAddr, fmt.Sprintf("https://{hostName}:%s/flv/{streamPath}", port), fmt.Sprintf("wss://{hostName}:%s/flv/{streamPath}", port))
+	}
+	return
+}
 
 func (plugin *FLVPlugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	streamPath := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/"), ".flv")
@@ -79,9 +96,9 @@ func (plugin *FLVPlugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = live.Run()
 }
 
-func (plugin *FLVPlugin) OnDeviceAdd(device *m7s.Device) any {
-	d := &FLVDevice{}
-	d.Device = device
+func (plugin *FLVPlugin) OnPullProxyAdd(pullProxy *m7s.PullProxy) any {
+	d := &m7s.HTTPPullProxy{}
+	d.PullProxy = pullProxy
 	d.Plugin = &plugin.Plugin
 	return d
 }

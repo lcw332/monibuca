@@ -2,11 +2,13 @@ package plugin_hls
 
 import (
 	"embed"
-	"m7s.live/v5/pkg/util"
+	"fmt"
 	"net/http"
 	"path"
 	"strings"
 	"time"
+
+	"m7s.live/v5/pkg/util"
 
 	"m7s.live/v5"
 	hls "m7s.live/v5/plugin/hls/pkg"
@@ -21,9 +23,25 @@ type HLSPlugin struct {
 	m7s.Plugin
 }
 
-func (p *HLSPlugin) OnDeviceAdd(device *m7s.Device) any {
-	d := &hls.HLSDevice{}
-	d.Device = device
+func (p *HLSPlugin) OnInit() (err error) {
+	_, port, _ := strings.Cut(p.GetCommonConf().HTTP.ListenAddr, ":")
+	if port == "80" {
+		p.PlayAddr = append(p.PlayAddr, "http://{hostName}/hls/{streamPath}.m3u8")
+	} else if port != "" {
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("http://{hostName}:%s/hls/{streamPath}.m3u8", port))
+	}
+	_, port, _ = strings.Cut(p.GetCommonConf().HTTP.ListenAddrTLS, ":")
+	if port == "443" {
+		p.PlayAddr = append(p.PlayAddr, "https://{hostName}/hls/{streamPath}.m3u8")
+	} else if port != "" {
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("https://{hostName}:%s/hls/{streamPath}.m3u8", port))
+	}
+	return
+}
+
+func (p *HLSPlugin) OnPullProxyAdd(pullProxy *m7s.PullProxy) any {
+	d := &m7s.HTTPPullProxy{}
+	d.PullProxy = pullProxy
 	d.Plugin = &p.Plugin
 	return d
 }

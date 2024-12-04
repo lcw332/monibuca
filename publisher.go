@@ -143,7 +143,7 @@ type Publisher struct {
 	GOP                    int
 	OnSeek                 func(time.Time)
 	OnGetPosition          func() time.Time
-	Device                 *Device
+	PullProxy              *PullProxy
 	dumpFile               *os.File
 }
 
@@ -189,14 +189,14 @@ func (p *Publisher) Start() (err error) {
 	}
 	s.Streams.Set(p)
 	p.Info("publish")
-	if device, ok := s.Devices.Find(func(device *Device) bool {
-		return device.GetStreamPath() == p.StreamPath
+	if pullProxy, ok := s.PullProxies.Find(func(pullProxy *PullProxy) bool {
+		return pullProxy.GetStreamPath() == p.StreamPath
 	}); ok {
-		p.Device = device
-		if device.Status == DeviceStatusOnline {
-			device.ChangeStatus(DeviceStatusPulling)
-			if mp4Plugin, ok := s.Plugins.Get("MP4"); ok && device.FilePath != "" {
-				mp4Plugin.Record(p, device.Record, nil)
+		p.PullProxy = pullProxy
+		if pullProxy.Status == PullProxyStatusOnline {
+			pullProxy.ChangeStatus(PullProxyStatusPulling)
+			if mp4Plugin, ok := s.Plugins.Get("MP4"); ok && pullProxy.FilePath != "" {
+				mp4Plugin.Record(p, pullProxy.Record, nil)
 			}
 		}
 	}
@@ -627,8 +627,8 @@ func (p *Publisher) Dispose() {
 		p.dumpFile.Close()
 	}
 	p.State = PublisherStateDisposed
-	if p.Device != nil && p.Device.Status == DeviceStatusPulling && s.Devices.Has(p.Device.GetKey()) {
-		p.Device.ChangeStatus(DeviceStatusOnline)
+	if p.PullProxy != nil && p.PullProxy.Status == PullProxyStatusPulling && s.PullProxies.Has(p.PullProxy.GetKey()) {
+		p.PullProxy.ChangeStatus(PullProxyStatusOnline)
 	}
 }
 

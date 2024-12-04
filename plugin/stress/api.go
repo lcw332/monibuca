@@ -43,7 +43,7 @@ func (r *StressPlugin) push(count int, streamPath, format, remoteHost string, pu
 	if i := r.pushers.Length; count > i {
 		for j := i; j < count; j++ {
 			p := pusher()
-			ctx := p.GetPushJob().Init(p, &r.Plugin, streamPath, config.Push{URL: fmt.Sprintf(format, remoteHost, j)})
+			ctx := p.GetPushJob().Init(p, &r.Plugin, streamPath, config.Push{URL: fmt.Sprintf(format, remoteHost, j)}, nil)
 			if err = ctx.WaitStarted(); err != nil {
 				return
 			}

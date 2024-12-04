@@ -2,8 +2,10 @@ package plugin_rtmp
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"m7s.live/v5"
 	"m7s.live/v5/pkg/task"
@@ -180,10 +182,42 @@ func (task *RTMPServer) Go() (err error) {
 	return
 }
 
-func (p *RTMPPlugin) OnDeviceAdd(device *m7s.Device) any {
-	ret := &RTMPDevice{}
-	ret.Device = device
+func (p *RTMPPlugin) OnPullProxyAdd(pullProxy *m7s.PullProxy) any {
+	ret := &RTMPPullProxy{}
+	ret.PullProxy = pullProxy
 	ret.Plugin = &p.Plugin
-	ret.Logger = p.With("device", device.Name)
+	ret.Logger = p.With("pullProxy", pullProxy.Name)
 	return ret
+}
+
+func (p *RTMPPlugin) OnPushProxyAdd(pushProxy *m7s.PushProxy) any {
+	ret := &RTMPPushProxy{}
+	ret.PushProxy = pushProxy
+	ret.Plugin = &p.Plugin
+	ret.Logger = p.With("pushProxy", pushProxy.Name)
+	return ret
+}
+
+func (p *RTMPPlugin) OnInit() (err error) {
+	if tcpAddr := p.GetCommonConf().TCP.ListenAddr; tcpAddr != "" {
+		_, port, _ := strings.Cut(tcpAddr, ":")
+		if port == "1935" {
+			p.PushAddr = append(p.PushAddr, "rtmp://{hostName}/{streamPath}")
+			p.PlayAddr = append(p.PlayAddr, "rtmp://{hostName}/{streamPath}")
+		} else {
+			p.PushAddr = append(p.PushAddr, fmt.Sprintf("rtmp://{hostName}:%s/{streamPath}", port))
+			p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("rtmp://{hostName}:%s/{streamPath}", port))
+		}
+	}
+	if tcpAddrTLS := p.GetCommonConf().TCP.ListenAddrTLS; tcpAddrTLS != "" {
+		_, port, _ := strings.Cut(tcpAddrTLS, ":")
+		if port == "443" {
+			p.PushAddr = append(p.PushAddr, "rtmps://{hostName}/{streamPath}")
+			p.PlayAddr = append(p.PlayAddr, "rtmps://{hostName}/{streamPath}")
+		} else {
+			p.PushAddr = append(p.PushAddr, fmt.Sprintf("rtmps://{hostName}:%s/{streamPath}", port))
+			p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("rtmps://{hostName}:%s/{streamPath}", port))
+		}
+	}
+	return
 }

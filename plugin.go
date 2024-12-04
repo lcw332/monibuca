@@ -58,6 +58,7 @@ type (
 		OnInit() error
 		OnStop()
 		Pull(string, config.Pull, *config.Publish)
+		Push(string, config.Push, *config.Subscribe)
 		Transform(*Publisher, config.Transform)
 		OnPublish(*Publisher)
 	}
@@ -81,9 +82,11 @@ type (
 	IQUICPlugin interface {
 		OnQUICConnect(quic.Connection) task.ITask
 	}
-
-	IDevicePlugin interface {
-		OnDeviceAdd(device *Device) any
+	IPullProxyPlugin interface {
+		OnPullProxyAdd(pullProxy *PullProxy) any
+	}
+	IPushProxyPlugin interface {
+		OnPushProxyAdd(pushProxy *PushProxy) any
 	}
 )
 
@@ -101,7 +104,7 @@ func (plugin *PluginMeta) Init(s *Server, userConfig map[string]any) (p *Plugin)
 	p.Logger = s.Logger.With("plugin", plugin.Name)
 	upperName := strings.ToUpper(plugin.Name)
 	if os.Getenv(upperName+"_ENABLE") == "false" {
-		p.Disabled = true
+		p.disable("env")
 		p.Warn("disabled by env")
 		return
 	}
@@ -137,6 +140,7 @@ func (plugin *PluginMeta) Init(s *Server, userConfig map[string]any) (p *Plugin)
 		p.Disabled = false
 	}
 	if p.Disabled {
+		p.disable("config")
 		p.Warn("plugin disabled")
 		return
 	} else {
@@ -151,7 +155,7 @@ func (plugin *PluginMeta) Init(s *Server, userConfig map[string]any) (p *Plugin)
 			s.DB, err = gorm.Open(factory(p.config.DSN), &gorm.Config{})
 			if err != nil {
 				s.Error("failed to connect database", "error", err, "dsn", s.config.DSN, "type", s.config.DBType)
-				p.Disabled = true
+				p.disable(fmt.Sprintf("database %v", err))
 				return
 			}
 		}
@@ -209,13 +213,14 @@ var _ IPlugin = (*Plugin)(nil)
 
 type Plugin struct {
 	task.Work
-	Disabled bool
-	Meta     *PluginMeta
-	config   config.Common
 	config.Config
-	handler IPlugin
-	Server  *Server
-	DB      *gorm.DB
+	Disabled           bool
+	Meta               *PluginMeta
+	PushAddr, PlayAddr []string
+	config             config.Common
+	handler            IPlugin
+	Server             *Server
+	DB                 *gorm.DB
 }
 
 func (Plugin) nothing() {
@@ -256,6 +261,12 @@ func (p *Plugin) settingPath() string {
 	return filepath.Join(p.Server.SettingDir, strings.ToLower(p.Meta.Name)+".yaml")
 }
 
+func (p *Plugin) disable(reason string) {
+	p.Disabled = true
+	p.SetDescription("disableReason", reason)
+	p.Server.disabledPlugins = append(p.Server.disabledPlugins, p)
+}
+
 func (p *Plugin) assign() {
 	f, err := os.Open(p.settingPath())
 	defer f.Close()
@@ -280,6 +291,7 @@ func (p *Plugin) Start() (err error) {
 		s.grpcServer.RegisterService(p.Meta.ServiceDesc, p.handler)
 		if p.Meta.RegisterGRPCHandler != nil {
 			if err = p.Meta.RegisterGRPCHandler(p.Context, s.config.HTTP.GetGRPCMux(), s.grpcClientConn); err != nil {
+				p.disable(fmt.Sprintf("grpc %v", err))
 				return
 			} else {
 				p.Info("grpc handler registered")
@@ -288,9 +300,11 @@ func (p *Plugin) Start() (err error) {
 	}
 	s.Plugins.Add(p)
 	if err = p.listen(); err != nil {
+		p.disable(fmt.Sprintf("listen %v", err))
 		return
 	}
 	if err = p.handler.OnInit(); err != nil {
+		p.disable(fmt.Sprintf("init %v", err))
 		return
 	}
 	return
@@ -374,7 +388,7 @@ func (p *Plugin) OnPublish(pub *Publisher) {
 	if p.Meta.Pusher != nil {
 		for r, pushConf := range onPublish.Push {
 			if pushConf.URL = r.Replace(pub.StreamPath, pushConf.URL); pushConf.URL != "" {
-				p.Push(pub, pushConf)
+				p.Push(pub.StreamPath, pushConf, nil)
 			}
 		}
 	}
@@ -505,10 +519,9 @@ func (p *Plugin) Pull(streamPath string, conf config.Pull, pubConf *config.Publi
 	puller.GetPullJob().Init(puller, p, streamPath, conf, pubConf)
 }
 
-func (p *Plugin) Push(pub *Publisher, conf config.Push) {
+func (p *Plugin) Push(streamPath string, conf config.Push, subConf *config.Subscribe) {
 	pusher := p.Meta.Pusher()
-	job := pusher.GetPushJob().Init(pusher, p, pub.StreamPath, conf)
-	job.Depend(pub)
+	pusher.GetPushJob().Init(pusher, p, streamPath, conf, subConf)
 }
 
 func (p *Plugin) Record(pub *Publisher, conf config.Record, subConf *config.Subscribe) {

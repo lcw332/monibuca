@@ -35,6 +35,22 @@ type LLHLSPlugin struct {
 	Plugin
 }
 
+func (c *LLHLSPlugin) OnInit() (err error) {
+	_, port, _ := strings.Cut(c.GetCommonConf().HTTP.ListenAddr, ":")
+	if port == "80" {
+		c.PlayAddr = append(c.PlayAddr, "http://{hostName}/llhls/{streamPath}/index.m3u8")
+	} else if port != "" {
+		c.PlayAddr = append(c.PlayAddr, fmt.Sprintf("http://{hostName}:%s/llhls/{streamPath}/index.m3u8", port))
+	}
+	_, port, _ = strings.Cut(c.GetCommonConf().HTTP.ListenAddrTLS, ":")
+	if port == "443" {
+		c.PlayAddr = append(c.PlayAddr, "https://{hostName}/llhls/{streamPath}/index.m3u8")
+	} else if port != "" {
+		c.PlayAddr = append(c.PlayAddr, fmt.Sprintf("https://{hostName}:%s/llhls/{streamPath}/index.m3u8", port))
+	}
+	return
+}
+
 func (c *LLHLSPlugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, ".html") {
 		w.Write([]byte(`<html><body><video src="/llhls/` + strings.TrimSuffix(r.URL.Path, ".html") + `/index.m3u8"></video></body></html>`))

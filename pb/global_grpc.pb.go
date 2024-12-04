@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ApiClient interface {
 	SysInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SysInfoResponse, error)
+	DisabledPlugins(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DisabledPluginsResponse, error)
 	Summary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SummaryResponse, error)
 	Shutdown(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	Restart(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
@@ -50,11 +51,17 @@ type ApiClient interface {
 	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
 	GetFormily(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigResponse, error)
 	ModifyConfig(ctx context.Context, in *ModifyConfigRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
-	GetDeviceList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DeviceListResponse, error)
-	AddDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
-	RemoveDevice(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
-	UpdateDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
+	GetPullProxyList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PullProxyListResponse, error)
+	AddPullProxy(ctx context.Context, in *PullProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
+	RemovePullProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
+	UpdatePullProxy(ctx context.Context, in *PullProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
+	GetPushProxyList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushProxyListResponse, error)
+	AddPushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
+	RemovePushProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
+	UpdatePushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error)
+	GetPushes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushListResponse, error)
+	AddPush(ctx context.Context, in *AddPushRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 }
 
 type apiClient struct {
@@ -68,6 +75,15 @@ func NewApiClient(cc grpc.ClientConnInterface) ApiClient {
 func (c *apiClient) SysInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SysInfoResponse, error) {
 	out := new(SysInfoResponse)
 	err := c.cc.Invoke(ctx, "/global.api/SysInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) DisabledPlugins(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DisabledPluginsResponse, error) {
+	out := new(DisabledPluginsResponse)
+	err := c.cc.Invoke(ctx, "/global.api/DisabledPlugins", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -308,36 +324,72 @@ func (c *apiClient) ModifyConfig(ctx context.Context, in *ModifyConfigRequest, o
 	return out, nil
 }
 
-func (c *apiClient) GetDeviceList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DeviceListResponse, error) {
-	out := new(DeviceListResponse)
-	err := c.cc.Invoke(ctx, "/global.api/GetDeviceList", in, out, opts...)
+func (c *apiClient) GetPullProxyList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PullProxyListResponse, error) {
+	out := new(PullProxyListResponse)
+	err := c.cc.Invoke(ctx, "/global.api/GetPullProxyList", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiClient) AddDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
+func (c *apiClient) AddPullProxy(ctx context.Context, in *PullProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	out := new(SuccessResponse)
-	err := c.cc.Invoke(ctx, "/global.api/AddDevice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/global.api/AddPullProxy", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiClient) RemoveDevice(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
+func (c *apiClient) RemovePullProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	out := new(SuccessResponse)
-	err := c.cc.Invoke(ctx, "/global.api/RemoveDevice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/global.api/RemovePullProxy", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiClient) UpdateDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
+func (c *apiClient) UpdatePullProxy(ctx context.Context, in *PullProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	out := new(SuccessResponse)
-	err := c.cc.Invoke(ctx, "/global.api/UpdateDevice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/global.api/UpdatePullProxy", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) GetPushProxyList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushProxyListResponse, error) {
+	out := new(PushProxyListResponse)
+	err := c.cc.Invoke(ctx, "/global.api/GetPushProxyList", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) AddPushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/AddPushProxy", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) RemovePushProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/RemovePushProxy", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) UpdatePushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/UpdatePushProxy", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -353,11 +405,30 @@ func (c *apiClient) GetRecording(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
+func (c *apiClient) GetPushes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushListResponse, error) {
+	out := new(PushListResponse)
+	err := c.cc.Invoke(ctx, "/global.api/GetPushes", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) AddPush(ctx context.Context, in *AddPushRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
+	out := new(SuccessResponse)
+	err := c.cc.Invoke(ctx, "/global.api/AddPush", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
 type ApiServer interface {
 	SysInfo(context.Context, *emptypb.Empty) (*SysInfoResponse, error)
+	DisabledPlugins(context.Context, *emptypb.Empty) (*DisabledPluginsResponse, error)
 	Summary(context.Context, *emptypb.Empty) (*SummaryResponse, error)
 	Shutdown(context.Context, *RequestWithId) (*SuccessResponse, error)
 	Restart(context.Context, *RequestWithId) (*SuccessResponse, error)
@@ -384,11 +455,17 @@ type ApiServer interface {
 	GetConfig(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
 	GetFormily(context.Context, *GetConfigRequest) (*GetConfigResponse, error)
 	ModifyConfig(context.Context, *ModifyConfigRequest) (*SuccessResponse, error)
-	GetDeviceList(context.Context, *emptypb.Empty) (*DeviceListResponse, error)
-	AddDevice(context.Context, *DeviceInfo) (*SuccessResponse, error)
-	RemoveDevice(context.Context, *RequestWithId) (*SuccessResponse, error)
-	UpdateDevice(context.Context, *DeviceInfo) (*SuccessResponse, error)
+	GetPullProxyList(context.Context, *emptypb.Empty) (*PullProxyListResponse, error)
+	AddPullProxy(context.Context, *PullProxyInfo) (*SuccessResponse, error)
+	RemovePullProxy(context.Context, *RequestWithId) (*SuccessResponse, error)
+	UpdatePullProxy(context.Context, *PullProxyInfo) (*SuccessResponse, error)
+	GetPushProxyList(context.Context, *emptypb.Empty) (*PushProxyListResponse, error)
+	AddPushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error)
+	RemovePushProxy(context.Context, *RequestWithId) (*SuccessResponse, error)
+	UpdatePushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error)
 	GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error)
+	GetPushes(context.Context, *emptypb.Empty) (*PushListResponse, error)
+	AddPush(context.Context, *AddPushRequest) (*SuccessResponse, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -398,6 +475,9 @@ type UnimplementedApiServer struct {
 
 func (UnimplementedApiServer) SysInfo(context.Context, *emptypb.Empty) (*SysInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SysInfo not implemented")
+}
+func (UnimplementedApiServer) DisabledPlugins(context.Context, *emptypb.Empty) (*DisabledPluginsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DisabledPlugins not implemented")
 }
 func (UnimplementedApiServer) Summary(context.Context, *emptypb.Empty) (*SummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Summary not implemented")
@@ -477,20 +557,38 @@ func (UnimplementedApiServer) GetFormily(context.Context, *GetConfigRequest) (*G
 func (UnimplementedApiServer) ModifyConfig(context.Context, *ModifyConfigRequest) (*SuccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ModifyConfig not implemented")
 }
-func (UnimplementedApiServer) GetDeviceList(context.Context, *emptypb.Empty) (*DeviceListResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetDeviceList not implemented")
+func (UnimplementedApiServer) GetPullProxyList(context.Context, *emptypb.Empty) (*PullProxyListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPullProxyList not implemented")
 }
-func (UnimplementedApiServer) AddDevice(context.Context, *DeviceInfo) (*SuccessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddDevice not implemented")
+func (UnimplementedApiServer) AddPullProxy(context.Context, *PullProxyInfo) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPullProxy not implemented")
 }
-func (UnimplementedApiServer) RemoveDevice(context.Context, *RequestWithId) (*SuccessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveDevice not implemented")
+func (UnimplementedApiServer) RemovePullProxy(context.Context, *RequestWithId) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemovePullProxy not implemented")
 }
-func (UnimplementedApiServer) UpdateDevice(context.Context, *DeviceInfo) (*SuccessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateDevice not implemented")
+func (UnimplementedApiServer) UpdatePullProxy(context.Context, *PullProxyInfo) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePullProxy not implemented")
+}
+func (UnimplementedApiServer) GetPushProxyList(context.Context, *emptypb.Empty) (*PushProxyListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPushProxyList not implemented")
+}
+func (UnimplementedApiServer) AddPushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPushProxy not implemented")
+}
+func (UnimplementedApiServer) RemovePushProxy(context.Context, *RequestWithId) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemovePushProxy not implemented")
+}
+func (UnimplementedApiServer) UpdatePushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePushProxy not implemented")
 }
 func (UnimplementedApiServer) GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRecording not implemented")
+}
+func (UnimplementedApiServer) GetPushes(context.Context, *emptypb.Empty) (*PushListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPushes not implemented")
+}
+func (UnimplementedApiServer) AddPush(context.Context, *AddPushRequest) (*SuccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPush not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -519,6 +617,24 @@ func _Api_SysInfo_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ApiServer).SysInfo(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_DisabledPlugins_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).DisabledPlugins(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/DisabledPlugins",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).DisabledPlugins(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -991,74 +1107,146 @@ func _Api_ModifyConfig_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Api_GetDeviceList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Api_GetPullProxyList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiServer).GetDeviceList(ctx, in)
+		return srv.(ApiServer).GetPullProxyList(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/global.api/GetDeviceList",
+		FullMethod: "/global.api/GetPullProxyList",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).GetDeviceList(ctx, req.(*emptypb.Empty))
+		return srv.(ApiServer).GetPullProxyList(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Api_AddDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeviceInfo)
+func _Api_AddPullProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullProxyInfo)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiServer).AddDevice(ctx, in)
+		return srv.(ApiServer).AddPullProxy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/global.api/AddDevice",
+		FullMethod: "/global.api/AddPullProxy",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).AddDevice(ctx, req.(*DeviceInfo))
+		return srv.(ApiServer).AddPullProxy(ctx, req.(*PullProxyInfo))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Api_RemoveDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Api_RemovePullProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestWithId)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiServer).RemoveDevice(ctx, in)
+		return srv.(ApiServer).RemovePullProxy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/global.api/RemoveDevice",
+		FullMethod: "/global.api/RemovePullProxy",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).RemoveDevice(ctx, req.(*RequestWithId))
+		return srv.(ApiServer).RemovePullProxy(ctx, req.(*RequestWithId))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Api_UpdateDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeviceInfo)
+func _Api_UpdatePullProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullProxyInfo)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiServer).UpdateDevice(ctx, in)
+		return srv.(ApiServer).UpdatePullProxy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/global.api/UpdateDevice",
+		FullMethod: "/global.api/UpdatePullProxy",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).UpdateDevice(ctx, req.(*DeviceInfo))
+		return srv.(ApiServer).UpdatePullProxy(ctx, req.(*PullProxyInfo))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_GetPushProxyList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetPushProxyList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetPushProxyList",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetPushProxyList(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_AddPushProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PushProxyInfo)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).AddPushProxy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/AddPushProxy",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).AddPushProxy(ctx, req.(*PushProxyInfo))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_RemovePushProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithId)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).RemovePushProxy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/RemovePushProxy",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).RemovePushProxy(ctx, req.(*RequestWithId))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_UpdatePushProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PushProxyInfo)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).UpdatePushProxy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/UpdatePushProxy",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).UpdatePushProxy(ctx, req.(*PushProxyInfo))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1081,6 +1269,42 @@ func _Api_GetRecording_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_GetPushes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetPushes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetPushes",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetPushes(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_AddPush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddPushRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).AddPush(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/AddPush",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).AddPush(ctx, req.(*AddPushRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1091,6 +1315,10 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SysInfo",
 			Handler:    _Api_SysInfo_Handler,
+		},
+		{
+			MethodName: "DisabledPlugins",
+			Handler:    _Api_DisabledPlugins_Handler,
 		},
 		{
 			MethodName: "Summary",
@@ -1197,24 +1425,48 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Api_ModifyConfig_Handler,
 		},
 		{
-			MethodName: "GetDeviceList",
-			Handler:    _Api_GetDeviceList_Handler,
+			MethodName: "GetPullProxyList",
+			Handler:    _Api_GetPullProxyList_Handler,
 		},
 		{
-			MethodName: "AddDevice",
-			Handler:    _Api_AddDevice_Handler,
+			MethodName: "AddPullProxy",
+			Handler:    _Api_AddPullProxy_Handler,
 		},
 		{
-			MethodName: "RemoveDevice",
-			Handler:    _Api_RemoveDevice_Handler,
+			MethodName: "RemovePullProxy",
+			Handler:    _Api_RemovePullProxy_Handler,
 		},
 		{
-			MethodName: "UpdateDevice",
-			Handler:    _Api_UpdateDevice_Handler,
+			MethodName: "UpdatePullProxy",
+			Handler:    _Api_UpdatePullProxy_Handler,
+		},
+		{
+			MethodName: "GetPushProxyList",
+			Handler:    _Api_GetPushProxyList_Handler,
+		},
+		{
+			MethodName: "AddPushProxy",
+			Handler:    _Api_AddPushProxy_Handler,
+		},
+		{
+			MethodName: "RemovePushProxy",
+			Handler:    _Api_RemovePushProxy_Handler,
+		},
+		{
+			MethodName: "UpdatePushProxy",
+			Handler:    _Api_UpdatePushProxy_Handler,
 		},
 		{
 			MethodName: "GetRecording",
 			Handler:    _Api_GetRecording_Handler,
+		},
+		{
+			MethodName: "GetPushes",
+			Handler:    _Api_GetPushes_Handler,
+		},
+		{
+			MethodName: "AddPush",
+			Handler:    _Api_AddPush_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

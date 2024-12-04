@@ -116,11 +116,11 @@ func (gb *GB28181Plugin) OnInit() (err error) {
 	return
 }
 
-func (p *GB28181Plugin) OnDeviceAdd(device *m7s.Device) any {
-	deviceID, channelID, _ := strings.Cut(device.URL, "/")
+func (p *GB28181Plugin) OnPullProxyAdd(pullProxy *m7s.PullProxy) any {
+	deviceID, channelID, _ := strings.Cut(pullProxy.URL, "/")
 	if d, ok := p.devices.Get(deviceID); ok {
 		if channel, ok := d.channels.Get(channelID); ok {
-			channel.AbstractDevice = device
+			channel.AbstractDevice = pullProxy
 			return channel
 		}
 	}
@@ -336,12 +336,12 @@ func (gb *GB28181Plugin) StoreDevice(id string, req *sip.Request) (d *Device) {
 	d.OnStart(func() {
 		gb.devices.Add(d)
 		d.channels.OnAdd(func(c *Channel) {
-			if absDevice, ok := gb.Server.Devices.Find(func(absDevice *m7s.Device) bool {
+			if absDevice, ok := gb.Server.PullProxies.Find(func(absDevice *m7s.PullProxy) bool {
 				return absDevice.Type == "gb28181" && absDevice.URL == fmt.Sprintf("%s/%s", d.ID, c.DeviceID)
 			}); ok {
 				c.AbstractDevice = absDevice
 				absDevice.Handler = c
-				absDevice.ChangeStatus(m7s.DeviceStatusOnline)
+				absDevice.ChangeStatus(m7s.PullProxyStatusOnline)
 			}
 			if gb.AutoInvite {
 				gb.Pull(fmt.Sprintf("%s/%s", d.ID, c.DeviceID), config.Pull{
@@ -355,7 +355,7 @@ func (gb *GB28181Plugin) StoreDevice(id string, req *sip.Request) (d *Device) {
 		if gb.devices.RemoveByKey(d.ID) {
 			for c := range d.channels.Range {
 				if c.AbstractDevice != nil {
-					c.AbstractDevice.ChangeStatus(m7s.DeviceStatusOffline)
+					c.AbstractDevice.ChangeStatus(m7s.PullProxyStatusOffline)
 				}
 			}
 		}

@@ -13,6 +13,11 @@ service api {
       get: "/api/sysinfo"
     };
   }
+  rpc DisabledPlugins (google.protobuf.Empty) returns (DisabledPluginsResponse) {
+    option (google.api.http) = {
+      get: "/api/plugins/disabled"
+    };
+  }
   rpc Summary (google.protobuf.Empty) returns (SummaryResponse) {
     option (google.api.http) = {
       get: "/api/summary"
@@ -153,26 +158,49 @@ service api {
       body: "yaml"
     };
   }
-  rpc GetDeviceList (google.protobuf.Empty) returns (DeviceListResponse) {
+  rpc GetPullProxyList (google.protobuf.Empty) returns (PullProxyListResponse) {
     option (google.api.http) = {
-      get: "/api/device/list"
+      get: "/api/proxy/pull/list"
     };
   }
-  rpc AddDevice (DeviceInfo) returns (SuccessResponse) {
+  rpc AddPullProxy (PullProxyInfo) returns (SuccessResponse) {
     option (google.api.http) = {
-      post: "/api/device/add"
+      post: "/api/proxy/pull/add"
       body: "*"
     };
   }
-  rpc RemoveDevice (RequestWithId) returns (SuccessResponse) {
+  rpc RemovePullProxy (RequestWithId) returns (SuccessResponse) {
     option (google.api.http) = {
-      post: "/api/device/remove/{id}"
+      post: "/api/proxy/pull/remove/{id}"
       body: "*"
     };
   }
-  rpc UpdateDevice (DeviceInfo) returns (SuccessResponse) {
+  rpc UpdatePullProxy (PullProxyInfo) returns (SuccessResponse) {
     option (google.api.http) = {
-      post: "/api/device/update"
+      post: "/api/proxy/pull/update"
+      body: "*"
+    };
+  }
+  rpc GetPushProxyList (google.protobuf.Empty) returns (PushProxyListResponse) {
+    option (google.api.http) = {
+      get: "/api/proxy/push/list"
+    };
+  }
+  rpc AddPushProxy (PushProxyInfo) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/proxy/push/add"
+      body: "*"
+    };
+  }
+  rpc RemovePushProxy (RequestWithId) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/proxy/push/remove/{id}"
+      body: "*"
+    };
+  }
+  rpc UpdatePushProxy (PushProxyInfo) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/proxy/push/update"
       body: "*"
     };
   }
@@ -181,6 +209,23 @@ service api {
       get: "/api/record/list"
     };
   }
+  rpc GetPushes (google.protobuf.Empty) returns (PushListResponse) {
+    option (google.api.http) = {
+      get: "/api/push/list"
+    };
+  }
+  rpc AddPush (AddPushRequest) returns (SuccessResponse) {
+    option (google.api.http) = {
+      post: "/api/push/add"
+      body: "*"
+    };
+  }
+}
+
+message DisabledPluginsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PluginInfo data = 3;
 }
 
 message GetConfigRequest {
@@ -257,19 +302,21 @@ message SummaryResponse {
 
 message PluginInfo {
   string name = 1;
-  bool disabled = 2;
-  map<string, string> description = 3;
+  repeated string pushAddr = 2;
+  repeated string playAddr = 3;
+  map<string, string> description = 4;
 }
 
 message SysInfoData  {
   google.protobuf.Timestamp startTime = 1;
   string localIP = 2;
-  string version = 3;
-  string goVersion = 4;
-  string os = 5;
-  string arch = 6;
-  int32 cpus = 7;
-  repeated PluginInfo plugins = 8;
+  string publicIP = 3;
+  string version = 4;
+  string goVersion = 5;
+  string os = 6;
+  string arch = 7;
+  int32 cpus = 8;
+  repeated PluginInfo plugins = 9;
 }
 
 message SysInfoResponse {
@@ -288,6 +335,7 @@ message TaskTreeData {
   uint32 state = 7;
   TaskTreeData blocked = 8;
   uint64 pointer = 9;
+  string startReason = 10;
 }
 
 message TaskTreeResponse {
@@ -454,13 +502,13 @@ message SubscribersResponse {
   repeated SubscriberSnapShot data = 6;
 }
 
-message DeviceListResponse {
+message PullProxyListResponse {
   int32 code = 1;
   string message = 2;
-  repeated DeviceInfo data = 3;
+  repeated PullProxyInfo data = 3;
 }
 
-message DeviceInfo {
+message PullProxyInfo {
   uint32 ID = 1;
   google.protobuf.Timestamp createTime = 2;
   google.protobuf.Timestamp updateTime = 3; // 更新时间
@@ -479,6 +527,29 @@ message DeviceInfo {
   uint32 rtt = 15; // 平均RTT
   string streamPath = 16; // 流路径
 }
+
+message PushProxyInfo {
+  uint32 ID = 1;
+  google.protobuf.Timestamp createTime = 2;
+  google.protobuf.Timestamp updateTime = 3;
+  uint32 parentID = 4; // 父设备ID
+  string name = 5; // 设备名称
+  string type = 6; // 设备类型
+  uint32 status = 7; // 设备状态
+  string pushURL = 8; // 推流地址
+  bool pushOnStart = 9; // 启动时推流
+  bool audio = 10; // 是否推音频
+  string description = 11; // 设备描述
+  uint32 rtt = 12; // 平均RTT
+  string streamPath = 13; // 流路径
+}
+
+message PushProxyListResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PushProxyInfo data = 3;
+}
+
 
 message SetStreamAliasRequest {
   string streamPath = 1;
@@ -519,4 +590,22 @@ message RecordingListResponse {
   int32 code = 1;
   string message = 2;
   repeated Recording data = 3;
+}
+
+message PushInfo {
+  string streamPath = 1;
+  string targetURL = 2;
+  google.protobuf.Timestamp startTime = 3;
+  string status = 4;
+}
+
+message PushListResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PushInfo data = 3;
+}
+
+message AddPushRequest {
+  string streamPath = 1;
+  string targetURL = 2;
 }

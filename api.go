@@ -47,6 +47,7 @@ func (s *Server) SysInfo(context.Context, *emptypb.Empty) (res *pb.SysInfoRespon
 		Data: &pb.SysInfoData{
 			Version:   Version,
 			LocalIP:   localIP,
+			PublicIP:  util.GetPublicIP(localIP),
 			StartTime: timestamppb.New(s.StartTime),
 			GoVersion: runtime.Version(),
 			Os:        runtime.GOOS,
@@ -57,9 +58,23 @@ func (s *Server) SysInfo(context.Context, *emptypb.Empty) (res *pb.SysInfoRespon
 	for p := range s.Plugins.Range {
 		res.Data.Plugins = append(res.Data.Plugins, &pb.PluginInfo{
 			Name:        p.Meta.Name,
-			Disabled:    p.Disabled,
+			PushAddr:    p.PushAddr,
+			PlayAddr:    p.PlayAddr,
 			Description: p.GetDescriptions(),
 		})
+	}
+	return
+}
+
+func (s *Server) DisabledPlugins(ctx context.Context, _ *emptypb.Empty) (res *pb.DisabledPluginsResponse, err error) {
+	res = &pb.DisabledPluginsResponse{
+		Data: make([]*pb.PluginInfo, len(s.disabledPlugins)),
+	}
+	for i, p := range s.disabledPlugins {
+		res.Data[i] = &pb.PluginInfo{
+			Name:        p.Meta.Name,
+			Description: p.GetDescriptions(),
+		}
 	}
 	return
 }
@@ -166,7 +181,17 @@ func (s *Server) StreamInfo(ctx context.Context, req *pb.StreamSnapRequest) (res
 func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResponse, err error) {
 	var fillData func(m task.ITask) *pb.TaskTreeData
 	fillData = func(m task.ITask) (res *pb.TaskTreeData) {
-		res = &pb.TaskTreeData{Id: m.GetTaskID(), Pointer: uint64(uintptr(unsafe.Pointer(m.GetTask()))), State: uint32(m.GetState()), Type: uint32(m.GetTaskType()), Owner: m.GetOwnerType(), StartTime: timestamppb.New(m.GetTask().StartTime), Description: m.GetDescriptions()}
+		t := m.GetTask()
+		res = &pb.TaskTreeData{
+			Id:          m.GetTaskID(),
+			Pointer:     uint64(uintptr(unsafe.Pointer(t))),
+			State:       uint32(m.GetState()),
+			Type:        uint32(m.GetTaskType()),
+			Owner:       m.GetOwnerType(),
+			StartTime:   timestamppb.New(t.StartTime),
+			Description: m.GetDescriptions(),
+			StartReason: t.StartReason,
+		}
 		if job, ok := m.(task.IJob); ok {
 			if blockedTask := job.Blocked(); blockedTask != nil {
 				res.Blocked = fillData(blockedTask)
@@ -353,7 +378,6 @@ func (s *Server) VideoTrackSnap(ctx context.Context, req *pb.StreamSnapRequest) 
 				}
 			}
 			pub.VideoTrack.Ring.Do(func(v *pkg.AVFrame) {
-				//if v.TryRLock() {
 				if len(v.Wraps) > 0 {
 					var snap pb.TrackSnapShot
 					snap.Sequence = v.Sequence
@@ -371,8 +395,6 @@ func (s *Server) VideoTrackSnap(ctx context.Context, req *pb.StreamSnapRequest) 
 					}
 					data.Ring = append(data.Ring, &snap)
 				}
-				//v.RUnlock()
-				//}
 			})
 			res = &pb.TrackSnapShotResponse{
 				Code:    0,
@@ -676,10 +698,10 @@ func (s *Server) ModifyConfig(_ context.Context, req *pb.ModifyConfigRequest) (r
 	return
 }
 
-func (s *Server) GetDeviceList(ctx context.Context, req *emptypb.Empty) (res *pb.DeviceListResponse, err error) {
-	res = &pb.DeviceListResponse{}
-	for device := range s.Devices.Range {
-		res.Data = append(res.Data, &pb.DeviceInfo{
+func (s *Server) GetPullProxyList(ctx context.Context, req *emptypb.Empty) (res *pb.PullProxyListResponse, err error) {
+	res = &pb.PullProxyListResponse{}
+	for device := range s.PullProxies.Range {
+		res.Data = append(res.Data, &pb.PullProxyInfo{
 			Name:           device.Name,
 			CreateTime:     timestamppb.New(device.CreatedAt),
 			UpdateTime:     timestamppb.New(device.UpdatedAt),
@@ -701,8 +723,8 @@ func (s *Server) GetDeviceList(ctx context.Context, req *emptypb.Empty) (res *pb
 	return
 }
 
-func (s *Server) AddDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.SuccessResponse, err error) {
-	device := &Device{
+func (s *Server) AddPullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *pb.SuccessResponse, err error) {
+	device := &PullProxy{
 		server:      s,
 		Name:        req.Name,
 		Type:        req.Type,
@@ -723,17 +745,17 @@ func (s *Server) AddDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.Suc
 		return
 	}
 	s.DB.Create(device)
-	s.Devices.Add(device)
+	s.PullProxies.Add(device)
 	res = &pb.SuccessResponse{}
 	return
 }
 
-func (s *Server) UpdateDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.SuccessResponse, err error) {
+func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *pb.SuccessResponse, err error) {
 	if s.DB == nil {
 		err = pkg.ErrNoDB
 		return
 	}
-	target := &Device{}
+	target := &PullProxy{}
 	s.DB.First(target, req.ID)
 	target.Name = req.Name
 	target.URL = req.PullURL
@@ -752,33 +774,33 @@ func (s *Server) UpdateDevice(ctx context.Context, req *pb.DeviceInfo) (res *pb.
 	return
 }
 
-func (s *Server) RemoveDevice(ctx context.Context, req *pb.RequestWithId) (res *pb.SuccessResponse, err error) {
+func (s *Server) RemovePullProxy(ctx context.Context, req *pb.RequestWithId) (res *pb.SuccessResponse, err error) {
 	if s.DB == nil {
 		err = pkg.ErrNoDB
 		return
 	}
 	res = &pb.SuccessResponse{}
 	if req.Id > 0 {
-		tx := s.DB.Delete(&Device{
+		tx := s.DB.Delete(&PullProxy{
 			ID: uint(req.Id),
 		})
 		err = tx.Error
-		s.Devices.Call(func() error {
-			if device, ok := s.Devices.Get(uint(req.Id)); ok {
+		s.PullProxies.Call(func() error {
+			if device, ok := s.PullProxies.Get(uint(req.Id)); ok {
 				device.Stop(task.ErrStopByUser)
 			}
 			return nil
 		})
 		return
 	} else if req.StreamPath != "" {
-		var deviceList []Device
+		var deviceList []PullProxy
 		s.DB.Find(&deviceList, "stream_path=?", req.StreamPath)
 		if len(deviceList) > 0 {
 			for _, device := range deviceList {
-				tx := s.DB.Delete(&Device{}, device.ID)
+				tx := s.DB.Delete(&PullProxy{}, device.ID)
 				err = tx.Error
-				s.Devices.Call(func() error {
-					if device, ok := s.Devices.Get(uint(device.ID)); ok {
+				s.PullProxies.Call(func() error {
+					if device, ok := s.PullProxies.Get(uint(device.ID)); ok {
 						device.Stop(task.ErrStopByUser)
 					}
 					return nil
@@ -888,4 +910,110 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 		return nil
 	})
 	return
+}
+
+func (s *Server) GetPushProxyList(ctx context.Context, req *emptypb.Empty) (res *pb.PushProxyListResponse, err error) {
+	res = &pb.PushProxyListResponse{}
+	for device := range s.PushProxies.Range {
+		res.Data = append(res.Data, &pb.PushProxyInfo{
+			Name:        device.Name,
+			CreateTime:  timestamppb.New(device.CreatedAt),
+			UpdateTime:  timestamppb.New(device.UpdatedAt),
+			Type:        device.Type,
+			PushURL:     device.URL,
+			ParentID:    uint32(device.ParentID),
+			Status:      uint32(device.Status),
+			ID:          uint32(device.ID),
+			PushOnStart: device.PushOnStart,
+			Audio:       device.Audio,
+			Description: device.Description,
+			Rtt:         uint32(device.RTT.Milliseconds()),
+			StreamPath:  device.GetStreamPath(),
+		})
+	}
+	return
+}
+
+func (s *Server) AddPushProxy(ctx context.Context, req *pb.PushProxyInfo) (res *pb.SuccessResponse, err error) {
+	device := &PushProxy{
+		server:      s,
+		Name:        req.Name,
+		Type:        req.Type,
+		ParentID:    uint(req.ParentID),
+		PushOnStart: req.PushOnStart,
+		Description: req.Description,
+		StreamPath:  req.StreamPath,
+	}
+	defaults.SetDefaults(&device.Push)
+	device.URL = req.PushURL
+	device.Audio = req.Audio
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	s.DB.Create(device)
+	s.PushProxies.Add(device)
+	res = &pb.SuccessResponse{}
+	return
+}
+
+func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (res *pb.SuccessResponse, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	target := &PushProxy{}
+	s.DB.First(target, req.ID)
+	target.Name = req.Name
+	target.URL = req.PushURL
+	target.ParentID = uint(req.ParentID)
+	target.Type = req.Type
+	target.PushOnStart = req.PushOnStart
+	target.Audio = req.Audio
+	target.Description = req.Description
+	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
+	target.StreamPath = req.StreamPath
+	s.DB.Save(target)
+	res = &pb.SuccessResponse{}
+	return
+}
+
+func (s *Server) RemovePushProxy(ctx context.Context, req *pb.RequestWithId) (res *pb.SuccessResponse, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	res = &pb.SuccessResponse{}
+	if req.Id > 0 {
+		tx := s.DB.Delete(&PushProxy{
+			ID: uint(req.Id),
+		})
+		err = tx.Error
+		s.PushProxies.Call(func() error {
+			if device, ok := s.PushProxies.Get(uint(req.Id)); ok {
+				device.Stop(task.ErrStopByUser)
+			}
+			return nil
+		})
+		return
+	} else if req.StreamPath != "" {
+		var deviceList []PushProxy
+		s.DB.Find(&deviceList, "stream_path=?", req.StreamPath)
+		if len(deviceList) > 0 {
+			for _, device := range deviceList {
+				tx := s.DB.Delete(&PushProxy{}, device.ID)
+				err = tx.Error
+				s.PushProxies.Call(func() error {
+					if device, ok := s.PushProxies.Get(uint(device.ID)); ok {
+						device.Stop(task.ErrStopByUser)
+					}
+					return nil
+				})
+			}
+		}
+		return
+	} else {
+		res.Message = "parameter wrong"
+		return
+	}
 }

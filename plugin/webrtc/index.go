@@ -136,6 +136,23 @@ func (p *WebRTCPlugin) OnInit() (err error) {
 	}
 	p.api = NewAPI(WithMediaEngine(&p.m),
 		WithInterceptorRegistry(i), WithSettingEngine(p.s))
+	_, port, _ := strings.Cut(p.GetCommonConf().HTTP.ListenAddr, ":")
+	if port == "80" {
+		p.PushAddr = append(p.PushAddr, "http://{hostName}/webrtc/push")
+		p.PlayAddr = append(p.PlayAddr, "http://{hostName}/webrtc/play")
+	} else if port != "" {
+		p.PushAddr = append(p.PushAddr, fmt.Sprintf("http://{hostName}:%s/webrtc/push", port))
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("http://{hostName}:%s/webrtc/play", port))
+	}
+	_, port, _ = strings.Cut(p.GetCommonConf().HTTP.ListenAddrTLS, ":")
+	if port == "443" {
+		p.PushAddr = append(p.PushAddr, "https://{hostName}/webrtc/push")
+		p.PlayAddr = append(p.PlayAddr, "https://{hostName}/webrtc/play")
+	} else if port != "" {
+		p.PushAddr = append(p.PushAddr, fmt.Sprintf("https://{hostName}:%s/webrtc/push", port))
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("https://{hostName}:%s/webrtc/play", port))
+	}
+
 	return
 }
 

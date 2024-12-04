@@ -59,7 +59,7 @@ type (
 		PulseInterval  time.Duration            `default:"5s" desc:"心跳事件间隔"`    //心跳事件间隔
 		DisableAll     bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
 		StreamAlias    map[config.Regexp]string `desc:"流别名"`
-		Device         []*Device
+		Device         []*PullProxy
 	}
 	WaitStream struct {
 		StreamPath string
@@ -77,7 +77,8 @@ type (
 		Pushs             task.Manager[string, *PushJob]
 		Records           task.Manager[string, *RecordJob]
 		Transforms        Transforms
-		Devices           DeviceManager
+		PullProxies       PullProxyManager
+		PushProxies       PushProxyManager
 		Subscribers       SubscriberCollection
 		LogHandler        MultiLogHandler
 		apiList           []string
@@ -87,6 +88,7 @@ type (
 		lastSummary       *pb.SummaryResponse
 		conf              any
 		configFileContent []byte
+		disabledPlugins   []*Plugin
 		prometheusDesc    prometheusDesc
 	}
 	CheckSubWaitTimeout struct {
@@ -107,7 +109,8 @@ func (w *WaitStream) GetKey() string {
 
 func NewServer(conf any) (s *Server) {
 	s = &Server{
-		conf: conf,
+		conf:            conf,
+		disabledPlugins: make([]*Plugin, 0),
 	}
 	s.ID = task.GetNextTaskID()
 	s.Meta = &serverMeta
@@ -266,7 +269,7 @@ func (s *Server) Start() (err error) {
 	s.AddTask(&s.Pulls)
 	s.AddTask(&s.Pushs)
 	s.AddTask(&s.Transforms)
-	s.AddTask(&s.Devices)
+	s.AddTask(&s.PullProxies)
 	promReg := prometheus.NewPedanticRegistry()
 	promReg.MustRegister(s)
 	for _, plugin := range plugins {
@@ -309,7 +312,7 @@ func (s *Server) Start() (err error) {
 			}
 		}
 		if s.DB != nil {
-			s.DB.AutoMigrate(&Device{})
+			s.DB.AutoMigrate(&PullProxy{})
 		}
 		for _, d := range s.Device {
 			if d.ID != 0 {
@@ -338,18 +341,18 @@ func (s *Server) Start() (err error) {
 				if s.DB != nil {
 					s.DB.Save(d)
 				} else {
-					s.Devices.Add(d, s.Logger.With("device", d.ID, "type", d.Type, "name", d.Name))
+					s.PullProxies.Add(d, s.Logger.With("pullProxy", d.ID, "type", d.Type, "name", d.Name))
 				}
 			}
 		}
 		if s.DB != nil {
-			var devices []*Device
-			s.DB.Find(&devices)
-			for _, d := range devices {
+			var pullProxies []*PullProxy
+			s.DB.Find(&pullProxies)
+			for _, d := range pullProxies {
 				d.server = s
-				d.Logger = s.Logger.With("device", d.ID, "type", d.Type, "name", d.Name)
-				d.ChangeStatus(DeviceStatusOffline)
-				s.Devices.Add(d)
+				d.Logger = s.Logger.With("pullProxy", d.ID, "type", d.Type, "name", d.Name)
+				d.ChangeStatus(PullProxyStatusOffline)
+				s.PullProxies.Add(d)
 			}
 		}
 		return nil
@@ -397,9 +400,9 @@ func (s *Server) OnSubscribe(streamPath string, args url.Values) {
 	for plugin := range s.Plugins.Range {
 		plugin.OnSubscribe(streamPath, args)
 	}
-	for device := range s.Devices.Range {
-		if device.Status == DeviceStatusOnline && device.GetStreamPath() == streamPath && !device.PullOnStart {
-			device.Handler.Pull()
+	for pullProxy := range s.PullProxies.Range {
+		if pullProxy.Status == PullProxyStatusOnline && pullProxy.GetStreamPath() == streamPath && !pullProxy.PullOnStart {
+			pullProxy.Handler.Pull()
 		}
 	}
 }

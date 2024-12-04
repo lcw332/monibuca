@@ -1,6 +1,7 @@
 package plugin_mp4
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -103,6 +104,18 @@ func (p *MP4Plugin) OnInit() (err error) {
 	// 		p.SendToThirdPartyAPI(exception)
 	// 	}
 	// }()
+	_, port, _ := strings.Cut(p.GetCommonConf().HTTP.ListenAddr, ":")
+	if port == "80" {
+		p.PlayAddr = append(p.PlayAddr, "http://{hostName}/mp4/{streamPath}.mp4")
+	} else if port != "" {
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("http://{hostName}:%s/mp4/{streamPath}.mp4", port))
+	}
+	_, port, _ = strings.Cut(p.GetCommonConf().HTTP.ListenAddrTLS, ":")
+	if port == "443" {
+		p.PlayAddr = append(p.PlayAddr, "https://{hostName}/mp4/{streamPath}.mp4")
+	} else if port != "" {
+		p.PlayAddr = append(p.PlayAddr, fmt.Sprintf("https://{hostName}:%s/mp4/{streamPath}.mp4", port))
+	}
 	return
 }
 func (p *MP4Plugin) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -28,7 +28,7 @@ type Channel struct {
 	RecordReqs          util.Collection[int, *RecordRequest]
 	*slog.Logger
 	gb28181.ChannelInfo
-	AbstractDevice *m7s.Device
+	AbstractDevice *m7s.PullProxy
 }
 
 func (c *Channel) GetKey() string {
