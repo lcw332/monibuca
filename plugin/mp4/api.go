@@ -2,6 +2,7 @@ package plugin_mp4
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -147,14 +148,30 @@ func (p *MP4Plugin) Delete(ctx context.Context, req *pb.ReqRecordDelete) (resp *
 }
 
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "video/mp4")
 	streamPath := r.PathValue("streamPath")
-	startTime, endTime, err := util.TimeRangeQueryParse(r.URL.Query())
+
+	query := r.URL.Query()
+	var streams []m7s.RecordStream
+	if id := query.Get("id"); id != "" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s_%s.mp4", streamPath, id))
+		p.DB.Find(&streams, "id=? AND stream_path=?", id, streamPath)
+		if len(streams) == 0 {
+			http.Error(w, "record not found", http.StatusNotFound)
+			return
+		}
+		http.ServeFile(w, r, streams[0].FilePath)
+		return
+	}
+
+	startTime, endTime, err := util.TimeRangeQueryParse(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	p.Info("download", "streamPath", streamPath, "start", startTime, "end", endTime)
-	var streams []m7s.RecordStream
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s_%s_%s.mp4", streamPath, startTime.Format("20060102150405"), endTime.Format("20060102150405")))
+
 	p.DB.Find(&streams, "end_time>? AND start_time<? AND stream_path=? AND record_mode=0", startTime, endTime, streamPath)
 	muxer := mp4.NewMuxer(0)
 	var n int

@@ -45,11 +45,13 @@ func (p *RecordReader) Run() (err error) {
 	defer allocator.Recycle()
 	publisher.OnSeek = func(seekTime time.Time) {
 		pullStartTime = seekTime
+		p.SetRetry(1, 0)
 		if util.UnixTimeReg.MatchString(pullJob.Args.Get(util.EndKey)) {
 			pullJob.Args.Set(util.StartKey, strconv.FormatInt(pullStartTime.Unix(), 10))
 		} else {
-			pullJob.Args.Set(util.EndKey, pullStartTime.Local().Format(util.LocalTimeFormat))
+			pullJob.Args.Set(util.StartKey, pullStartTime.Local().Format(util.LocalTimeFormat))
 		}
+		publisher.Stop(pkg.ErrSeek)
 	}
 	publisher.OnGetPosition = func() time.Time {
 		return realTime
@@ -97,15 +99,12 @@ func (p *RecordReader) Run() (err error) {
 
 		for track, sample := range p.demuxer.ReadSample {
 			if p.IsStopped() {
-				break
+				return p.StopReason()
 			}
 			if publisher.Paused != nil {
 				publisher.Paused.Await()
 			}
-			if pullStartTime != p.PullStartTime {
-				p.SetRetry(1, 0)
-				return pkg.ErrSeek
-			}
+
 			if _, err = p.demuxer.reader.Seek(sample.Offset, io.SeekStart); err != nil {
 				return
 			}

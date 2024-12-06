@@ -60,8 +60,6 @@ type ApiClient interface {
 	RemovePushProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	UpdatePushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error)
-	GetPushes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushListResponse, error)
-	AddPush(ctx context.Context, in *AddPushRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 }
 
 type apiClient struct {
@@ -405,24 +403,6 @@ func (c *apiClient) GetRecording(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
-func (c *apiClient) GetPushes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PushListResponse, error) {
-	out := new(PushListResponse)
-	err := c.cc.Invoke(ctx, "/global.api/GetPushes", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *apiClient) AddPush(ctx context.Context, in *AddPushRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
-	out := new(SuccessResponse)
-	err := c.cc.Invoke(ctx, "/global.api/AddPush", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
@@ -464,8 +444,6 @@ type ApiServer interface {
 	RemovePushProxy(context.Context, *RequestWithId) (*SuccessResponse, error)
 	UpdatePushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error)
 	GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error)
-	GetPushes(context.Context, *emptypb.Empty) (*PushListResponse, error)
-	AddPush(context.Context, *AddPushRequest) (*SuccessResponse, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -583,12 +561,6 @@ func (UnimplementedApiServer) UpdatePushProxy(context.Context, *PushProxyInfo) (
 }
 func (UnimplementedApiServer) GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRecording not implemented")
-}
-func (UnimplementedApiServer) GetPushes(context.Context, *emptypb.Empty) (*PushListResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPushes not implemented")
-}
-func (UnimplementedApiServer) AddPush(context.Context, *AddPushRequest) (*SuccessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddPush not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -1269,42 +1241,6 @@ func _Api_GetRecording_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Api_GetPushes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ApiServer).GetPushes(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/global.api/GetPushes",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).GetPushes(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Api_AddPush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AddPushRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ApiServer).AddPush(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/global.api/AddPush",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiServer).AddPush(ctx, req.(*AddPushRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1459,14 +1395,6 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRecording",
 			Handler:    _Api_GetRecording_Handler,
-		},
-		{
-			MethodName: "GetPushes",
-			Handler:    _Api_GetPushes_Handler,
-		},
-		{
-			MethodName: "AddPush",
-			Handler:    _Api_AddPush_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

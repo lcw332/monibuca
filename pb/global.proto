@@ -139,7 +139,7 @@ service api {
   rpc UpdateConfigFile (UpdateConfigFileRequest) returns (SuccessResponse) {
     option (google.api.http) = {
       post: "/api/config/file/update"
-      body: "*"
+      body: "content"
     };
   }
   rpc GetConfig (GetConfigRequest) returns (GetConfigResponse) {
@@ -207,17 +207,6 @@ service api {
   rpc GetRecording (google.protobuf.Empty) returns (RecordingListResponse) {
     option (google.api.http) = {
       get: "/api/record/list"
-    };
-  }
-  rpc GetPushes (google.protobuf.Empty) returns (PushListResponse) {
-    option (google.api.http) = {
-      get: "/api/push/list"
-    };
-  }
-  rpc AddPush (AddPushRequest) returns (SuccessResponse) {
-    option (google.api.http) = {
-      post: "/api/push/add"
-      body: "*"
     };
   }
 }
