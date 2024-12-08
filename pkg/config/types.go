@@ -15,10 +15,17 @@ const (
 	RelayModeRemux = "remux"
 	RelayModeRelay = "relay"
 	RelayModeMix   = "mix"
+
+	HookOnPublish         HookType = "publish"
+	HookOnSubscribe       HookType = "subscribe"
+	HookOnPublishEnd      HookType = "publish_end"
+	HookOnSubscribeEnd    HookType = "subscribe_end"
+	HookOnServerKeepAlive HookType = "server_keep_alive"
 )
 
 type (
-	Publish struct {
+	HookType string
+	Publish  struct {
 		MaxCount          int             `default:"0" desc:"最大发布者数量"` // 最大发布者数量
 		PubAudio          bool            `default:"true" desc:"是否发布音频"`
 		PubVideo          bool            `default:"true" desc:"是否发布视频"`
@@ -87,6 +94,15 @@ type (
 		Pull      map[Regexp]Pull
 		Transform map[Regexp]Transform
 	}
+	Webhook struct {
+		URL            string            `yaml:"url" json:"url"`                                  // Webhook 地址
+		Method         string            `yaml:"method" json:"method" default:"POST"`             // HTTP 方法
+		Headers        map[string]string `yaml:"headers" json:"headers"`                          // 自定义请求头
+		TimeoutSeconds int               `yaml:"timeout" json:"timeout" default:"5"`              // 超时时间(秒)
+		RetryTimes     int               `yaml:"retry" json:"retry" default:"3"`                  // 重试次数
+		RetryInterval  time.Duration     `yaml:"retryInterval" json:"retryInterval" default:"1s"` // 重试间隔
+		Interval       int               `yaml:"interval" json:"interval" default:"60"`           // 保活间隔(秒)
+	}
 	Common struct {
 		PublicIP   string
 		PublicIPv6 string
@@ -98,6 +114,7 @@ type (
 		Quic
 		TCP
 		UDP
+		Hook      map[HookType]Webhook
 		Pull      map[string]Pull
 		Transform map[string]Transform
 		OnSub     OnSubscribe

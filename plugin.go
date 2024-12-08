@@ -1,7 +1,9 @@
 package m7s
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
 
 	"m7s.live/v5/pkg/task"
 
@@ -307,6 +310,11 @@ func (p *Plugin) Start() (err error) {
 		p.disable(fmt.Sprintf("init %v", err))
 		return
 	}
+	if p.config.Hook != nil {
+		if hook, ok := p.config.Hook[config.HookOnServerKeepAlive]; ok && hook.Interval > 0 {
+			p.AddTask(&ServerKeepAliveTask{plugin: p})
+		}
+	}
 	return
 }
 
@@ -380,6 +388,71 @@ func (p *Plugin) OnInit() error {
 
 func (p *Plugin) OnStop() {
 
+}
+
+type WebHookTask struct {
+	task.Task
+	plugin   *Plugin
+	hookType config.HookType
+	conf     *config.Webhook
+	data     any
+	jsonData []byte
+}
+
+func (t *WebHookTask) Start() error {
+	if t.conf == nil || t.conf.URL == "" {
+		return task.ErrTaskComplete
+	}
+
+	var err error
+	t.jsonData, err = json.Marshal(t.data)
+	if err != nil {
+		return fmt.Errorf("marshal webhook data: %w", err)
+	}
+
+	t.SetRetry(t.conf.RetryTimes, t.conf.RetryInterval)
+	return nil
+}
+
+func (t *WebHookTask) Run() error {
+	req, err := http.NewRequest(t.conf.Method, t.conf.URL, bytes.NewBuffer(t.jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range t.conf.Headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{
+		Timeout: time.Duration(t.conf.TimeoutSeconds) * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.plugin.Error("webhook request failed", "error", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return task.ErrTaskComplete
+	}
+
+	err = fmt.Errorf("webhook request failed with status: %d", resp.StatusCode)
+	t.plugin.Error("webhook response error", "status", resp.StatusCode)
+	return err
+}
+
+func (p *Plugin) SendWebhook(hookType config.HookType, conf config.Webhook, data any) *task.Task {
+	webhookTask := &WebHookTask{
+		plugin:   p,
+		hookType: hookType,
+		conf:     &conf,
+		data:     data,
+	}
+	return p.AddTask(webhookTask)
 }
 
 // TODO: use alias stream
@@ -613,4 +686,98 @@ func (s *SaveConfig) Run() (err error) {
 
 func (s *SaveConfig) Dispose() {
 	s.file.Close()
+}
+
+func (p *Plugin) sendPublishWebhook(pub *Publisher) {
+	if p.config.Hook == nil {
+		return
+	}
+	webhookData := map[string]interface{}{
+		"event":      "publish",
+		"streamPath": pub.StreamPath,
+		"args":       pub.Args,
+		"publishId":  pub.ID,
+		"remoteAddr": pub.RemoteAddr,
+		"type":       pub.Type,
+		"timestamp":  time.Now().Unix(),
+	}
+	p.SendWebhook(config.HookOnPublish, p.config.Hook[config.HookOnPublish], webhookData)
+}
+
+func (p *Plugin) sendPublishEndWebhook(pub *Publisher) {
+	if p.config.Hook == nil {
+		return
+	}
+	webhookData := map[string]interface{}{
+		"event":      "publish_end",
+		"streamPath": pub.StreamPath,
+		"publishId":  pub.ID,
+		"reason":     pub.StopReason().Error(),
+		"timestamp":  time.Now().Unix(),
+	}
+	p.SendWebhook(config.HookOnPublishEnd, p.config.Hook[config.HookOnPublishEnd], webhookData)
+}
+
+func (p *Plugin) sendSubscribeWebhook(pub *Publisher, sub *Subscriber) {
+	if p.config.Hook == nil {
+		return
+	}
+	webhookData := map[string]interface{}{
+		"event":        "subscribe",
+		"streamPath":   pub.StreamPath,
+		"publishId":    pub.ID,
+		"subscriberId": sub.ID,
+		"remoteAddr":   sub.RemoteAddr,
+		"type":         sub.Type,
+		"args":         sub.Args,
+		"timestamp":    time.Now().Unix(),
+	}
+	p.SendWebhook(config.HookOnSubscribe, p.config.Hook[config.HookOnSubscribe], webhookData)
+}
+
+func (p *Plugin) sendSubscribeEndWebhook(sub *Subscriber) {
+	if p.config.Hook == nil {
+		return
+	}
+	webhookData := map[string]interface{}{
+		"event":        "subscribe_end",
+		"streamPath":   sub.StreamPath,
+		"subscriberId": sub.ID,
+		"reason":       sub.StopReason().Error(),
+		"timestamp":    time.Now().Unix(),
+	}
+	if sub.Publisher != nil {
+		webhookData["publishId"] = sub.Publisher.ID
+	}
+	p.SendWebhook(config.HookOnSubscribeEnd, p.config.Hook[config.HookOnSubscribeEnd], webhookData)
+}
+
+func (p *Plugin) sendServerKeepAliveWebhook() {
+	if p.config.Hook == nil {
+		return
+	}
+	s := p.Server
+	webhookData := map[string]interface{}{
+		"event":           "server_keep_alive",
+		"timestamp":       time.Now().Unix(),
+		"streams":         s.Streams.Length,
+		"subscribers":     s.Subscribers.Length,
+		"publisherCount":  s.Streams.Length,
+		"subscriberCount": s.Subscribers.Length,
+		"uptime":          time.Since(s.StartTime).Seconds(),
+	}
+	p.SendWebhook(config.HookOnServerKeepAlive, p.config.Hook[config.HookOnServerKeepAlive], webhookData)
+}
+
+type ServerKeepAliveTask struct {
+	task.TickTask
+	plugin *Plugin
+}
+
+func (t *ServerKeepAliveTask) GetTickInterval() time.Duration {
+	return time.Duration(t.plugin.config.Hook[config.HookOnServerKeepAlive].Interval) * time.Second
+}
+
+func (t *ServerKeepAliveTask) Tick(now any) {
+	t.plugin.sendServerKeepAliveWebhook()
 }

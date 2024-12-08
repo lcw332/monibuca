@@ -64,6 +64,7 @@ type Subscriber struct {
 	PubSubBase
 	config.Subscribe
 	Publisher                  *Publisher
+	DataChannel                chan IDataFrame
 	waitPublishDone            chan struct{}
 	waitStartTime              time.Time
 	AudioReader, VideoReader   *AVRingReader

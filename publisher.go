@@ -545,16 +545,17 @@ func (p *Publisher) WriteAudio(data IAVFrame) (err error) {
 }
 
 func (p *Publisher) WriteData(data IDataFrame) (err error) {
-	if err = p.Err(); err != nil {
-		return
+	for subscriber := range p.SubscriberRange {
+		if subscriber.DataChannel == nil {
+			continue
+		}
+		select {
+		case subscriber.DataChannel <- data:
+		default:
+			p.Warn("subscriber channel full", "subscriber", subscriber.ID)
+		}
 	}
-	if p.DataTrack == nil {
-		p.DataTrack = &DataTrack{}
-		p.DataTrack.Logger = p.Logger.With("track", "data")
-		p.Call(p.trackAdded)
-	}
-	// TODO: Implement this function
-	return
+	return nil
 }
 
 func (p *Publisher) GetAudioCodecCtx() (ctx codec.ICodecCtx) {
