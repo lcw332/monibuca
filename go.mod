@@ -11,9 +11,11 @@ require (
 	github.com/cilium/ebpf v0.15.0
 	github.com/cloudwego/goref v0.0.0-20240724113447-685d2a9523c8
 	github.com/deepch/vdk v0.0.27
+	github.com/disintegration/imaging v1.6.2
 	github.com/emiago/sipgo v0.22.0
 	github.com/go-delve/delve v1.23.0
 	github.com/gobwas/ws v1.3.2
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/husanpao/ip v0.0.0-20220711082147-73160bb611a8
@@ -34,7 +36,8 @@ require (
 	github.com/shirou/gopsutil/v4 v4.24.8
 	github.com/vishvananda/netlink v1.1.0
 	github.com/yapingcat/gomedia v0.0.0-20240601043430-920523f8e5c7
-	golang.org/x/text v0.17.0
+	golang.org/x/image v0.22.0
+	golang.org/x/text v0.20.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -114,7 +117,7 @@ require (
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/arch v0.6.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/sync v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
 )
 
@@ -132,7 +135,7 @@ require (
 	github.com/quangngotan95/go-m3u8 v0.1.0
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/exp v0.0.0-20240716175740-e3f259677ff7 // indirect
+	golang.org/x/exp v0.0.0-20240716175740-e3f259677ff7
 	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.27.0
 	golang.org/x/sys v0.25.0
