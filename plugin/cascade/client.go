@@ -25,7 +25,7 @@ type CascadeClientPlugin struct {
 var _ = m7s.InstallPlugin[CascadeClientPlugin](cascade.NewCascadePuller)
 
 type CascadeClient struct {
-	task.Task
+	task.Work
 	cfg *CascadeClientPlugin
 	quic.Connection
 }
@@ -58,7 +58,7 @@ func (task *CascadeClient) Start() (err error) {
 				zapErr = res[0]
 			}
 			task.Error("connect to cascade server", "server", task.cfg.Server, "err", zapErr)
-			return nil
+			return err
 		}
 	}
 	return
@@ -68,7 +68,7 @@ func (task *CascadeClient) Run() (err error) {
 	for err == nil {
 		var s quic.Stream
 		if s, err = task.AcceptStream(task.Task.Context); err == nil {
-			task.cfg.AddTask(&cascade.ReceiveRequestTask{
+			task.AddTask(&cascade.ReceiveRequestTask{
 				Stream:     s,
 				Handler:    task.cfg.GetGlobalCommonConf().GetHandler(),
 				Connection: task.Connection,

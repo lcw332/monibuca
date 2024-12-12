@@ -22,4 +22,5 @@ var (
 	ErrSeek                     = errors.New("seek")
 	ErrRecordSamePath           = errors.New("record same path")
 	ErrTransformSame            = errors.New("transform same")
+	ErrNotListen                = errors.New("not listen")
 )

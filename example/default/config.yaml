@@ -21,6 +21,9 @@ mp4:
   onsub:
     pull:
       ^vod/(.+)$: $1
+cascadeserver:
+  quic:
+    listenaddr: :44944
 # llhls:
 #   onpub:
 #     transform:

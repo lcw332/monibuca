@@ -1,15 +1,12 @@
 global:
-  # loglevel: debug
-  http:
-    listenaddr: :8081
-    listenaddrtls: :8555
-  tcp:
-    listenaddr: :50052
+  loglevel: debug
+  disableall: true
+  http: :8081
+  tcp: :50052
 cascadeclient:
+  enable: true
   server: localhost:44944
-  pull:
-    enableregexp: true
-    pullonsub:
+  secret: dexter
+  onsub:
+    pull:
       .*: m7s://$0
-#console:
-#  secret: de2c0bb9fd47684adc07a426e139239b
