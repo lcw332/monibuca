@@ -41,9 +41,9 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 	var totalCount int64                       //总条数
 
 	// 查询总记录数
-	countQuery := p.DB.Model(m7s.RecordStream{})
+	countQuery := p.DB.Model(&m7s.RecordStream{})
 	// 查询当前页的数据
-	query := p.DB.Model(m7s.RecordStream{})
+	query := p.DB.Model(&m7s.RecordStream{})
 	if req.PageSize > 0 {
 		query = query.Limit(int(req.PageSize)).Offset(int(offset))
 	}
