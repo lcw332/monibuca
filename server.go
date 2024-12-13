@@ -145,6 +145,9 @@ func exit() {
 }
 
 var zipReader *zip.ReadCloser
+var adminZipLastModTime time.Time
+var lastCheckTime time.Time
+var checkInterval = time.Second * 3 // 检查间隔为3秒
 
 func init() {
 	Servers.Init()
@@ -152,7 +155,18 @@ func init() {
 		time.AfterFunc(3*time.Second, exit)
 	})
 	Servers.OnDispose(exit)
-	zipReader, _ = zip.OpenReader("admin.zip")
+	loadAdminZip()
+}
+
+func loadAdminZip() {
+	if zipReader != nil {
+		zipReader.Close()
+		zipReader = nil
+	}
+	if info, err := os.Stat("admin.zip"); err == nil {
+		adminZipLastModTime = info.ModTime()
+		zipReader, _ = zip.OpenReader("admin.zip")
+	}
 }
 
 func (s *Server) GetKey() uint32 {
@@ -408,6 +422,16 @@ func (s *Server) OnSubscribe(streamPath string, args url.Values) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// 检查 admin.zip 是否需要重新加载
+	now := time.Now()
+	if now.Sub(lastCheckTime) > checkInterval {
+		if info, err := os.Stat("admin.zip"); err == nil && info.ModTime() != adminZipLastModTime {
+			s.Info("admin.zip changed, reloading...")
+			loadAdminZip()
+		}
+		lastCheckTime = now
+	}
+
 	if zipReader != nil {
 		http.ServeFileFS(w, r, zipReader, strings.TrimPrefix(r.URL.Path, "/admin"))
 		return

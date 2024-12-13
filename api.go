@@ -181,6 +181,9 @@ func (s *Server) StreamInfo(ctx context.Context, req *pb.StreamSnapRequest) (res
 func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResponse, err error) {
 	var fillData func(m task.ITask) *pb.TaskTreeData
 	fillData = func(m task.ITask) (res *pb.TaskTreeData) {
+		if m == nil {
+			return
+		}
 		t := m.GetTask()
 		res = &pb.TaskTreeData{
 			Id:          m.GetTaskID(),
@@ -197,7 +200,11 @@ func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResp
 				res.Blocked = fillData(blockedTask)
 			}
 			for t := range job.RangeSubTask {
-				res.Children = append(res.Children, fillData(t))
+				child := fillData(t)
+				if child == nil {
+					continue
+				}
+				res.Children = append(res.Children, child)
 			}
 		}
 		return
