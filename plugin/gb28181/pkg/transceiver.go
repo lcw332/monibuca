@@ -100,6 +100,8 @@ func (p *PSPublisher) Demux() {
 			}
 		case StartCodeMAP:
 			p.decProgramStreamMap()
+		case StartCodeSYS, PrivateStreamCode:
+			p.ReadPayload()
 		default:
 			p.ReadPayload()
 		}
@@ -136,6 +138,9 @@ func (dec *PSPublisher) decProgramStreamMap() (err error) {
 func (p *Receiver) ReadRTP(rtp util.Buffer) (err error) {
 	if err = p.Unmarshal(rtp); err != nil {
 		return
+	}
+	if p.Enabled(p, task.TraceLevel) {
+		p.Trace("rtp", "len", rtp.Len(), "seq", p.SequenceNumber, "payloadType", p.PayloadType, "ssrc", p.SSRC)
 	}
 	copyData := make([]byte, len(p.Payload))
 	copy(copyData, p.Payload)

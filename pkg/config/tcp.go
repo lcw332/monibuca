@@ -73,6 +73,7 @@ func (task *ListenTCPWork) Start() (err error) {
 		task.Info("listen tcp")
 	} else {
 		task.Error("failed to listen tcp", "error", err)
+		return err
 	}
 	if task.handler == nil {
 		return nil

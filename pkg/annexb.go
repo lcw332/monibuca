@@ -85,9 +85,14 @@ func (a *AnnexB) Parse(t *AVTrack) (err error) {
 			switch codec.ParseH264NALUType(nalu.Buffers[0][0]) {
 			case codec.NALU_SPS:
 				ctx.RecordInfo.SPS = [][]byte{nalu.ToBytes()}
+				if len(ctx.RecordInfo.PPS) > 0 {
+					ctx.CodecData, err = h264parser.NewCodecDataFromSPSAndPPS(ctx.SPS(), ctx.PPS())
+				}
 			case codec.NALU_PPS:
 				ctx.RecordInfo.PPS = [][]byte{nalu.ToBytes()}
-				ctx.CodecData, err = h264parser.NewCodecDataFromSPSAndPPS(ctx.SPS(), ctx.PPS())
+				if len(ctx.RecordInfo.SPS) > 0 {
+					ctx.CodecData, err = h264parser.NewCodecDataFromSPSAndPPS(ctx.SPS(), ctx.PPS())
+				}
 			case codec.NALU_IDR_Picture:
 				t.Value.IDR = true
 			}

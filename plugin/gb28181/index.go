@@ -58,7 +58,10 @@ type GB28181Plugin struct {
 	tcpPorts   chan uint16
 }
 
-var _ = m7s.InstallPlugin[GB28181Plugin](pb.RegisterApiHandler, &pb.Api_ServiceDesc, func() m7s.IPuller {
+var _ = m7s.InstallPlugin[GB28181Plugin](pb.RegisterApiHandler, &pb.Api_ServiceDesc, func(conf config.Pull) m7s.IPuller {
+	if util.Exist(conf.URL) {
+		return &gb28181.DumpPuller{}
+	}
 	return new(Dialog)
 })
 
@@ -365,6 +368,11 @@ func (gb *GB28181Plugin) StoreDevice(id string, req *sip.Request) (d *Device) {
 }
 
 func (gb *GB28181Plugin) Pull(streamPath string, conf config.Pull, pubConf *config.Publish) {
+	if util.Exist(conf.URL) {
+		var puller gb28181.DumpPuller
+		puller.GetPullJob().Init(&puller, &gb.Plugin, streamPath, conf, pubConf)
+		return
+	}
 	dialog := Dialog{
 		gb: gb,
 	}

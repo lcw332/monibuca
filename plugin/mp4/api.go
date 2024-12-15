@@ -88,6 +88,10 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 }
 
 func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.ResponseCatalog, err error) {
+	if p.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
 	resp = &pb.ResponseCatalog{}
 	var result []struct {
 		StreamPath string
@@ -151,6 +155,10 @@ func (p *MP4Plugin) Delete(ctx context.Context, req *pb.ReqRecordDelete) (resp *
 }
 
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
+	if p.DB == nil {
+		http.Error(w, pkg.ErrNoDB.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "video/mp4")
 	streamPath := r.PathValue("streamPath")
 
