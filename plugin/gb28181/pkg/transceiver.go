@@ -1,6 +1,7 @@
 package gb28181
 
 import (
+	"errors"
 	"net"
 	"os"
 
@@ -27,6 +28,8 @@ type PSPublisher struct {
 	*util.BufReader
 	Receiver Receiver
 }
+
+var ErrRTPReceiveLost = errors.New("rtp receive lost")
 
 type Receiver struct {
 	task.Task
@@ -136,8 +139,12 @@ func (dec *PSPublisher) decProgramStreamMap() (err error) {
 }
 
 func (p *Receiver) ReadRTP(rtp util.Buffer) (err error) {
+	lastSeq := p.SequenceNumber
 	if err = p.Unmarshal(rtp); err != nil {
 		return
+	}
+	if p.SequenceNumber != lastSeq+1 {
+		return ErrRTPReceiveLost
 	}
 	if p.Enabled(p, task.TraceLevel) {
 		p.Trace("rtp", "len", rtp.Len(), "seq", p.SequenceNumber, "payloadType", p.PayloadType, "ssrc", p.SSRC)

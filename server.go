@@ -59,7 +59,7 @@ type (
 		PulseInterval  time.Duration            `default:"5s" desc:"心跳事件间隔"`    //心跳事件间隔
 		DisableAll     bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
 		StreamAlias    map[config.Regexp]string `desc:"流别名"`
-		Device         []*PullProxy
+		PullProxy      []*PullProxy
 	}
 	WaitStream struct {
 		StreamPath string
@@ -328,7 +328,7 @@ func (s *Server) Start() (err error) {
 		if s.DB != nil {
 			s.DB.AutoMigrate(&PullProxy{})
 		}
-		for _, d := range s.Device {
+		for _, d := range s.PullProxy {
 			if d.ID != 0 {
 				d.server = s
 				if d.Type == "" {

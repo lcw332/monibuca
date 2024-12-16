@@ -740,6 +740,28 @@ func (s *Server) AddPullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *
 		Description: req.Description,
 		StreamPath:  req.StreamPath,
 	}
+	if device.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PullURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			device.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				device.Type = "hls"
+			case ".flv":
+				device.Type = "flv"
+			case ".mp4":
+				device.Type = "mp4"
+			}
+		}
+	}
 	defaults.SetDefaults(&device.Pull)
 	defaults.SetDefaults(&device.Record)
 	device.URL = req.PullURL
@@ -763,11 +785,36 @@ func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (re
 		return
 	}
 	target := &PullProxy{}
-	s.DB.First(target, req.ID)
+	err = s.DB.First(target, req.ID).Error
+	if err != nil {
+		return
+	}
 	target.Name = req.Name
 	target.URL = req.PullURL
 	target.ParentID = uint(req.ParentID)
 	target.Type = req.Type
+	if target.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PullURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			target.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				target.Type = "hls"
+			case ".flv":
+				target.Type = "flv"
+			case ".mp4":
+				target.Type = "mp4"
+			}
+		}
+	}
 	target.PullOnStart = req.PullOnStart
 	target.StopOnIdle = req.StopOnIdle
 	target.Audio = req.Audio
@@ -777,6 +824,24 @@ func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (re
 	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
 	target.StreamPath = req.StreamPath
 	s.DB.Save(target)
+	s.PullProxies.Call(func() error {
+		if device, ok := s.PullProxies.Get(uint(req.ID)); ok {
+			if target.URL != device.URL || device.Audio != target.Audio || device.StreamPath != target.StreamPath || device.Record.FilePath != target.Record.FilePath || device.Record.Fragment != target.Record.Fragment {
+				device.Stop(task.ErrStopByUser)
+				device.WaitStopped()
+				s.PullProxies.Add(target)
+				return nil
+			}
+			if device.PullOnStart != target.PullOnStart && target.PullOnStart && device.Handler != nil && device.Status == PullProxyStatusOnline {
+				device.Handler.Pull()
+			}
+			device.Name = target.Name
+			device.PullOnStart = target.PullOnStart
+			device.StopOnIdle = target.StopOnIdle
+			device.Description = target.Description
+		}
+		return nil
+	})
 	res = &pb.SuccessResponse{}
 	return
 }
@@ -951,6 +1016,30 @@ func (s *Server) AddPushProxy(ctx context.Context, req *pb.PushProxyInfo) (res *
 		Description: req.Description,
 		StreamPath:  req.StreamPath,
 	}
+
+	if device.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PushURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			device.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				device.Type = "hls"
+			case ".flv":
+				device.Type = "flv"
+			case ".mp4":
+				device.Type = "mp4"
+			}
+		}
+	}
+
 	defaults.SetDefaults(&device.Push)
 	device.URL = req.PushURL
 	device.Audio = req.Audio
@@ -975,6 +1064,28 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 	target.URL = req.PushURL
 	target.ParentID = uint(req.ParentID)
 	target.Type = req.Type
+	if target.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PushURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			target.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				target.Type = "hls"
+			case ".flv":
+				target.Type = "flv"
+			case ".mp4":
+				target.Type = "mp4"
+			}
+		}
+	}
 	target.PushOnStart = req.PushOnStart
 	target.Audio = req.Audio
 	target.Description = req.Description

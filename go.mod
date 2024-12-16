@@ -129,6 +129,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/pprof v0.0.0-20240409012703-83162a5b38cd // indirect
 	github.com/gorilla/websocket v1.5.1
+	github.com/ianlancetaylor/demangle v0.0.0-20240912202439-0a2b6291aafd
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/phsym/console-slog v0.3.1
 	github.com/prometheus/client_golang v1.20.4
