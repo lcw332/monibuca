@@ -165,6 +165,11 @@ func (r *Receiver) Receive() (err error) {
 		},
 	}
 	return r.NetConnection.Receive(false, func(channelID byte, buf []byte) error {
+		if r.Publisher.Paused != nil {
+			r.Stream.Pause()
+			r.Publisher.Paused.Await()
+			r.Stream.Play()
+		}
 		if time.Since(rtcpTS) > 5*time.Second {
 			rtcpTS = time.Now()
 			// Serialize RTCP packets

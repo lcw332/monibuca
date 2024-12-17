@@ -60,6 +60,7 @@ type ApiClient interface {
 	RemovePushProxy(ctx context.Context, in *RequestWithId, opts ...grpc.CallOption) (*SuccessResponse, error)
 	UpdatePushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error)
+	GetTransformList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TransformListResponse, error)
 }
 
 type apiClient struct {
@@ -403,6 +404,15 @@ func (c *apiClient) GetRecording(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
+func (c *apiClient) GetTransformList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TransformListResponse, error) {
+	out := new(TransformListResponse)
+	err := c.cc.Invoke(ctx, "/global.api/GetTransformList", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
@@ -444,6 +454,7 @@ type ApiServer interface {
 	RemovePushProxy(context.Context, *RequestWithId) (*SuccessResponse, error)
 	UpdatePushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error)
 	GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error)
+	GetTransformList(context.Context, *emptypb.Empty) (*TransformListResponse, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -561,6 +572,9 @@ func (UnimplementedApiServer) UpdatePushProxy(context.Context, *PushProxyInfo) (
 }
 func (UnimplementedApiServer) GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRecording not implemented")
+}
+func (UnimplementedApiServer) GetTransformList(context.Context, *emptypb.Empty) (*TransformListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransformList not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -1241,6 +1255,24 @@ func _Api_GetRecording_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_GetTransformList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetTransformList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetTransformList",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetTransformList(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1395,6 +1427,10 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRecording",
 			Handler:    _Api_GetRecording_Handler,
+		},
+		{
+			MethodName: "GetTransformList",
+			Handler:    _Api_GetTransformList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

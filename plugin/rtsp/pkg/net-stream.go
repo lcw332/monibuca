@@ -227,6 +227,11 @@ func (c *Stream) Play() (err error) {
 	return
 }
 
+func (c *Stream) Pause() (err error) {
+	_, err = c.Do(&util.Request{Method: MethodPause, URL: c.URL})
+	return
+}
+
 func (c *Stream) Record() (err error) {
 	_, err = c.Do(&util.Request{Method: MethodRecord, URL: c.URL})
 	return

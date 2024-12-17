@@ -1,9 +1,9 @@
 name: Go
 
 on:
-  push:
-    branches:
-      - v5
+  create:
+    tags:
+      - 'v5*'
 env:
   dest: bin
 jobs:
@@ -92,5 +92,5 @@ jobs:
     - name: docker push
       if: success() && !contains(env.version, 'beta')
       run:  |
-        docker tag langhuihui/monibuca:latest langhuihui/monibuca:${{ env.version }}
+        docker tag langhuihui/monibuca:v5 langhuihui/monibuca:${{ env.version }}
         docker push langhuihui/monibuca:${{ env.version }}

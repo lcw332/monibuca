@@ -209,6 +209,11 @@ service api {
       get: "/api/record/list"
     };
   }
+  rpc GetTransformList (google.protobuf.Empty) returns (TransformListResponse) {
+    option (google.api.http) = {
+      get: "/api/transform/list"
+    };
+  }
 }
 
 message DisabledPluginsResponse {
@@ -597,4 +602,17 @@ message PushListResponse {
 message AddPushRequest {
   string streamPath = 1;
   string targetURL = 2;
+}
+
+message Transform {
+  string streamPath = 1;
+  string target = 2;
+  string pluginName = 3;
+  string config = 4;
+}
+
+message TransformListResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated Transform data = 3;
 }

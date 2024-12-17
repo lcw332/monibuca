@@ -157,6 +157,8 @@ func (pc *PlayController) Go() (err error) {
 				pc.Subscriber.Publisher.Seek(time.Unix(int64(binary.BigEndian.Uint32(b[4:8])), 0))
 			case 4: // speed
 				pc.Subscriber.Publisher.Speed = float64(binary.BigEndian.Uint32(b[4:8])) / 100
+			case 5: // scale
+				pc.Subscriber.Publisher.Scale = float64(binary.BigEndian.Uint32(b[4:8])) / 100
 			}
 		}
 	}

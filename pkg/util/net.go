@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	myip "github.com/husanpao/ip"
@@ -283,17 +284,26 @@ func IsPrivateIP(ip string) bool {
 	return privateIPReg.MatchString(ip)
 }
 
-// TODO: map race
-func GetPublicIP(ip string) string {
-	if routes == nil {
-		routes = make(map[string]string)
-		for k, v := range myip.LocalAndInternalIPs() {
-			routes[k] = v
-			if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
-				routes[k[0:lastdot]] = k
-			}
+func initRoutes() {
+	for k, v := range myip.LocalAndInternalIPs() {
+		routes[k] = v
+		if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
+			routes[k[0:lastdot]] = k
 		}
 	}
+	initRoutesWait.Done()
+}
+
+var initRoutesWait sync.WaitGroup
+
+func init() {
+	routes = make(map[string]string)
+	initRoutesWait.Add(1)
+	go initRoutes()
+}
+
+func GetPublicIP(ip string) string {
+	initRoutesWait.Wait()
 	if publicIP, ok := routes[ip]; ok {
 		return publicIP
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +16,7 @@ import (
 
 	"m7s.live/v5/pkg/task"
 
+	myip "github.com/husanpao/ip"
 	"github.com/mcuadros/go-defaults"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -37,9 +37,10 @@ var empty = &emptypb.Empty{}
 
 func (s *Server) SysInfo(context.Context, *emptypb.Empty) (res *pb.SysInfoResponse, err error) {
 	if localIP == "" {
-		if conn, err := net.Dial("udp", "114.114.114.114:80"); err == nil {
-			localIP, _, _ = strings.Cut(conn.LocalAddr().String(), ":")
-		}
+		localIP = myip.LocalIP()
+		// if conn, err := net.Dial("udp", "114.114.114.114:80"); err == nil {
+		// 	localIP, _, _ = strings.Cut(conn.LocalAddr().String(), ":")
+		// }
 	}
 	res = &pb.SysInfoResponse{
 		Code:    0,
@@ -1134,4 +1135,29 @@ func (s *Server) RemovePushProxy(ctx context.Context, req *pb.RequestWithId) (re
 		res.Message = "parameter wrong"
 		return
 	}
+}
+
+func (s *Server) GetTransformList(ctx context.Context, req *emptypb.Empty) (res *pb.TransformListResponse, err error) {
+	res = &pb.TransformListResponse{}
+	s.Transforms.Call(func() error {
+		for transform := range s.Transforms.Range {
+			info := &pb.Transform{
+				StreamPath: transform.StreamPath,
+				Target:     transform.Target,
+			}
+			if transform.TransformJob != nil {
+				info.PluginName = transform.TransformJob.Plugin.Meta.Name
+				var result []byte
+				result, err = yaml.Marshal(transform.TransformJob.Config)
+				if err != nil {
+					s.Error("marshal transform config failed", "error", err)
+					return err
+				}
+				info.Config = string(result)
+			}
+			res.Data = append(res.Data, info)
+		}
+		return nil
+	})
+	return
 }
