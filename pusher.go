@@ -49,7 +49,7 @@ func (p *PushJob) Subscribe() (err error) {
 		p.Subscriber, err = p.Plugin.Subscribe(p.pusher.GetTask().Context, p.StreamPath)
 	}
 	if p.Subscriber != nil {
-		p.Subscriber.Internal = true
+		p.Subscriber.Type = SubscribeTypePush
 	}
 	return
 }

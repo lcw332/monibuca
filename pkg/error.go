@@ -5,6 +5,7 @@ import "errors"
 var (
 	ErrNotFound                 = errors.New("not found")
 	ErrStreamExist              = errors.New("stream exist")
+	ErrRecordExists             = errors.New("record exists")
 	ErrKick                     = errors.New("kick")
 	ErrDiscard                  = errors.New("discard")
 	ErrPublishTimeout           = errors.New("publish timeout")

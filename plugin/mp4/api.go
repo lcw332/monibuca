@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/mcuadros/go-defaults"
 	"m7s.live/v5/pkg/config"
@@ -294,53 +295,81 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (p *MP4Plugin) StartRecord(ctx context.Context, req *pb.ReqStartRecord) (res *pb.ResponseStartRecord, err error) {
+	var recordExists bool
+	res = &pb.ResponseStartRecord{}
+	p.Server.Records.Call(func() error {
+		_, recordExists = p.Server.Records.Find(func(job *m7s.RecordJob) bool {
+			return job.StreamPath == req.StreamPath && job.FilePath == req.FilePath
+		})
+		return nil
+	})
+	if recordExists {
+		err = pkg.ErrRecordExists
+		return
+	}
+	p.Server.Streams.Call(func() error {
+		if stream, ok := p.Server.Streams.Get(req.StreamPath); ok {
+			recordConf := config.Record{
+				Append:   false,
+				Fragment: req.Fragment.AsDuration(),
+				FilePath: req.FilePath,
+			}
+			job := p.Record(stream, recordConf, nil)
+			res.Data = uint64(uintptr(unsafe.Pointer(job.GetTask())))
+		}
+		return nil
+	})
+	return
+}
+
 func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res *pb.ResponseEventRecord, err error) {
 	beforeDuration := p.BeforeDuration
 	afterDuration := p.AfterDuration
-
+	res = &pb.ResponseEventRecord{}
 	if req.BeforeDuration != "" {
 		beforeDuration, err = time.ParseDuration(req.BeforeDuration)
 		if err != nil {
-			p.Info("error", err)
+			p.Error("EventStart", "error", err)
 		}
 	}
 	if req.AfterDuration != "" {
 		afterDuration, err = time.ParseDuration(req.AfterDuration)
 		if err != nil {
-			p.Info("error", err)
+			p.Error("EventStart", "error", err)
 		}
 	}
 	recorder := p.Meta.Recorder()
-	recorderJobs := p.Server.Records
 	var tmpJob *m7s.RecordJob
-	if recorderJobs.Length > 0 {
-		for job := range recorderJobs.Range {
-			if job.StreamPath == req.StreamPath {
-				tmpJob = job
-			}
-		}
-	}
+	p.Server.Records.Call(func() error {
+		tmpJob, _ = p.Server.Records.Find(func(job *m7s.RecordJob) bool {
+			return job.StreamPath == req.StreamPath
+		})
+		return nil
+	})
 	if tmpJob == nil { //为空表示没有正在进行的录制，也就是没有自动录像，则进行正常的事件录像
-		if stream, ok := p.Server.Streams.Get(req.StreamPath); ok {
-			recordConf := config.Record{
-				Append:   false,
-				Fragment: 0,
-				FilePath: filepath.Join(p.EventRecordFilePath, stream.StreamPath, time.Now().Local().Format("2006-01-02-15-04-05")),
+		p.Server.Streams.Call(func() error {
+			if stream, ok := p.Server.Streams.Get(req.StreamPath); ok {
+				recordConf := config.Record{
+					Append:   false,
+					Fragment: 0,
+					FilePath: filepath.Join(p.EventRecordFilePath, stream.StreamPath, time.Now().Local().Format("2006-01-02-15-04-05")),
+				}
+				recordJob := recorder.GetRecordJob()
+				recordJob.EventId = req.EventId
+				recordJob.EventLevel = req.EventLevel
+				recordJob.EventName = req.EventName
+				recordJob.EventDesc = req.EventDesc
+				recordJob.AfterDuration = afterDuration
+				recordJob.BeforeDuration = beforeDuration
+				recordJob.RecordMode = m7s.RecordModeEvent
+				var subconfig config.Subscribe
+				defaults.SetDefaults(&subconfig)
+				subconfig.BufferTime = beforeDuration
+				p.Record(stream, recordConf, &subconfig)
 			}
-			recordJob := recorder.GetRecordJob()
-			recordJob.EventId = req.EventId
-			recordJob.EventLevel = req.EventLevel
-			recordJob.EventName = req.EventName
-			recordJob.EventDesc = req.EventDesc
-			recordJob.AfterDuration = afterDuration
-			recordJob.BeforeDuration = beforeDuration
-			recordJob.RecordMode = "1"
-			var subconfig config.Subscribe
-			defaults.SetDefaults(&subconfig)
-			subconfig.BufferTime = beforeDuration
-			job := recorder.GetRecordJob().Init(recorder, &p.Plugin, stream.StreamPath, recordConf, &subconfig)
-			job.Depend(stream)
-		}
+			return nil
+		})
 	} else {
 		if tmpJob.AfterDuration != 0 { //当前有事件录像正在录制，则更新该录像的结束时间
 			tmpJob.AfterDuration = time.Duration(tmpJob.Subscriber.VideoReader.AbsTime)*time.Millisecond + afterDuration
@@ -351,7 +380,7 @@ func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res
 				EventLevel:     req.EventLevel,
 				EventDesc:      req.EventDesc,
 				EventName:      req.EventName,
-				RecordMode:     "1",
+				RecordMode:     m7s.RecordModeEvent,
 				BeforeDuration: beforeDuration,
 				AfterDuration:  afterDuration,
 			}

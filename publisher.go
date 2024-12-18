@@ -635,7 +635,7 @@ func (p *Publisher) Dispose() {
 
 func (p *Publisher) TransferSubscribers(newPublisher *Publisher) {
 	for subscriber := range p.SubscriberRange {
-		if subscriber.Internal {
+		if subscriber.Type != SubscribeTypeServer {
 			continue
 		}
 		newPublisher.AddSubscriber(subscriber)

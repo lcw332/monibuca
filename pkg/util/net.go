@@ -279,12 +279,14 @@ var ipReg = regexp.MustCompile(`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(2
 var privateIPReg = regexp.MustCompile(`^((10|192\.168|172\.(1[6-9]|2[0-9]|3[0-1]))\.){3}(10|192\.168|172\.(1[6-9]|2[0-9]|3[0-1]))$`)
 
 var routes map[string]string
+var PublicIP string
 
 func IsPrivateIP(ip string) bool {
 	return privateIPReg.MatchString(ip)
 }
 
 func initRoutes() {
+	PublicIP = myip.ExternalIP()
 	for k, v := range myip.LocalAndInternalIPs() {
 		routes[k] = v
 		if lastdot := strings.LastIndex(k, "."); lastdot >= 0 {
@@ -304,6 +306,9 @@ func init() {
 
 func GetPublicIP(ip string) string {
 	initRoutesWait.Wait()
+	if ip == "" {
+		return PublicIP
+	}
 	if publicIP, ok := routes[ip]; ok {
 		return publicIP
 	}

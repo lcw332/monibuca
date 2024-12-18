@@ -23,6 +23,15 @@ import (
 var AVFrameType = reflect.TypeOf((*AVFrame)(nil))
 var Owner task.TaskContextKey = "owner"
 
+const (
+	SubscribeTypePush      = "push"
+	SubscribeTypeServer    = "server"
+	SubscribeTypeVod       = "vod"
+	SubscribeTypeTransform = "transform"
+	SubscribeTypeReplay    = "replay"
+	SubscribeTypeAPI       = "api"
+)
+
 type PubSubBase struct {
 	task.Job
 	Plugin     *Plugin
@@ -75,6 +84,7 @@ func createSubscriber(p *Plugin, streamPath string, conf config.Subscribe) *Subs
 	subscriber := &Subscriber{Subscribe: conf, waitPublishDone: make(chan struct{})}
 	subscriber.ID = task.GetNextTaskID()
 	subscriber.Plugin = p
+	subscriber.Type = SubscribeTypeServer
 	subscriber.Logger = p.Logger.With("streamPath", streamPath, "sId", subscriber.ID)
 	subscriber.Init(streamPath, &subscriber.Subscribe)
 	if subscriber.Subscribe.BufferTime > 0 {
@@ -356,10 +366,10 @@ func (handler *SubscribeHandler[A, V]) Run() (err error) {
 	handler.startAudioTs, handler.startVideoTs = s.StartAudioTS, s.StartVideoTS
 	var initState = 0
 	handler.p = s.Publisher
-	if s.SubAudio {
+	if s.SubAudio && handler.OnAudio != nil {
 		handler.dataTypeAudio = reflect.TypeOf(handler.OnAudio).In(0)
 	}
-	if s.SubVideo {
+	if s.SubVideo && handler.OnVideo != nil {
 		handler.dataTypeVideo = reflect.TypeOf(handler.OnVideo).In(0)
 	}
 	handler.createReaders()
@@ -394,7 +404,9 @@ func (handler *SubscribeHandler[A, V]) Run() (err error) {
 					vr.LastCodecCtx = vr.Track.ICodecCtx
 					if seqFrame := vr.Track.SequenceFrame; seqFrame != nil {
 						s.Debug("video codec changed", "data", seqFrame.String())
-						err = handler.OnVideo(seqFrame.(V))
+						if handler.vwi >= 0 {
+							err = handler.OnVideo(seqFrame.(V))
+						}
 					}
 				}
 				if ar != nil {

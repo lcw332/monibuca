@@ -7,10 +7,13 @@ srt:
   listenaddr: :6000
   passphrase: foobarfoobar
 gb28181:
+  enable: false
   autoinvite: true
   sip:
     listenaddr:
           - udp::5060
+  # pull:
+  #   live/test: dump/34020000001320000001
   onsub:
     pull:
       .* : $0

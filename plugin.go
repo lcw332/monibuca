@@ -3,6 +3,7 @@ package m7s
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -495,6 +497,24 @@ func (p *Plugin) OnPublish(pub *Publisher) {
 		}
 	}
 }
+
+func (p *Plugin) auth(streamPath string, key string, secret string, expire string) (err error) {
+	if unixTime, err := strconv.ParseInt(expire, 16, 64); err != nil || time.Now().Unix() > unixTime {
+		return fmt.Errorf("auth failed expired")
+	}
+	if len(secret) != 32 {
+		return fmt.Errorf("auth failed secret length must be 32")
+	}
+	trueSecret := md5.Sum([]byte(key + streamPath + expire))
+	for i := 0; i < 16; i++ {
+		hex, err := strconv.ParseInt(secret[i<<1:(i<<1)+2], 16, 16)
+		if trueSecret[i] != byte(hex) || err != nil {
+			return fmt.Errorf("auth failed invalid secret")
+		}
+	}
+	return nil
+}
+
 func (p *Plugin) OnSubscribe(streamPath string, args url.Values) {
 	//	var avoidTrans bool
 	//AVOID:
@@ -544,6 +564,11 @@ func (p *Plugin) PublishWithConfig(ctx context.Context, streamPath string, conf 
 				p.Warn("auth failed", "error", err)
 				return
 			}
+		} else if conf.Key != "" {
+			if err = p.auth(streamPath, conf.Key, publisher.Args.Get("secret"), publisher.Args.Get("expire")); err != nil {
+				p.Warn("auth failed", "error", err)
+				return
+			}
 		}
 	}
 	err = p.Server.Streams.AddTask(publisher, ctx).WaitStarted()
@@ -563,6 +588,11 @@ func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, con
 		}
 		if onAuthSub != nil {
 			if err = onAuthSub(subscriber).Await(); err != nil {
+				p.Warn("auth failed", "error", err)
+				return
+			}
+		} else if conf.Key != "" {
+			if err = p.auth(streamPath, conf.Key, subscriber.Args.Get("secret"), subscriber.Args.Get("expire")); err != nil {
 				p.Warn("auth failed", "error", err)
 				return
 			}
@@ -597,10 +627,11 @@ func (p *Plugin) Push(streamPath string, conf config.Push, subConf *config.Subsc
 	pusher.GetPushJob().Init(pusher, p, streamPath, conf, subConf)
 }
 
-func (p *Plugin) Record(pub *Publisher, conf config.Record, subConf *config.Subscribe) {
+func (p *Plugin) Record(pub *Publisher, conf config.Record, subConf *config.Subscribe) *RecordJob {
 	recorder := p.Meta.Recorder()
 	job := recorder.GetRecordJob().Init(recorder, p, pub.StreamPath, conf, subConf)
 	job.Depend(pub)
+	return job
 }
 
 func (p *Plugin) Transform(pub *Publisher, conf config.Transform) {

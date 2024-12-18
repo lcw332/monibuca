@@ -43,7 +43,7 @@ var (
 	MergeConfigs = [...]string{"Publish", "Subscribe", "HTTP", "PublicIP", "PublicIPv6", "LogLevel", "EnableAuth", "DB"}
 	ExecPath     = os.Args[0]
 	ExecDir      = filepath.Dir(ExecPath)
-	serverMeta   = PluginMeta{
+	ServerMeta   = PluginMeta{
 		Name:    "Global",
 		Version: Version,
 	}
@@ -113,7 +113,7 @@ func NewServer(conf any) (s *Server) {
 		disabledPlugins: make([]*Plugin, 0),
 	}
 	s.ID = task.GetNextTaskID()
-	s.Meta = &serverMeta
+	s.Meta = &ServerMeta
 	s.SetDescriptions(task.Description{
 		"version":   Version,
 		"goVersion": sysruntime.Version(),
@@ -138,8 +138,8 @@ func exit() {
 			meta.OnExit()
 		}
 	}
-	if serverMeta.OnExit != nil {
-		serverMeta.OnExit()
+	if ServerMeta.OnExit != nil {
+		ServerMeta.OnExit()
 	}
 	os.Exit(0)
 }
@@ -241,6 +241,7 @@ func (s *Server) Start() (err error) {
 		"/api/config/json/{name}":             s.api_Config_JSON_,
 		"/api/stream/annexb/{streamPath...}":  s.api_Stream_AnnexB_,
 		"/api/videotrack/sse/{streamPath...}": s.api_VideoTrack_SSE,
+		"/api/audiotrack/sse/{streamPath...}": s.api_AudioTrack_SSE,
 	})
 	if s.config.DSN != "" {
 		if factory, ok := db.Factory[s.config.DBType]; ok {
