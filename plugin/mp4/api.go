@@ -61,9 +61,9 @@ func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.R
 		condition += " AND stream_path=?"
 		values = append(values, req.StreamPath)
 	}
-	if req.RecordMode != "" {
-		condition += " AND record_mode=?"
-		values = append(values, req.RecordMode)
+	if req.Mode != "" {
+		condition += " AND mode=?"
+		values = append(values, req.Mode)
 	}
 	values = append([]any{condition}, values...)
 	err = countQuery.Find(&streams, values...).Count(&totalCount).Error
@@ -362,7 +362,7 @@ func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res
 				recordJob.EventDesc = req.EventDesc
 				recordJob.AfterDuration = afterDuration
 				recordJob.BeforeDuration = beforeDuration
-				recordJob.RecordMode = m7s.RecordModeEvent
+				recordJob.Mode = m7s.RecordModeEvent
 				var subconfig config.Subscribe
 				defaults.SetDefaults(&subconfig)
 				subconfig.BufferTime = beforeDuration
@@ -380,7 +380,7 @@ func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res
 				EventLevel:     req.EventLevel,
 				EventDesc:      req.EventDesc,
 				EventName:      req.EventName,
-				RecordMode:     m7s.RecordModeEvent,
+				Mode:           m7s.RecordModeEvent,
 				BeforeDuration: beforeDuration,
 				AfterDuration:  afterDuration,
 			}

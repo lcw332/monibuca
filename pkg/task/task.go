@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"m7s.live/v5/pkg/util"
 )
@@ -129,6 +130,10 @@ type (
 	}
 )
 
+func FromPointer(pointer uintptr) *Task {
+	return (*Task)(unsafe.Pointer(pointer))
+}
+
 func (*Task) keepalive() bool {
 	return false
 }
@@ -165,6 +170,10 @@ func (*Task) GetTaskType() TaskType {
 
 func (task *Task) GetTask() *Task {
 	return task
+}
+
+func (task *Task) GetTaskPointer() uintptr {
+	return uintptr(unsafe.Pointer(task))
 }
 
 func (task *Task) getParent() *Job {

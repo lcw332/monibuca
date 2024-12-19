@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"unsafe"
 
 	"m7s.live/v5/pkg/task"
 
@@ -136,15 +135,24 @@ func (s *Server) getStreamInfo(pub *Publisher) (res *pb.StreamInfoResponse, err 
 			BufferTime:  durationpb.New(pub.BufferTime),
 		},
 	}
-
+	var audioBpsOut, videoBpsOut uint32
+	for sub := range pub.Subscribers.Range {
+		if sub.AudioReader != nil {
+			audioBpsOut += sub.AudioReader.BPS
+		}
+		if sub.VideoReader != nil {
+			videoBpsOut += sub.VideoReader.BPS
+		}
+	}
 	if t := pub.AudioTrack.AVTrack; t != nil {
 		if t.ICodecCtx != nil {
 			res.Data.AudioTrack = &pb.AudioTrackInfo{
-				Codec: t.FourCC().String(),
-				Meta:  t.GetInfo(),
-				Bps:   uint32(t.BPS),
-				Fps:   uint32(t.FPS),
-				Delta: pub.AudioTrack.Delta.String(),
+				Codec:  t.FourCC().String(),
+				Meta:   t.GetInfo(),
+				Bps:    uint32(t.BPS),
+				BpsOut: audioBpsOut,
+				Fps:    uint32(t.FPS),
+				Delta:  pub.AudioTrack.Delta.String(),
 			}
 			res.Data.AudioTrack.SampleRate = uint32(t.ICodecCtx.(pkg.IAudioCodecCtx).GetSampleRate())
 			res.Data.AudioTrack.Channels = uint32(t.ICodecCtx.(pkg.IAudioCodecCtx).GetChannels())
@@ -153,12 +161,13 @@ func (s *Server) getStreamInfo(pub *Publisher) (res *pb.StreamInfoResponse, err 
 	if t := pub.VideoTrack.AVTrack; t != nil {
 		if t.ICodecCtx != nil {
 			res.Data.VideoTrack = &pb.VideoTrackInfo{
-				Codec: t.FourCC().String(),
-				Meta:  t.GetInfo(),
-				Bps:   uint32(t.BPS),
-				Fps:   uint32(t.FPS),
-				Delta: pub.VideoTrack.Delta.String(),
-				Gop:   uint32(pub.GOP),
+				Codec:  t.FourCC().String(),
+				Meta:   t.GetInfo(),
+				Bps:    uint32(t.BPS),
+				BpsOut: videoBpsOut,
+				Fps:    uint32(t.FPS),
+				Delta:  pub.VideoTrack.Delta.String(),
+				Gop:    uint32(pub.GOP),
 			}
 			res.Data.VideoTrack.Width = uint32(t.ICodecCtx.(pkg.IVideoCodecCtx).Width())
 			res.Data.VideoTrack.Height = uint32(t.ICodecCtx.(pkg.IVideoCodecCtx).Height())
@@ -168,12 +177,17 @@ func (s *Server) getStreamInfo(pub *Publisher) (res *pb.StreamInfoResponse, err 
 }
 
 func (s *Server) StreamInfo(ctx context.Context, req *pb.StreamSnapRequest) (res *pb.StreamInfoResponse, err error) {
-	recording := false
+	var recordings []*pb.RecordingDetail
 	s.Records.Call(func() error {
 		for record := range s.Records.Range {
 			if record.StreamPath == req.StreamPath {
-				recording = true
-				break
+				recordings = append(recordings, &pb.RecordingDetail{
+					FilePath:   record.FilePath,
+					Mode:       record.Mode,
+					Fragment:   durationpb.New(record.Fragment),
+					Append:     record.Append,
+					PluginName: record.Plugin.Meta.Name,
+				})
 			}
 		}
 		return nil
@@ -184,7 +198,7 @@ func (s *Server) StreamInfo(ctx context.Context, req *pb.StreamSnapRequest) (res
 			if err != nil {
 				return err
 			}
-			res.Data.Recording = recording
+			res.Data.Recording = recordings
 		} else {
 			err = pkg.ErrNotFound
 		}
@@ -202,7 +216,7 @@ func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResp
 		t := m.GetTask()
 		res = &pb.TaskTreeData{
 			Id:          m.GetTaskID(),
-			Pointer:     uint64(uintptr(unsafe.Pointer(t))),
+			Pointer:     uint64(t.GetTaskPointer()),
 			State:       uint32(m.GetState()),
 			Type:        uint32(m.GetTaskType()),
 			Owner:       m.GetOwnerType(),
@@ -229,7 +243,7 @@ func (s *Server) TaskTree(context.Context, *emptypb.Empty) (res *pb.TaskTreeResp
 }
 
 func (s *Server) StopTask(ctx context.Context, req *pb.RequestWithId64) (resp *pb.SuccessResponse, err error) {
-	t := (*task.Task)(unsafe.Pointer(uintptr(req.Id)))
+	t := task.FromPointer(uintptr(req.Id))
 	if t == nil {
 		return nil, pkg.ErrNotFound
 	}
@@ -238,7 +252,7 @@ func (s *Server) StopTask(ctx context.Context, req *pb.RequestWithId64) (resp *p
 }
 
 func (s *Server) RestartTask(ctx context.Context, req *pb.RequestWithId64) (resp *pb.SuccessResponse, err error) {
-	t := (*task.Task)(unsafe.Pointer(uintptr(req.Id)))
+	t := task.FromPointer(uintptr(req.Id))
 	if t == nil {
 		return nil, pkg.ErrNotFound
 	}
@@ -254,7 +268,7 @@ func (s *Server) GetRecording(ctx context.Context, req *emptypb.Empty) (resp *pb
 				StreamPath: record.StreamPath,
 				StartTime:  timestamppb.New(record.StartTime),
 				Type:       reflect.TypeOf(record.recorder).String(),
-				Pointer:    uint64(uintptr(unsafe.Pointer(record.GetTask()))),
+				Pointer:    uint64(record.GetTaskPointer()),
 			})
 		}
 		return nil
@@ -284,6 +298,7 @@ func (s *Server) GetSubscribers(context.Context, *pb.SubscribersRequest) (res *p
 					Timestamp: ar.AbsTime,
 					Delay:     ar.Delay,
 					State:     int32(ar.State),
+					Bps:       ar.BPS,
 				}
 			}
 			if vr := subscriber.VideoReader; vr != nil {
@@ -292,6 +307,7 @@ func (s *Server) GetSubscribers(context.Context, *pb.SubscribersRequest) (res *p
 					Timestamp: vr.AbsTime,
 					Delay:     vr.Delay,
 					State:     int32(vr.State),
+					Bps:       vr.BPS,
 				}
 			}
 			subscribers = append(subscribers, snap)
@@ -564,10 +580,17 @@ func (s *Server) StopPublish(ctx context.Context, req *pb.StreamSnapRequest) (re
 
 // /api/stream/list
 func (s *Server) StreamList(_ context.Context, req *pb.StreamListRequest) (res *pb.StreamListResponse, err error) {
-	recordingSet := make(map[string]struct{})
+	recordingMap := make(map[string][]*pb.RecordingDetail)
 	s.Records.Call(func() error {
 		for record := range s.Records.Range {
-			recordingSet[record.StreamPath] = struct{}{}
+			recordingMap[record.StreamPath] = append(recordingMap[record.StreamPath], &pb.RecordingDetail{
+				FilePath:   record.FilePath,
+				Mode:       record.Mode,
+				Fragment:   durationpb.New(record.Fragment),
+				Append:     record.Append,
+				PluginName: record.Plugin.Meta.Name,
+				Pointer:    uint64(record.GetTaskPointer()),
+			})
 		}
 		return nil
 	})
@@ -578,7 +601,7 @@ func (s *Server) StreamList(_ context.Context, req *pb.StreamListRequest) (res *
 			if err != nil {
 				continue
 			}
-			_, info.Data.Recording = recordingSet[info.Data.Path]
+			info.Data.Recording = recordingMap[info.Data.Path]
 			streams = append(streams, info.Data)
 		}
 		res = &pb.StreamListResponse{Data: streams, Total: int32(s.Streams.Length), PageNum: req.PageNum, PageSize: req.PageSize}

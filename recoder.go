@@ -35,7 +35,7 @@ type (
 		FilePath       string
 		recorder       IRecorder
 		EventId        string        `json:"eventId" desc:"事件编号"`
-		RecordMode     RecordMode    `json:"recordMode" desc:"事件类型,auto=连续录像模式，event=事件录像模式"`
+		Mode           RecordMode    `json:"mode" desc:"事件类型,auto=连续录像模式，event=事件录像模式"`
 		BeforeDuration time.Duration `json:"beforeDuration" desc:"事件前缓存时长"`
 		AfterDuration  time.Duration `json:"afterDuration" desc:"事件后缓存时长"`
 		EventDesc      string        `json:"eventDesc" desc:"事件描述"`
@@ -50,7 +50,7 @@ type (
 		ID                     uint          `gorm:"primarykey"`
 		StartTime, EndTime     time.Time     `gorm:"default:'1970-01-01 00:00:00'"`
 		EventId                string        `json:"eventId" desc:"事件编号" gorm:"type:varchar(255);comment:事件编号"`
-		RecordMode             RecordMode    `json:"recordMode" desc:"事件类型,auto=连续录像模式，event=事件录像模式" gorm:"type:varchar(255);comment:事件类型,auto=连续录像模式，event=事件录像模式;default:'auto'"`
+		Mode                   RecordMode    `json:"mode" desc:"事件类型,auto=连续录像模式，event=事件录像模式" gorm:"type:varchar(255);comment:事件类型,auto=连续录像模式，event=事件录像模式;default:'auto'"`
 		EventName              string        `json:"eventName" desc:"事件名称" gorm:"type:varchar(255);comment:事件名称"`
 		BeforeDuration         time.Duration `json:"beforeDuration" desc:"事件前缓存时长" gorm:"type:BIGINT;comment:事件前缓存时长;default:30000000000"`
 		AfterDuration          time.Duration `json:"afterDuration" desc:"事件后缓存时长" gorm:"type:BIGINT;comment:事件后缓存时长;default:30000000000"`

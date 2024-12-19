@@ -3,10 +3,11 @@ package pkg
 import (
 	"context"
 	"log/slog"
+	"time"
+
 	"m7s.live/v5/pkg/codec"
 	"m7s.live/v5/pkg/config"
 	"m7s.live/v5/pkg/task"
-	"time"
 )
 
 const (
@@ -36,6 +37,7 @@ type AVRingReader struct {
 	startTime    time.Time
 	AbsTime      uint32
 	Delay        uint32
+	BPS          uint32 // Bytes per second
 }
 
 func (r *AVRingReader) DecConfChanged() bool {
@@ -171,7 +173,7 @@ func (r *AVRingReader) ReadFrame(conf *config.Subscribe) (err error) {
 	}
 	r.Delay = r.Track.LastValue.Sequence - r.Value.Sequence
 	if r.Track.ICodecCtx != nil {
-		r.Log(context.TODO(), task.TraceLevel, r.Track.FourCC().String(), "ts", r.Value.Timestamp, "delay", r.Delay)
+		r.Log(context.TODO(), task.TraceLevel, r.Track.FourCC().String(), "ts", r.Value.Timestamp, "delay", r.Delay, "bps", r.BPS)
 	} else {
 		r.Warn("no codec")
 	}

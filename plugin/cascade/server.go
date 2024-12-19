@@ -2,6 +2,7 @@ package plugin_cascade
 
 import (
 	"bufio"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -83,12 +84,17 @@ func (task *CascadeServer) Go() (err error) {
 	}
 	secret = secret[:len(secret)-1] // 去掉msg末尾的0
 	child := &cascade.Instance{}
-	tx := task.conf.DB.First(child, "secret = ?", secret)
-	err = tx.Error
+	if secret != "" {
+		tx := task.conf.DB.First(child, "secret = ?", secret)
+		err = tx.Error
+	} else {
+		tx := task.conf.DB.First(child, "ip = ?", remoteAddr)
+		err = tx.Error
+	}
 	if err == nil {
 		task.conf.clients.Set(child)
 	} else if task.conf.AutoRegister {
-		child.Secret = secret
+		child.Secret = sql.NullString{String: secret, Valid: secret != ""}
 		child.IP = remoteAddr
 		err = task.conf.DB.First(child, "ip = ?", remoteAddr).Error
 		if err != nil {
@@ -184,7 +190,7 @@ func (c *CascadeServerPlugin) CreateClient(ctx context.Context, req *pb.CreateCl
 
 	instance := &cascade.Instance{
 		Name:   req.Name,
-		Secret: req.Secret,
+		Secret: sql.NullString{String: req.Secret, Valid: req.Secret != ""},
 	}
 
 	if err = c.DB.Create(instance).Error; err != nil {
@@ -212,7 +218,7 @@ func (c *CascadeServerPlugin) UpdateClient(ctx context.Context, req *pb.UpdateCl
 	}
 
 	instance.Name = req.Name
-	instance.Secret = req.Secret
+	instance.Secret = sql.NullString{String: req.Secret, Valid: req.Secret != ""}
 
 	if err = c.DB.Save(instance).Error; err != nil {
 		return

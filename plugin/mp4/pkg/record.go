@@ -151,7 +151,7 @@ func (r *Recorder) createStream(start time.Time) (err error) {
 		EventLevel:     recordJob.EventLevel,
 		BeforeDuration: recordJob.BeforeDuration,
 		AfterDuration:  recordJob.AfterDuration,
-		RecordMode:     recordJob.RecordMode,
+		Mode:           recordJob.Mode,
 	}
 	dir := filepath.Dir(r.stream.FilePath)
 	if err = os.MkdirAll(dir, 0755); err != nil {

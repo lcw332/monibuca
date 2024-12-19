@@ -249,6 +249,8 @@ type SubscribeHandler[A any, V any] struct {
 	dataTypeAudio, dataTypeVideo reflect.Type
 	audioFrame, videoFrame       *AVFrame
 	awi, vwi                     int
+	lastBPSTime                  time.Time
+	bytesRead                    uint32
 }
 
 //func Play[A any, V any](s *Subscriber, onAudio func(A) error, onVideo func(V) error) {
@@ -307,6 +309,16 @@ func (handler *SubscribeHandler[A, V]) sendAudioFrame() (err error) {
 		} else {
 			handler.s.AudioReader.StopRead()
 		}
+		// Calculate BPS
+		if handler.s.AudioReader != nil {
+			handler.bytesRead += uint32(handler.audioFrame.Wraps[handler.awi].GetSize())
+			now := time.Now()
+			if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
+				handler.s.AudioReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
+				handler.bytesRead = 0
+				handler.lastBPSTime = now
+			}
+		}
 	} else {
 		err = handler.OnAudio(any(handler.audioFrame).(A))
 	}
@@ -331,6 +343,16 @@ func (handler *SubscribeHandler[A, V]) sendVideoFrame() (err error) {
 			err = handler.OnVideo(handler.videoFrame.Wraps[handler.vwi].(V))
 		} else {
 			handler.s.VideoReader.StopRead()
+		}
+		// Calculate BPS
+		if handler.s.VideoReader != nil {
+			handler.bytesRead += uint32(handler.videoFrame.Wraps[handler.vwi].GetSize())
+			now := time.Now()
+			if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
+				handler.s.VideoReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
+				handler.bytesRead = 0
+				handler.lastBPSTime = now
+			}
 		}
 	} else {
 		err = handler.OnVideo(any(handler.videoFrame).(V))
@@ -373,6 +395,7 @@ func (handler *SubscribeHandler[A, V]) Run() (err error) {
 		handler.dataTypeVideo = reflect.TypeOf(handler.OnVideo).In(0)
 	}
 	handler.createReaders()
+	handler.lastBPSTime = time.Now()
 	defer func() {
 		handler.clearReader()
 		handler.s.SetDescription("stopPlay", time.Now())

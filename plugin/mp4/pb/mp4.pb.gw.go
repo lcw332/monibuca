@@ -214,6 +214,23 @@ func request_Api_StartRecord_0(ctx context.Context, marshaler runtime.Marshaler,
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["streamPath"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "streamPath")
+	}
+
+	protoReq.StreamPath, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "streamPath", err)
+	}
+
 	msg, err := client.StartRecord(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
@@ -225,6 +242,23 @@ func local_request_Api_StartRecord_0(ctx context.Context, marshaler runtime.Mars
 
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["streamPath"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "streamPath")
+	}
+
+	protoReq.StreamPath, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "streamPath", err)
 	}
 
 	msg, err := server.StartRecord(ctx, &protoReq)
@@ -346,7 +380,7 @@ func RegisterApiHandlerServer(ctx context.Context, mux *runtime.ServeMux, server
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/mp4.Api/StartRecord", runtime.WithHTTPPathPattern("/mp4/api/start"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/mp4.Api/StartRecord", runtime.WithHTTPPathPattern("/mp4/api/start/{streamPath=**}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -498,7 +532,7 @@ func RegisterApiHandlerClient(ctx context.Context, mux *runtime.ServeMux, client
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/mp4.Api/StartRecord", runtime.WithHTTPPathPattern("/mp4/api/start"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/mp4.Api/StartRecord", runtime.WithHTTPPathPattern("/mp4/api/start/{streamPath=**}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -526,7 +560,7 @@ var (
 
 	pattern_Api_EventStart_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"mp4", "api", "event", "start"}, ""))
 
-	pattern_Api_StartRecord_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"mp4", "api", "start"}, ""))
+	pattern_Api_StartRecord_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 3, 0, 4, 1, 5, 3}, []string{"mp4", "api", "start", "streamPath"}, ""))
 )
 
 var (

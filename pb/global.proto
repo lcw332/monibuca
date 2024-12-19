@@ -396,7 +396,16 @@ message StreamInfo {
   float speed = 12;
   google.protobuf.Duration bufferTime = 13;
   bool stopOnIdle = 14;
-  bool recording = 15;
+  repeated RecordingDetail recording = 15;
+}
+
+message RecordingDetail {
+  string filePath = 1;
+  string mode = 2;
+  google.protobuf.Duration fragment = 3;
+  bool append = 4;
+  string pluginName = 5;
+  uint64 pointer = 6;
 }
 
 message Wrap {
@@ -428,9 +437,10 @@ message AudioTrackInfo {
   string delta = 2;
   string meta = 3;
   uint32 bps = 4;
-  uint32 fps = 5;
-  uint32 sampleRate = 6;
-  uint32 channels =7;
+  uint32 bps_out = 5;
+  uint32 fps = 6;
+  uint32 sampleRate = 7;
+  uint32 channels =8;
 }
 
 message TrackSnapShotData {
@@ -451,10 +461,11 @@ message VideoTrackInfo {
   string delta = 2;
   string meta = 3;
   uint32 bps = 4;
-  uint32 fps = 5;
-  uint32 width = 6;
-  uint32 height =7;
-  uint32 gop = 8;
+  uint32 bps_out = 5;
+  uint32 fps = 6;
+  uint32 width = 7;
+  uint32 height =8;
+  uint32 gop = 9;
 }
 
 message SuccessResponse {
@@ -487,6 +498,7 @@ message RingReaderSnapShot {
   uint32 timestamp = 2;
   uint32 delay = 3;
   int32 state = 4;
+  uint32 bps = 5;
 }
 
 message SubscriberSnapShot {
