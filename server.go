@@ -285,6 +285,7 @@ func (s *Server) Start() (err error) {
 	s.AddTask(&s.Pushs)
 	s.AddTask(&s.Transforms)
 	s.AddTask(&s.PullProxies)
+	s.AddTask(&s.PushProxies)
 	promReg := prometheus.NewPedanticRegistry()
 	promReg.MustRegister(s)
 	for _, plugin := range plugins {

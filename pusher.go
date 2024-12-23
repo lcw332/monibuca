@@ -30,6 +30,11 @@ func (p *PushJob) GetKey() string {
 func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf config.Push, subConf *config.Subscribe) *PushJob {
 	p.Connection.Init(plugin, streamPath, conf.URL, conf.Proxy, http.Header(conf.Header))
 	p.pusher = pusher
+	if subConf == nil {
+		conf := plugin.config.Subscribe
+		subConf = &conf
+	}
+	subConf.SubType = SubscribeTypePush
 	p.SubConf = subConf
 	p.SetDescriptions(task.Description{
 		"plugin":     plugin.Meta.Name,
@@ -43,13 +48,7 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 }
 
 func (p *PushJob) Subscribe() (err error) {
-	if p.SubConf != nil {
-		p.SubConf.SubType = SubscribeTypePush
-		p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.pusher.GetTask().Context, p.StreamPath, *p.SubConf)
-	} else {
-		p.SubConf = &config.Subscribe{SubType: SubscribeTypePush}
-		p.Subscriber, err = p.Plugin.Subscribe(p.pusher.GetTask().Context, p.StreamPath)
-	}
+	p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.pusher.GetTask().Context, p.StreamPath, *p.SubConf)
 	return
 }
 

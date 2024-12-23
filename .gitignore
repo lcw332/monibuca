@@ -13,5 +13,8 @@ bin
 *.flv
 pullcf.yaml
 admin.zip
-example/default/default
 __debug*
+.cursorrules
+example/default/*
+!example/default/main.go
+!example/default/config.yaml

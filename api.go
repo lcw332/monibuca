@@ -793,26 +793,29 @@ func (s *Server) ModifyConfig(_ context.Context, req *pb.ModifyConfigRequest) (r
 
 func (s *Server) GetPullProxyList(ctx context.Context, req *emptypb.Empty) (res *pb.PullProxyListResponse, err error) {
 	res = &pb.PullProxyListResponse{}
-	for device := range s.PullProxies.Range {
-		res.Data = append(res.Data, &pb.PullProxyInfo{
-			Name:           device.Name,
-			CreateTime:     timestamppb.New(device.CreatedAt),
-			UpdateTime:     timestamppb.New(device.UpdatedAt),
-			Type:           device.Type,
-			PullURL:        device.URL,
-			ParentID:       uint32(device.ParentID),
-			Status:         uint32(device.Status),
-			ID:             uint32(device.ID),
-			PullOnStart:    device.PullOnStart,
-			StopOnIdle:     device.StopOnIdle,
-			Audio:          device.Audio,
-			RecordPath:     device.Record.FilePath,
-			RecordFragment: durationpb.New(device.Record.Fragment),
-			Description:    device.Description,
-			Rtt:            uint32(device.RTT.Milliseconds()),
-			StreamPath:     device.GetStreamPath(),
-		})
-	}
+	s.PullProxies.Call(func() error {
+		for device := range s.PullProxies.Range {
+			res.Data = append(res.Data, &pb.PullProxyInfo{
+				Name:           device.Name,
+				CreateTime:     timestamppb.New(device.CreatedAt),
+				UpdateTime:     timestamppb.New(device.UpdatedAt),
+				Type:           device.Type,
+				PullURL:        device.URL,
+				ParentID:       uint32(device.ParentID),
+				Status:         uint32(device.Status),
+				ID:             uint32(device.ID),
+				PullOnStart:    device.PullOnStart,
+				StopOnIdle:     device.StopOnIdle,
+				Audio:          device.Audio,
+				RecordPath:     device.Record.FilePath,
+				RecordFragment: durationpb.New(device.Record.Fragment),
+				Description:    device.Description,
+				Rtt:            uint32(device.RTT.Milliseconds()),
+				StreamPath:     device.GetStreamPath(),
+			})
+		}
+		return nil
+	})
 	return
 }
 
@@ -1072,23 +1075,26 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 
 func (s *Server) GetPushProxyList(ctx context.Context, req *emptypb.Empty) (res *pb.PushProxyListResponse, err error) {
 	res = &pb.PushProxyListResponse{}
-	for device := range s.PushProxies.Range {
-		res.Data = append(res.Data, &pb.PushProxyInfo{
-			Name:        device.Name,
-			CreateTime:  timestamppb.New(device.CreatedAt),
-			UpdateTime:  timestamppb.New(device.UpdatedAt),
-			Type:        device.Type,
-			PushURL:     device.URL,
-			ParentID:    uint32(device.ParentID),
-			Status:      uint32(device.Status),
-			ID:          uint32(device.ID),
-			PushOnStart: device.PushOnStart,
-			Audio:       device.Audio,
-			Description: device.Description,
-			Rtt:         uint32(device.RTT.Milliseconds()),
-			StreamPath:  device.GetStreamPath(),
-		})
-	}
+	s.PushProxies.Call(func() error {
+		for device := range s.PushProxies.Range {
+			res.Data = append(res.Data, &pb.PushProxyInfo{
+				Name:        device.Name,
+				CreateTime:  timestamppb.New(device.CreatedAt),
+				UpdateTime:  timestamppb.New(device.UpdatedAt),
+				Type:        device.Type,
+				PushURL:     device.URL,
+				ParentID:    uint32(device.ParentID),
+				Status:      uint32(device.Status),
+				ID:          uint32(device.ID),
+				PushOnStart: device.PushOnStart,
+				Audio:       device.Audio,
+				Description: device.Description,
+				Rtt:         uint32(device.RTT.Milliseconds()),
+				StreamPath:  device.GetStreamPath(),
+			})
+		}
+		return nil
+	})
 	return
 }
 

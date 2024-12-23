@@ -81,13 +81,8 @@ func (p *RecordJob) GetKey() string {
 }
 
 func (p *RecordJob) Subscribe() (err error) {
-	if p.SubConf != nil {
-		p.SubConf.SubType = SubscribeTypeVod
-		p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.recorder.GetTask().Context, p.StreamPath, *p.SubConf)
-	} else {
-		p.SubConf = &config.Subscribe{SubType: SubscribeTypeVod}
-		p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.recorder.GetTask().Context, p.StreamPath, *p.SubConf)
-	}
+
+	p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.recorder.GetTask().Context, p.StreamPath, *p.SubConf)
 	return
 }
 
@@ -97,6 +92,11 @@ func (p *RecordJob) Init(recorder IRecorder, plugin *Plugin, streamPath string, 
 	p.Append = conf.Append
 	p.FilePath = conf.FilePath
 	p.StreamPath = streamPath
+	if subConf == nil {
+		conf := p.Plugin.config.Subscribe
+		subConf = &conf
+	}
+	subConf.SubType = SubscribeTypeVod
 	p.SubConf = subConf
 	p.recorder = recorder
 	p.SetDescriptions(task.Description{

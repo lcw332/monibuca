@@ -68,8 +68,9 @@ func (r *DefaultTransformer) GetTransformJob() *TransformJob {
 }
 
 func (p *TransformJob) Subscribe() (err error) {
-	p.Plugin.config.SubType = SubscribeTypeTransform
-	p.Subscriber, err = p.Plugin.Subscribe(p.Transformer, p.StreamPath)
+	subConfig := p.Plugin.config.Subscribe
+	subConfig.SubType = SubscribeTypeTransform
+	p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.Transformer, p.StreamPath, subConfig)
 	if err == nil {
 		p.Transformer.Depend(p.Subscriber)
 	}
