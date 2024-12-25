@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"m7s.live/v5/pkg/db"
 	"m7s.live/v5/pkg/task"
 
 	myip "github.com/husanpao/ip"
@@ -33,6 +34,11 @@ import (
 
 var localIP string
 var empty = &emptypb.Empty{}
+
+func init() {
+	// Add auto-migration for User model
+	db.AutoMigrations = append(db.AutoMigrations, &db.User{})
+}
 
 func (s *Server) SysInfo(context.Context, *emptypb.Empty) (res *pb.SysInfoResponse, err error) {
 	if localIP == "" {
@@ -121,21 +127,22 @@ func (s *Server) getStreamInfo(pub *Publisher) (res *pb.StreamInfoResponse, err 
 	tmp, _ := json.Marshal(pub.GetDescriptions())
 	res = &pb.StreamInfoResponse{
 		Data: &pb.StreamInfo{
-			Meta:        string(tmp),
-			Path:        pub.StreamPath,
-			State:       int32(pub.State),
-			StartTime:   timestamppb.New(pub.StartTime),
-			Subscribers: int32(pub.Subscribers.Length),
-			PluginName:  pub.Plugin.Meta.Name,
-			Type:        pub.Type,
-			Speed:       float32(pub.Speed),
-			StopOnIdle:  pub.DelayCloseTimeout > 0,
-			IsPaused:    pub.Paused != nil,
-			Gop:         int32(pub.GOP),
-			BufferTime:  durationpb.New(pub.BufferTime),
+			Meta:      string(tmp),
+			Path:      pub.StreamPath,
+			State:     int32(pub.State),
+			StartTime: timestamppb.New(pub.StartTime),
+			// Subscribers: int32(pub.Subscribers.Length),
+			PluginName: pub.Plugin.Meta.Name,
+			Type:       pub.Type,
+			Speed:      float32(pub.Speed),
+			StopOnIdle: pub.DelayCloseTimeout > 0,
+			IsPaused:   pub.Paused != nil,
+			Gop:        int32(pub.GOP),
+			BufferTime: durationpb.New(pub.BufferTime),
 		},
 	}
 	var audioBpsOut, videoBpsOut uint32
+	var serverSubCount int32
 	for sub := range pub.Subscribers.Range {
 		if sub.AudioReader != nil {
 			audioBpsOut += sub.AudioReader.BPS
@@ -143,7 +150,11 @@ func (s *Server) getStreamInfo(pub *Publisher) (res *pb.StreamInfoResponse, err 
 		if sub.VideoReader != nil {
 			videoBpsOut += sub.VideoReader.BPS
 		}
+		if sub.Type == SubscribeTypeServer {
+			serverSubCount++
+		}
 	}
+	res.Data.Subscribers = serverSubCount
 	if t := pub.AudioTrack.AVTrack; t != nil {
 		if t.ICodecCtx != nil {
 			res.Data.AudioTrack = &pb.AudioTrackInfo{

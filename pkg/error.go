@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrNotFound                 = errors.New("not found")
+	ErrDisabled                 = errors.New("disabled")
 	ErrStreamExist              = errors.New("stream exist")
 	ErrRecordExists             = errors.New("record exists")
 	ErrKick                     = errors.New("kick")
@@ -24,4 +25,5 @@ var (
 	ErrRecordSamePath           = errors.New("record same path")
 	ErrTransformSame            = errors.New("transform same")
 	ErrNotListen                = errors.New("not listen")
+	ErrInvalidCredentials       = errors.New("invalid credentials")
 )

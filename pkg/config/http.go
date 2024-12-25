@@ -5,8 +5,9 @@ import (
 	"crypto/subtle"
 	"crypto/tls"
 	"log/slog"
-	"m7s.live/v5/pkg/task"
 	"net/http"
+
+	"m7s.live/v5/pkg/task"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
@@ -45,7 +46,8 @@ func (config *HTTP) GetHandler() http.Handler {
 	return config.mux
 }
 
-func (config *HTTP) GetHttpMux() *http.ServeMux {
+func (config *HTTP) CreateHttpMux() *http.ServeMux {
+	config.mux = http.NewServeMux()
 	return config.mux
 }
 

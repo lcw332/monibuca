@@ -17,9 +17,9 @@ import (
 	"github.com/shirou/gopsutil/v4/cpu"
 	"google.golang.org/protobuf/proto"
 
-	"m7s.live/v5/pkg/task"
-
+	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/config"
+	"m7s.live/v5/pkg/task"
 
 	sysruntime "runtime"
 
@@ -30,10 +30,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 	"m7s.live/v5/pb"
 	. "m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/auth"
 	"m7s.live/v5/pkg/db"
 	"m7s.live/v5/pkg/util"
 )
@@ -53,13 +55,13 @@ var (
 
 type (
 	ServerConfig struct {
-		EnableSubEvent bool                     `default:"true" desc:"启用订阅事件,禁用可以提高性能"` //启用订阅事件,禁用可以提高性能
-		SettingDir     string                   `default:".m7s" desc:""`
-		FatalDir       string                   `default:"fatal" desc:""`
-		PulseInterval  time.Duration            `default:"5s" desc:"心跳事件间隔"`    //心跳事件间隔
-		DisableAll     bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
-		StreamAlias    map[config.Regexp]string `desc:"流别名"`
-		PullProxy      []*PullProxy
+		SettingDir    string                   `default:".m7s" desc:""`
+		FatalDir      string                   `default:"fatal" desc:""`
+		PulseInterval time.Duration            `default:"5s" desc:"心跳事件间隔"`    //心跳事件间隔
+		DisableAll    bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
+		StreamAlias   map[config.Regexp]string `desc:"流别名"`
+		PullProxy     []*PullProxy
+		EnableLogin   bool `default:"false" desc:"启用登录机制"` //启用登录机制
 	}
 	WaitStream struct {
 		StreamPath string
@@ -67,7 +69,9 @@ type (
 	}
 	Server struct {
 		pb.UnimplementedApiServer
+		pb.UnimplementedAuthServer
 		Plugin
+
 		ServerConfig
 		Plugins           util.Collection[string, *Plugin]
 		Streams           task.Manager[string, *Publisher]
@@ -191,18 +195,29 @@ func (s *Server) Start() (err error) {
 	s.LogHandler.Add(defaultLogHandler)
 	s.Logger = slog.New(&s.LogHandler).With("server", s.ID)
 	s.Waiting.Logger = s.Logger
-	mux := runtime.NewServeMux(runtime.WithMarshalerOption("text/plain", &pb.TextPlain{}), runtime.WithForwardResponseOption(func(ctx context.Context, w http.ResponseWriter, m proto.Message) error {
-		header := w.Header()
-		header.Set("Access-Control-Allow-Credentials", "true")
-		header.Set("Cross-Origin-Resource-Policy", "cross-origin")
-		header.Set("Access-Control-Allow-Headers", "Content-Type,Access-Token")
-		header.Set("Access-Control-Allow-Private-Network", "true")
-		header.Set("Access-Control-Allow-Origin", "*")
-		return nil
-	}), runtime.WithRoutingErrorHandler(func(_ context.Context, _ *runtime.ServeMux, _ runtime.Marshaler, w http.ResponseWriter, r *http.Request, _ int) {
-		httpConf.GetHttpMux().ServeHTTP(w, r)
-	}))
+
+	var httpMux http.Handler = httpConf.CreateHttpMux()
+	if s.ServerConfig.EnableLogin {
+		httpMux = auth.Middleware(s)(httpMux)
+	}
+	mux := runtime.NewServeMux(
+		runtime.WithMarshalerOption("text/plain", &pb.TextPlain{}),
+		runtime.WithForwardResponseOption(func(ctx context.Context, w http.ResponseWriter, m proto.Message) error {
+			header := w.Header()
+			header.Set("Access-Control-Allow-Credentials", "true")
+			header.Set("Cross-Origin-Resource-Policy", "cross-origin")
+			header.Set("Access-Control-Allow-Headers", "Content-Type,Access-Token,Authorization")
+			header.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+			header.Set("Access-Control-Allow-Private-Network", "true")
+			header.Set("Access-Control-Allow-Origin", "*")
+			return nil
+		}),
+		runtime.WithRoutingErrorHandler(func(_ context.Context, _ *runtime.ServeMux, _ runtime.Marshaler, w http.ResponseWriter, r *http.Request, _ int) {
+			httpMux.ServeHTTP(w, r)
+		}),
+	)
 	httpConf.SetMux(mux)
+
 	var cg RawConfig
 	var configYaml []byte
 	switch v := s.conf.(type) {
@@ -243,6 +258,7 @@ func (s *Server) Start() (err error) {
 		"/api/videotrack/sse/{streamPath...}": s.api_VideoTrack_SSE,
 		"/api/audiotrack/sse/{streamPath...}": s.api_AudioTrack_SSE,
 	})
+
 	if s.config.DSN != "" {
 		if factory, ok := db.Factory[s.config.DBType]; ok {
 			s.DB, err = gorm.Open(factory(s.config.DSN), &gorm.Config{})
@@ -250,19 +266,43 @@ func (s *Server) Start() (err error) {
 				s.Error("failed to connect database", "error", err, "dsn", s.config.DSN, "type", s.config.DBType)
 				return
 			}
+			// Auto-migrate the User model
+			if err = s.DB.AutoMigrate(&db.User{}); err != nil {
+				s.Error("failed to auto-migrate User model", "error", err)
+				return
+			}
+			// Create default admin user if not exists
+			var count int64
+			s.DB.Model(&db.User{}).Count(&count)
+			if count == 0 {
+				adminUser := &db.User{
+					Username: "admin",
+					Password: "admin",
+					Role:     "admin",
+				}
+				if err = s.DB.Create(adminUser).Error; err != nil {
+					s.Error("failed to create default admin user", "error", err)
+					return
+				}
+			}
 		}
 	}
+
 	if httpConf.ListenAddrTLS != "" {
 		s.AddDependTask(httpConf.CreateHTTPSWork(s.Logger))
 	}
 	if httpConf.ListenAddr != "" {
 		s.AddDependTask(httpConf.CreateHTTPWork(s.Logger))
 	}
+
 	var grpcServer *GRPCServer
 	if tcpConf.ListenAddr != "" {
 		var opts []grpc.ServerOption
+		// Add the auth interceptor
+		opts = append(opts, grpc.UnaryInterceptor(s.AuthInterceptor()))
 		s.grpcServer = grpc.NewServer(opts...)
 		pb.RegisterApiServer(s.grpcServer, s)
+		pb.RegisterAuthServer(s.grpcServer, s)
 
 		s.grpcClientConn, err = grpc.DialContext(s.Context, tcpConf.ListenAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
@@ -270,7 +310,11 @@ func (s *Server) Start() (err error) {
 			return
 		}
 		if err = pb.RegisterApiHandler(s.Context, mux, s.grpcClientConn); err != nil {
-			s.Error("register handler faild", "error", err)
+			s.Error("register handler failed", "error", err)
+			return
+		}
+		if err = pb.RegisterAuthHandler(s.Context, mux, s.grpcClientConn); err != nil {
+			s.Error("register auth handler failed", "error", err)
 			return
 		}
 		grpcServer = &GRPCServer{s: s, tcpTask: tcpConf.CreateTCPWork(s.Logger, nil)}
@@ -279,6 +323,7 @@ func (s *Server) Start() (err error) {
 			return
 		}
 	}
+
 	s.AddTask(&s.Records)
 	s.AddTask(&s.Streams)
 	s.AddTask(&s.Pulls)
@@ -448,5 +493,137 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, api := range s.apiList {
 		_, _ = fmt.Fprintf(w, "%s\n", api)
+	}
+}
+
+// ValidateToken implements auth.TokenValidator
+func (s *Server) ValidateToken(tokenString string) (*auth.JWTClaims, error) {
+	if !s.ServerConfig.EnableLogin {
+		return &auth.JWTClaims{Username: "anonymous"}, nil
+	}
+	return auth.ValidateJWT(tokenString)
+}
+
+// Login implements the Login RPC method
+func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (res *pb.LoginResponse, err error) {
+	res = &pb.LoginResponse{}
+	if !s.ServerConfig.EnableLogin {
+		err = pkg.ErrDisabled
+		return
+	}
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	var user db.User
+	if err = s.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		return
+	}
+
+	if !user.CheckPassword(req.Password) {
+		err = pkg.ErrInvalidCredentials
+		return
+	}
+
+	// Generate JWT token
+	var tokenString string
+	tokenString, err = auth.GenerateToken(user.Username)
+	if err != nil {
+		return
+	}
+
+	// Update last login time
+	s.DB.Model(&user).Update("last_login", time.Now())
+	res.Data = &pb.LoginSuccess{
+		Token: tokenString,
+		UserInfo: &pb.UserInfo{
+			Username:  user.Username,
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		},
+	}
+	return
+}
+
+// Logout implements the Logout RPC method
+func (s *Server) Logout(ctx context.Context, req *pb.LogoutRequest) (res *pb.LogoutResponse, err error) {
+	if !s.ServerConfig.EnableLogin {
+		err = pkg.ErrDisabled
+		return
+	}
+	// In a more complex system, you might want to maintain a blacklist of logged-out tokens
+	// For now, we'll just return success as JWT tokens are stateless
+	res = &pb.LogoutResponse{Code: 0, Message: "success"}
+	return
+}
+
+// GetUserInfo implements the GetUserInfo RPC method
+func (s *Server) GetUserInfo(ctx context.Context, req *pb.UserInfoRequest) (res *pb.UserInfoResponse, err error) {
+	if !s.ServerConfig.EnableLogin {
+		res = &pb.UserInfoResponse{
+			Code:    0,
+			Message: "success",
+			Data: &pb.UserInfo{
+				Username:  "anonymous",
+				ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			},
+		}
+		return
+	}
+	res = &pb.UserInfoResponse{}
+	claims, err := s.ValidateToken(req.Token)
+	if err != nil {
+		err = pkg.ErrInvalidCredentials
+		return
+	}
+
+	var user db.User
+	if err = s.DB.Where("username = ?", claims.Username).First(&user).Error; err != nil {
+		return
+	}
+
+	// Token is valid for 24 hours from now
+	expiresAt := time.Now().Add(24 * time.Hour).Unix()
+
+	return &pb.UserInfoResponse{
+		Code:    0,
+		Message: "success",
+		Data: &pb.UserInfo{
+			Username:  user.Username,
+			ExpiresAt: expiresAt,
+		},
+	}, nil
+}
+
+// AuthInterceptor creates a new unary interceptor for authentication
+func (s *Server) AuthInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if !s.ServerConfig.EnableLogin {
+			return handler(ctx, req)
+		}
+
+		// Skip auth for login endpoint
+		if info.FullMethod == "/pb.Auth/Login" {
+			return handler(ctx, req)
+		}
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, errors.New("missing metadata")
+		}
+
+		authHeader := md.Get("authorization")
+		if len(authHeader) == 0 {
+			return nil, errors.New("missing authorization header")
+		}
+
+		tokenString := strings.TrimPrefix(authHeader[0], "Bearer ")
+		claims, err := s.ValidateToken(tokenString)
+		if err != nil {
+			return nil, errors.New("invalid token")
+		}
+
+		// Add claims to context
+		newCtx := context.WithValue(ctx, "claims", claims)
+		return handler(newCtx, req)
 	}
 }
