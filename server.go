@@ -202,9 +202,6 @@ func (s *Server) Start() (err error) {
 	s.Waiting.Logger = s.Logger
 
 	var httpMux http.Handler = httpConf.CreateHttpMux()
-	if s.ServerConfig.EnableLogin {
-		httpMux = auth.Middleware(s)(httpMux)
-	}
 	mux := runtime.NewServeMux(
 		runtime.WithMarshalerOption("text/plain", &pb.TextPlain{}),
 		runtime.WithForwardResponseOption(func(ctx context.Context, w http.ResponseWriter, m proto.Message) error {

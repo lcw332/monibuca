@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -506,13 +507,10 @@ func (p *Plugin) auth(streamPath string, key string, secret string, expire strin
 		return fmt.Errorf("auth failed secret length must be 32")
 	}
 	trueSecret := md5.Sum([]byte(key + streamPath + expire))
-	for i := 0; i < 16; i++ {
-		hex, err := strconv.ParseInt(secret[i<<1:(i<<1)+2], 16, 16)
-		if trueSecret[i] != byte(hex) || err != nil {
-			return fmt.Errorf("auth failed invalid secret")
-		}
+	if secret == hex.EncodeToString(trueSecret[:]) {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("auth failed invalid secret")
 }
 
 func (p *Plugin) OnSubscribe(streamPath string, args url.Values) {
@@ -659,6 +657,32 @@ func (p *Plugin) registerHandler(handlers map[string]http.HandlerFunc) {
 	}
 	for patten, handler := range handlers {
 		p.handle(patten, handler)
+	}
+	if p.config.EnableAuth && p.Server.ServerConfig.EnableLogin {
+		p.handle("/api/secret/{type}/{streamPath...}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(rw, "missing authorization header", http.StatusUnauthorized)
+				return
+			}
+
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			_, err := p.Server.ValidateToken(tokenString)
+			if err != nil {
+				http.Error(rw, "invalid token", http.StatusUnauthorized)
+				return
+			}
+			streamPath := r.PathValue("streamPath")
+			t := r.PathValue("type")
+			expire := r.URL.Query().Get("expire")
+			if t == "publish" {
+				secret := md5.Sum([]byte(p.config.Publish.Key + streamPath + expire))
+				rw.Write([]byte(hex.EncodeToString(secret[:])))
+			} else if t == "subscribe" {
+				secret := md5.Sum([]byte(p.config.Subscribe.Key + streamPath + expire))
+				rw.Write([]byte(hex.EncodeToString(secret[:])))
+			}
+		}))
 	}
 	if rootHandler, ok := p.handler.(http.Handler); ok {
 		p.handle("/", rootHandler)
