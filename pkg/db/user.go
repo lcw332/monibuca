@@ -29,6 +29,18 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// BeforeUpdate hook to hash password before updating
+func (u *User) BeforeUpdate(tx *gorm.DB) error {
+	if tx.Statement.Changed("Password") {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		u.Password = string(hashedPassword)
+	}
+	return nil
+}
+
 // CheckPassword verifies if the provided password matches the hash
 func (u *User) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))

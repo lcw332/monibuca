@@ -62,6 +62,11 @@ type (
 		StreamAlias   map[config.Regexp]string `desc:"流别名"`
 		PullProxy     []*PullProxy
 		EnableLogin   bool `default:"false" desc:"启用登录机制"` //启用登录机制
+		Users         []struct {
+			Username string `desc:"用户名"`
+			Password string `desc:"密码"`
+			Role     string `default:"user" desc:"角色,可选值:admin,user"`
+		} `desc:"用户列表,仅在启用登录机制时生效"`
 	}
 	WaitStream struct {
 		StreamPath string
@@ -271,7 +276,36 @@ func (s *Server) Start() (err error) {
 				s.Error("failed to auto-migrate User model", "error", err)
 				return
 			}
-			// Create default admin user if not exists
+			// Create users from configuration if EnableLogin is true
+			if s.ServerConfig.EnableLogin {
+				for _, userConfig := range s.ServerConfig.Users {
+					var user db.User
+					// Check if user exists
+					if err = s.DB.Where("username = ?", userConfig.Username).First(&user).Error; err != nil {
+						// Create user if not exists
+						user = db.User{
+							Username: userConfig.Username,
+							Password: userConfig.Password,
+							Role:     userConfig.Role,
+						}
+						if err = s.DB.Create(&user).Error; err != nil {
+							s.Error("failed to create user", "error", err, "username", userConfig.Username)
+							continue
+						}
+						s.Info("created user from config", "username", userConfig.Username)
+					} else {
+						// Update existing user with config values
+						user.Password = userConfig.Password
+						user.Role = userConfig.Role
+						if err = s.DB.Save(&user).Error; err != nil {
+							s.Error("failed to update user", "error", err, "username", userConfig.Username)
+							continue
+						}
+						s.Info("updated user from config", "username", userConfig.Username)
+					}
+				}
+			}
+			// Create default admin user if no users exist
 			var count int64
 			s.DB.Model(&db.User{}).Count(&count)
 			if count == 0 {
