@@ -41,9 +41,23 @@ import (
 	"context"
 
 	"m7s.live/v5"
-	_ "m7s.live/v5/plugin/debug"  // 调试插件
-	_ "m7s.live/v5/plugin/flv"    // FLV插件
-	_ "m7s.live/v5/plugin/rtmp"   // RTMP插件
+	_ "m7s.live/v5/plugin/cascade"
+	_ "m7s.live/v5/plugin/debug"
+	_ "m7s.live/v5/plugin/flv"
+	_ "m7s.live/v5/plugin/gb28181"
+	_ "m7s.live/v5/plugin/hls"
+	_ "m7s.live/v5/plugin/logrotate"
+	_ "m7s.live/v5/plugin/monitor"
+	_ "m7s.live/v5/plugin/mp4"
+	_ "m7s.live/v5/plugin/preview"
+	_ "m7s.live/v5/plugin/rtmp"
+	_ "m7s.live/v5/plugin/rtsp"
+	_ "m7s.live/v5/plugin/sei"
+	_ "m7s.live/v5/plugin/snap"
+	_ "m7s.live/v5/plugin/srt"
+	_ "m7s.live/v5/plugin/stress"
+	_ "m7s.live/v5/plugin/transcode"
+	_ "m7s.live/v5/plugin/webrtc"
 )
 
 func main() {

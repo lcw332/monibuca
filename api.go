@@ -654,6 +654,16 @@ func (s *Server) Api_Stream_Position_SSE(rw http.ResponseWriter, r *http.Request
 	}, rw, r)
 }
 
+// func (s *Server) Api_Vod_Position(rw http.ResponseWriter, r *http.Request) {
+// 	streamPath := r.URL.Query().Get("streamPath")
+// 	s.Streams.Call(func() error {
+// 		if pub, ok := s.Streams.Get(streamPath); ok {
+// 			t = pub.GetPosition()
+// 		}
+// 		return nil
+// 	})
+// }
+
 func (s *Server) Summary(context.Context, *emptypb.Empty) (res *pb.SummaryResponse, err error) {
 	dur := time.Since(s.lastSummaryTime)
 	if dur < time.Second {
