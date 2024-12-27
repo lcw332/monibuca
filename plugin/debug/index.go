@@ -193,7 +193,7 @@ func (p *DebugPlugin) GetHeap(ctx context.Context, empty *emptypb.Empty) (*pb.He
 		obj.Size += size
 		totalSize += size
 
-		// 构建引用关系
+		// 构建引���关系
 		for i := 1; i < len(sample.Location); i++ {
 			loc := sample.Location[i]
 			if len(loc.Line) == 0 || loc.Line[0].Function == nil {
@@ -293,13 +293,32 @@ func (p *DebugPlugin) collectCPUProfile() error {
 }
 
 // GetCpu 接口
-func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.CpuResponse, error) {
-	// 确保只采集一次 CPU Profile
+func (p *DebugPlugin) GetCpu(ctx context.Context, req *pb.CpuRequest) (*pb.CpuResponse, error) {
+	// 如果需要刷新或者缓存中没有数据
+	if req.Refresh || p.cpuProfileData == nil {
+		p.cpuProfileLock.Lock()
+		p.cpuProfileData = nil         // 清除现有缓存
+		p.cpuProfileOnce = sync.Once{} // 重置 Once
+		p.cpuProfileLock.Unlock()
+	}
+
+	// 如果请求指定了duration，临时更新ProfileDuration
+	originalDuration := p.ProfileDuration
+	if req.Duration > 0 {
+		p.ProfileDuration = time.Duration(req.Duration) * time.Second
+	}
+
+	// 确保采集 CPU Profile
 	p.cpuProfileOnce.Do(func() {
 		if err := p.collectCPUProfile(); err != nil {
 			fmt.Printf("Failed to collect CPU profile: %v\n", err)
 		}
 	})
+
+	// 恢复原始的ProfileDuration
+	if req.Duration > 0 {
+		p.ProfileDuration = originalDuration
+	}
 
 	// 如果缓存中没有数据，返回错误
 	if p.cpuProfileData == nil {
@@ -341,13 +360,32 @@ func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.Cpu
 }
 
 // GetCpuGraph 接口
-func (p *DebugPlugin) GetCpuGraph(ctx context.Context, empty *emptypb.Empty) (*pb.CpuGraphResponse, error) {
-	// 确保只采集一次 CPU Profile
+func (p *DebugPlugin) GetCpuGraph(ctx context.Context, req *pb.CpuRequest) (*pb.CpuGraphResponse, error) {
+	// 如果需要刷新或者缓存中没有数据
+	if req.Refresh || p.cpuProfileData == nil {
+		p.cpuProfileLock.Lock()
+		p.cpuProfileData = nil         // 清除现有缓存
+		p.cpuProfileOnce = sync.Once{} // 重置 Once
+		p.cpuProfileLock.Unlock()
+	}
+
+	// 如果请求指定了duration，临时更新ProfileDuration
+	originalDuration := p.ProfileDuration
+	if req.Duration > 0 {
+		p.ProfileDuration = time.Duration(req.Duration) * time.Second
+	}
+
+	// 确保采集 CPU Profile
 	p.cpuProfileOnce.Do(func() {
 		if err := p.collectCPUProfile(); err != nil {
 			fmt.Printf("Failed to collect CPU profile: %v\n", err)
 		}
 	})
+
+	// 恢复原始的ProfileDuration
+	if req.Duration > 0 {
+		p.ProfileDuration = originalDuration
+	}
 
 	// 如果缓存中没有数据，返回错误
 	if p.cpuProfileData == nil {

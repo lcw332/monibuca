@@ -16,16 +16,22 @@ service api {
       get: "/debug/api/heap/graph"
     };
   }
-  rpc GetCpuGraph (google.protobuf.Empty) returns (CpuGraphResponse) {
+  rpc GetCpuGraph (CpuRequest) returns (CpuGraphResponse) {
     option (google.api.http) = {
       get: "/debug/api/cpu/graph"
     };
   }
-  rpc GetCpu (google.protobuf.Empty) returns (CpuResponse) {
+  rpc GetCpu (CpuRequest) returns (CpuResponse) {
     option (google.api.http) = {
       get: "/debug/api/cpu"
     };
   }
+}
+
+// CPU分析请求参数
+message CpuRequest {
+  bool refresh = 1;              // 是否刷新数据
+  uint32 duration = 2;           // 分析时间（秒）
 }
 
 message HeapObject {
