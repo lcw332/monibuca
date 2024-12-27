@@ -1,7 +1,6 @@
 package plugin_debug
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	runtimePPROF "runtime/pprof"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	myproc "github.com/cloudwego/goref/pkg/proc"
@@ -34,6 +34,11 @@ type DebugPlugin struct {
 	Profile         string        `desc:"采集profile存储文件"`
 	ChartPeriod     time.Duration `default:"1s" desc:"图表更新周期"`
 	Grfout          string        `default:"grf.out" desc:"grf输出文件"`
+
+	// 添加缓存字段
+	cpuProfileData *profile.Profile // 缓存 CPU Profile 数据
+	cpuProfileOnce sync.Once        // 确保只采集一次
+	cpuProfileLock sync.Mutex       // 保护缓存数据
 }
 
 type WriteToFile struct {
@@ -42,17 +47,10 @@ type WriteToFile struct {
 }
 
 func (w *WriteToFile) Header() http.Header {
-	// return w.w.Header()
 	return w.header
 }
 
-//	func (w *WriteToFile) Write(p []byte) (int, error) {
-//		// w.w.Write(p)
-//		return w.Writer.Write(p)
-//	}
-func (w *WriteToFile) WriteHeader(statusCode int) {
-	// w.w.WriteHeader(statusCode)
-}
+func (w *WriteToFile) WriteHeader(statusCode int) {}
 
 func (p *DebugPlugin) OnInit() error {
 	// 启用阻塞分析
@@ -255,59 +253,64 @@ func (p *DebugPlugin) GetHeap(ctx context.Context, empty *emptypb.Empty) (*pb.He
 	return resp, nil
 }
 
-func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.CpuResponse, error) {
-	// 创建一个临时文件来存储CPU profile数据
+// 采集 CPU Profile 并缓存
+func (p *DebugPlugin) collectCPUProfile() error {
+	p.cpuProfileLock.Lock()
+	defer p.cpuProfileLock.Unlock()
+
+	// 如果已经采集过，直接返回
+	if p.cpuProfileData != nil {
+		return nil
+	}
+
+	// 创建临时文件用于存储 CPU Profile 数据
 	f, err := os.CreateTemp("", "cpu_profile")
 	if err != nil {
-		return nil, fmt.Errorf("could not create CPU profile: %v", err)
+		return fmt.Errorf("could not create CPU profile: %v", err)
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	// 开始CPU profiling
+	// 开始 CPU profiling
 	if err := runtimePPROF.StartCPUProfile(f); err != nil {
-		return nil, fmt.Errorf("could not start CPU profile: %v", err)
+		return fmt.Errorf("could not start CPU profile: %v", err)
 	}
 
 	// 采样指定时间
-	time.Sleep(1 * time.Second)
+	time.Sleep(p.ProfileDuration)
 	runtimePPROF.StopCPUProfile()
 
-	// 读取profile数据
-	profileData, err := os.ReadFile(f.Name())
+	// 读取并解析 CPU Profile 数据
+	f.Seek(0, 0)
+	profileData, err := profile.Parse(f)
 	if err != nil {
-		return nil, fmt.Errorf("could not read CPU profile: %v", err)
+		return fmt.Errorf("could not parse CPU profile: %v", err)
 	}
 
-	// 解析profile数据
-	parsedProfile, err := profile.Parse(bytes.NewReader(profileData))
-	if err != nil {
-		return nil, fmt.Errorf("could not parse CPU profile: %v", err)
+	// 缓存 CPU Profile 数据
+	p.cpuProfileData = profileData
+	return nil
+}
+
+// GetCpu 接口
+func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.CpuResponse, error) {
+	// 确保只采集一次 CPU Profile
+	p.cpuProfileOnce.Do(func() {
+		if err := p.collectCPUProfile(); err != nil {
+			fmt.Printf("Failed to collect CPU profile: %v\n", err)
+		}
+	})
+
+	// 如果缓存中没有数据，返回错误
+	if p.cpuProfileData == nil {
+		return nil, fmt.Errorf("CPU profile data is not available")
 	}
 
-	// 获取阻塞分析数据
-	blockBuf := &bytes.Buffer{}
-	if err := runtimePPROF.Lookup("block").WriteTo(blockBuf, 1); err != nil {
-		return nil, fmt.Errorf("could not write block profile: %v", err)
-	}
-
-	// 解析阻塞分析数据
-	blockProfile, err := profile.Parse(bytes.NewReader(blockBuf.Bytes()))
-	if err != nil {
-		return nil, fmt.Errorf("could not parse block profile: %v", err)
-	}
-
-	// 计算总阻塞时间
-	var totalBlockingTime uint64
-	for _, sample := range blockProfile.Sample {
-		totalBlockingTime += uint64(sample.Value[0])
-	}
-
-	// 构建响应
+	// 使用缓存的 CPU Profile 数据构建响应
 	resp := &pb.CpuResponse{
 		Data: &pb.CpuData{
-			TotalCpuTimeNs:     uint64(parsedProfile.DurationNanos),
-			SamplingIntervalNs: uint64(parsedProfile.Period),
+			TotalCpuTimeNs:     uint64(p.cpuProfileData.DurationNanos),
+			SamplingIntervalNs: uint64(p.cpuProfileData.Period),
 			Functions:          make([]*pb.FunctionProfile, 0),
 			Goroutines:         make([]*pb.GoroutineProfile, 0),
 			SystemCalls:        make([]*pb.SystemCall, 0),
@@ -315,8 +318,8 @@ func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.Cpu
 		},
 	}
 
-	// 收集函数调用信息
-	for _, sample := range parsedProfile.Sample {
+	// 填充函数调用信息
+	for _, sample := range p.cpuProfileData.Sample {
 		functionProfile := &pb.FunctionProfile{
 			FunctionName:    sample.Location[0].Line[0].Function.Name,
 			CpuTimeNs:       uint64(sample.Value[0]),
@@ -324,7 +327,7 @@ func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.Cpu
 			CallStack:       make([]string, 0),
 		}
 
-		// 收集调用栈信息
+		// 填充调用栈信息
 		for _, loc := range sample.Location {
 			for _, line := range loc.Line {
 				functionProfile.CallStack = append(functionProfile.CallStack, line.Function.Name)
@@ -334,17 +337,32 @@ func (p *DebugPlugin) GetCpu(ctx context.Context, empty *emptypb.Empty) (*pb.Cpu
 		resp.Data.Functions = append(resp.Data.Functions, functionProfile)
 	}
 
-	// 收集运行时统计信息
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	resp.Data.RuntimeStats = &pb.RuntimeStats{
-		GcCpuFraction:  memStats.GCCPUFraction,
-		GcCount:        uint64(memStats.NumGC),
-		GcPauseTimeNs:  memStats.PauseTotalNs,
-		BlockingTimeNs: totalBlockingTime, // 添加阻塞时间统计
+	return resp, nil
+}
+
+// GetCpuGraph 接口
+func (p *DebugPlugin) GetCpuGraph(ctx context.Context, empty *emptypb.Empty) (*pb.CpuGraphResponse, error) {
+	// 确保只采集一次 CPU Profile
+	p.cpuProfileOnce.Do(func() {
+		if err := p.collectCPUProfile(); err != nil {
+			fmt.Printf("Failed to collect CPU profile: %v\n", err)
+		}
+	})
+
+	// 如果缓存中没有数据，返回错误
+	if p.cpuProfileData == nil {
+		return nil, fmt.Errorf("CPU profile data is not available")
 	}
 
-	return resp, nil
+	// 使用缓存的 CPU Profile 数据生成 dot 图
+	dot, err := debug.GetDotGraph(p.cpuProfileData)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate dot graph: %v", err)
+	}
+
+	return &pb.CpuGraphResponse{
+		Data: dot,
+	}, nil
 }
 
 // 辅助函数：检查字符串切片是否包含特定字符串
@@ -384,41 +402,6 @@ func (p *DebugPlugin) GetHeapGraph(ctx context.Context, empty *emptypb.Empty) (*
 		return nil, err
 	}
 	return &pb.HeapGraphResponse{
-		Data: dot,
-	}, nil
-}
-
-func (p *DebugPlugin) GetCpuGraph(ctx context.Context, empty *emptypb.Empty) (*pb.CpuGraphResponse, error) {
-	// 创建临时文件用于存储CPU profile信息
-	f, err := os.CreateTemp("", "cpu")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	// 开始CPU profile收集
-	if err := runtimePPROF.StartCPUProfile(f); err != nil {
-		return nil, err
-	}
-
-	// 收集30秒的CPU数据
-	time.Sleep(1 * time.Second)
-	runtimePPROF.StopCPUProfile()
-
-	// 读取CPU profile信息
-	f.Seek(0, 0)
-	profile, err := profile.Parse(f)
-	if err != nil {
-		return nil, err
-	}
-
-	// 生成dot图
-	dot, err := debug.GetDotGraph(profile)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.CpuGraphResponse{
 		Data: dot,
 	}, nil
 }
