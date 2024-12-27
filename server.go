@@ -539,7 +539,12 @@ func (s *Server) ValidateToken(tokenString string) (*auth.JWTClaims, error) {
 func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (res *pb.LoginResponse, err error) {
 	res = &pb.LoginResponse{}
 	if !s.ServerConfig.EnableLogin {
-		err = pkg.ErrDisabled
+		res.Data = &pb.LoginSuccess{
+			UserInfo: &pb.UserInfo{
+				Username:  "anonymous",
+				ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			},
+		}
 		return
 	}
 	if s.DB == nil {
@@ -577,10 +582,6 @@ func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (res *pb.Login
 
 // Logout implements the Logout RPC method
 func (s *Server) Logout(ctx context.Context, req *pb.LogoutRequest) (res *pb.LogoutResponse, err error) {
-	if !s.ServerConfig.EnableLogin {
-		err = pkg.ErrDisabled
-		return
-	}
 	// In a more complex system, you might want to maintain a blacklist of logged-out tokens
 	// For now, we'll just return success as JWT tokens are stateless
 	res = &pb.LogoutResponse{Code: 0, Message: "success"}
