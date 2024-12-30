@@ -310,18 +310,18 @@ func (handler *SubscribeHandler[A, V]) sendAudioFrame() (err error) {
 				handler.s.Trace("send audio frame", "seq", handler.audioFrame.Sequence)
 			}
 			err = handler.OnAudio(handler.audioFrame.Wraps[handler.awi].(A))
-		} else {
-			handler.s.AudioReader.StopRead()
-		}
-		// Calculate BPS
-		if handler.s.AudioReader != nil {
-			handler.bytesRead += uint32(handler.audioFrame.Wraps[handler.awi].GetSize())
-			now := time.Now()
-			if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
-				handler.s.AudioReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
-				handler.bytesRead = 0
-				handler.lastBPSTime = now
+			// Calculate BPS
+			if handler.s.AudioReader != nil {
+				handler.bytesRead += uint32(handler.audioFrame.Wraps[handler.awi].GetSize())
+				now := time.Now()
+				if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
+					handler.s.AudioReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
+					handler.bytesRead = 0
+					handler.lastBPSTime = now
+				}
 			}
+		} else if handler.s.AudioReader != nil {
+			handler.s.AudioReader.StopRead()
 		}
 	} else {
 		err = handler.OnAudio(any(handler.audioFrame).(A))
@@ -345,18 +345,18 @@ func (handler *SubscribeHandler[A, V]) sendVideoFrame() (err error) {
 				handler.s.Trace("send video frame", "seq", handler.videoFrame.Sequence, "data", handler.videoFrame.Wraps[handler.vwi].String(), "size", handler.videoFrame.Wraps[handler.vwi].GetSize())
 			}
 			err = handler.OnVideo(handler.videoFrame.Wraps[handler.vwi].(V))
-		} else {
-			handler.s.VideoReader.StopRead()
-		}
-		// Calculate BPS
-		if handler.s.VideoReader != nil {
-			handler.bytesRead += uint32(handler.videoFrame.Wraps[handler.vwi].GetSize())
-			now := time.Now()
-			if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
-				handler.s.VideoReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
-				handler.bytesRead = 0
-				handler.lastBPSTime = now
+			// Calculate BPS
+			if handler.s.VideoReader != nil {
+				handler.bytesRead += uint32(handler.videoFrame.Wraps[handler.vwi].GetSize())
+				now := time.Now()
+				if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
+					handler.s.VideoReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
+					handler.bytesRead = 0
+					handler.lastBPSTime = now
+				}
 			}
+		} else if handler.s.VideoReader != nil {
+			handler.s.VideoReader.StopRead()
 		}
 	} else {
 		err = handler.OnVideo(any(handler.videoFrame).(V))
