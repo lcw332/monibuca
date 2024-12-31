@@ -78,8 +78,9 @@ func (p *TransformJob) Subscribe() (err error) {
 }
 
 func (p *TransformJob) Publish(streamPath string) (err error) {
-	p.Publisher, err = p.Plugin.Publish(context.WithValue(p.Transformer, Owner, p.Transformer), streamPath)
-	p.Publisher.Type = PublishTypeTransform
+	var conf = p.Plugin.GetCommonConf().Publish
+	conf.PubType = PublishTypeTransform
+	p.Publisher, err = p.Plugin.PublishWithConfig(context.WithValue(p.Transformer, Owner, p.Transformer), streamPath, conf)
 	if err == nil {
 		p.Publisher.OnDispose(func() {
 			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, task.ErrStopByUser) {

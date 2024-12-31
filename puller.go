@@ -36,7 +36,7 @@ type (
 	PullJob struct {
 		Connection
 		Publisher     *Publisher
-		PublishConfig *config.Publish
+		PublishConfig config.Publish
 		puller        IPuller
 		conf          *config.Pull
 	}
@@ -82,7 +82,12 @@ func (p *PullJob) GetPullJob() *PullJob {
 }
 
 func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf config.Pull, pubConf *config.Publish) *PullJob {
-	p.PublishConfig = pubConf
+	if pubConf == nil {
+		p.PublishConfig = p.Plugin.GetCommonConf().Publish
+	} else {
+		p.PublishConfig = *pubConf
+	}
+	p.PublishConfig.PubType = PublishTypePull
 	p.Args = url.Values(conf.Args.DeepClone())
 	p.conf = &conf
 	remoteURL := conf.URL
@@ -125,13 +130,7 @@ func (p *PullJob) Publish() (err error) {
 	if len(p.Args) > 0 {
 		streamPath += "?" + p.Args.Encode()
 	}
-	if p.PublishConfig == nil {
-		p.Publisher, err = p.Plugin.Publish(p.puller.GetTask().Context, streamPath)
-		p.PublishConfig = &p.Plugin.GetCommonConf().Publish
-	} else {
-		p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, *p.PublishConfig)
-	}
-	p.Publisher.Type = PublishTypePull
+	p.Publisher, err = p.Plugin.PublishWithConfig(p.puller.GetTask().Context, streamPath, p.PublishConfig)
 	if err == nil && p.conf.MaxRetry != 0 {
 		p.Publisher.OnDispose(func() {
 			if p.Publisher.StopReasonIs(pkg.ErrPublishDelayCloseTimeout, task.ErrStopByUser) {
@@ -202,6 +201,7 @@ func (p *RecordFilePuller) Start() (err error) {
 	if p.PullJob.Plugin.DB == nil {
 		return pkg.ErrNoDB
 	}
+	p.PullJob.PublishConfig.PubType = PublishTypeVod
 	if err = p.PullJob.Publish(); err != nil {
 		return
 	}

@@ -552,7 +552,7 @@ func (p *Plugin) OnSubscribe(streamPath string, args url.Values) {
 }
 func (p *Plugin) PublishWithConfig(ctx context.Context, streamPath string, conf config.Publish) (publisher *Publisher, err error) {
 	publisher = createPublisher(p, streamPath, conf)
-	if p.config.EnableAuth {
+	if p.config.EnableAuth && publisher.Type == PublishTypeServer {
 		onAuthPub := p.Meta.OnAuthPub
 		if onAuthPub == nil {
 			onAuthPub = p.Server.Meta.OnAuthPub
@@ -579,22 +579,20 @@ func (p *Plugin) Publish(ctx context.Context, streamPath string) (publisher *Pub
 
 func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, conf config.Subscribe) (subscriber *Subscriber, err error) {
 	subscriber = createSubscriber(p, streamPath, conf)
-	if subscriber.Type == SubscribeTypeServer {
-		if p.config.EnableAuth {
-			onAuthSub := p.Meta.OnAuthSub
-			if onAuthSub == nil {
-				onAuthSub = p.Server.Meta.OnAuthSub
+	if p.config.EnableAuth && subscriber.Type == SubscribeTypeServer {
+		onAuthSub := p.Meta.OnAuthSub
+		if onAuthSub == nil {
+			onAuthSub = p.Server.Meta.OnAuthSub
+		}
+		if onAuthSub != nil {
+			if err = onAuthSub(subscriber).Await(); err != nil {
+				p.Warn("auth failed", "error", err)
+				return
 			}
-			if onAuthSub != nil {
-				if err = onAuthSub(subscriber).Await(); err != nil {
-					p.Warn("auth failed", "error", err)
-					return
-				}
-			} else if conf.Key != "" {
-				if err = p.auth(subscriber.StreamPath, conf.Key, subscriber.Args.Get("secret"), subscriber.Args.Get("expire")); err != nil {
-					p.Warn("auth failed", "error", err)
-					return
-				}
+		} else if conf.Key != "" {
+			if err = p.auth(subscriber.StreamPath, conf.Key, subscriber.Args.Get("secret"), subscriber.Args.Get("expire")); err != nil {
+				p.Warn("auth failed", "error", err)
+				return
 			}
 		}
 	}
@@ -756,9 +754,14 @@ func (p *Plugin) sendPublishWebhook(pub *Publisher) {
 		"publishId":  pub.ID,
 		"remoteAddr": pub.RemoteAddr,
 		"type":       pub.Type,
+		"pluginName": p.Meta.Name,
 		"timestamp":  time.Now().Unix(),
 	}
 	p.SendWebhook(config.HookOnPublish, p.config.Hook[config.HookOnPublish], webhookData)
+	if p.Server.config.Hook == nil {
+		return
+	}
+	p.Server.SendWebhook(config.HookOnPublish, p.Server.config.Hook[config.HookOnPublish], webhookData)
 }
 
 func (p *Plugin) sendPublishEndWebhook(pub *Publisher) {

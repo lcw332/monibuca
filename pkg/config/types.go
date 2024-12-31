@@ -41,6 +41,7 @@ type (
 		Key               string          `desc:"发布鉴权key"`                                                  // 发布鉴权key
 		RingSize          util.Range[int] `default:"20-1024" desc:"RingSize范围"`                             // 缓冲区大小范围
 		RelayMode         string          `default:"remux" desc:"转发模式" enum:"remux:转格式,relay:纯转发,mix:混合转发"` // 转发模式
+		PubType           string          `default:"server" desc:"发布类型"`                                    // 发布类型
 		Dump              bool
 	}
 	Subscribe struct {
@@ -54,7 +55,7 @@ type (
 		WaitTimeout     time.Duration `default:"10s" desc:"等待流超时时间"`                        // 等待流超时
 		WriteBufferSize int           `desc:"写缓冲大小"`                                        // 写缓冲大小
 		Key             string        `desc:"订阅鉴权key"`                                      // 订阅鉴权key
-		SubType         string        `desc:"订阅类型"`                                                        // 订阅类型
+		SubType         string        `desc:"订阅类型"`                                         // 订阅类型
 	}
 	HTTPValus map[string][]string
 	Pull      struct {

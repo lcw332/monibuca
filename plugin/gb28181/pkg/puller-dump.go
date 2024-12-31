@@ -1,18 +1,23 @@
 package gb28181
 
 import (
+	"time"
+
 	"m7s.live/v5"
 	"m7s.live/v5/pkg/util"
-	"time"
 )
 
 type DumpPuller struct {
 	m7s.HTTPFilePuller
 }
 
+func (p *DumpPuller) Start() (err error) {
+	p.PullJob.PublishConfig.PubType = m7s.PublishTypeReplay
+	return p.HTTPFilePuller.Start()
+}
+
 func (p *DumpPuller) Run() (err error) {
 	pub := p.PullJob.Publisher
-	pub.Type = m7s.PublishTypeReplay
 	puber := NewPSPublisher(pub)
 	puber.Receiver.Logger = p.Logger
 	go puber.Demux()

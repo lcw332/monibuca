@@ -38,7 +38,6 @@ func (p *RecordReader) Run() (err error) {
 	pullJob := &p.PullJob
 	pullStartTime := p.PullStartTime
 	publisher := pullJob.Publisher
-	publisher.Type = m7s.PublishTypeVod
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	var ts, tsOffset int64
 	var realTime time.Time

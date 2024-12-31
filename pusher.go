@@ -19,7 +19,7 @@ type Pusher = func() IPusher
 type PushJob struct {
 	Connection
 	Subscriber *Subscriber
-	SubConf    *config.Subscribe
+	SubConf    config.Subscribe
 	pusher     IPusher
 }
 
@@ -31,11 +31,11 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 	p.Connection.Init(plugin, streamPath, conf.URL, conf.Proxy, http.Header(conf.Header))
 	p.pusher = pusher
 	if subConf == nil {
-		conf := plugin.config.Subscribe
-		subConf = &conf
+		p.SubConf = plugin.GetCommonConf().Subscribe
+	} else {
+		p.SubConf = *subConf
 	}
-	subConf.SubType = SubscribeTypePush
-	p.SubConf = subConf
+	p.SubConf.SubType = SubscribeTypePush
 	p.SetDescriptions(task.Description{
 		"plugin":     plugin.Meta.Name,
 		"streamPath": streamPath,
@@ -48,7 +48,7 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 }
 
 func (p *PushJob) Subscribe() (err error) {
-	p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.pusher.GetTask().Context, p.StreamPath, *p.SubConf)
+	p.Subscriber, err = p.Plugin.SubscribeWithConfig(p.pusher.GetTask().Context, p.StreamPath, p.SubConf)
 	return
 }
 

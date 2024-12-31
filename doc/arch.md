@@ -1,104 +1,132 @@
 ```mermaid
-graph LR
-    subgraph Core
-        direction LR
-        Server(Server)
-        ConfigManager(Config Manager)
-        LogHandler(Log Handler)
-        TaskManager(Task Manager)
-        HookManager(Hook Manager)
-        MemorySpace(Memory Space)
-        MetricsCollector(Metrics Collector)
+graph TB
+    subgraph Core["Core System"]
+        Server["Server"]
+        ConfigManager["Config Manager"]
+        LogManager["Log Manager"]
+        TaskManager["Task Manager"]
+        PluginRegistry["Plugin Registry"]
+        MetricsCollector["Metrics Collector"]
+        EventBus["Event Bus"]
     end
 
-    subgraph Plugins
-        direction TB
-        PluginLoader(Plugin Loader)
-        Plugin[["Plugin 1\n(e.g., RTSP, HLS)"]]
-        PluginN[["Plugin N"]]
+    subgraph Media["Media Processing"]
+        CodecRegistry["Codec Registry"]
+        MediaEngine["Media Engine"]
+        AVTracks["AV Tracks"]
+        MediaFormats["Media Formats"]
+        MediaTransform["Media Transform"]
     end
 
-    subgraph Streams
-        direction TB
-        StreamManager(Stream Manager)
-        Publisher
-        Subscriber
-        AliasManager(Alias Manager)
-        StreamWaitingQueue(Stream Waiting Queue)
+    subgraph Streams["Stream Management"]
+        StreamManager["Stream Manager"]
+        Publisher["Publisher"]
+        Subscriber["Subscriber"]
+        StreamBuffer["Stream Buffer"]
+        StreamState["Stream State"]
+        StreamEvents["Stream Events"]
+        AliasManager["Alias Manager"]
     end
 
-    subgraph Forwarding
-        direction TB
-        ForwardingManager(Forwarding Manager)
-        PullJob
-        PushJob
-        TransformJob
+    subgraph Plugins["Plugin System"]
+        PluginLoader["Plugin Loader"]
+        PluginConfig["Plugin Config"]
+        PluginLifecycle["Plugin Lifecycle"]
+        PluginAPI["Plugin API"]
+        
+        subgraph PluginTypes["Plugin Types"]
+            RTSP["RTSP"]
+            HLS["HLS"]
+            WebRTC["WebRTC"]
+            GB28181["GB28181"]
+            RTMP["RTMP"]
+            Room["Room"]
+            Debug["Debug"]
+        end
     end
 
-    subgraph API
-        direction TB
-        GRPCServer(gRPC Server)
-        GRPCGateway(gRPC Gateway)
-        HTTPServer(HTTP Server)
-        APIReflection(API Reflection)
+    subgraph Storage["Storage System"]
+        RecordManager["Record Manager"]
+        FileManager["File Manager"]
+        StorageQuota["Storage Quota"]
+        StorageEvents["Storage Events"]
     end
 
-    Core -- "Loads & Manages" --> Plugins
-    Core -- "Manages" --> TaskManager
-    Core -- "Handles" --> LogHandler
-    Core -- "Stores" --> ConfigManager
-    Core -- "Dispatches" --> HookManager
-    Core -- "Monitors" --> MetricsCollector
+    subgraph API["API Layer"]
+        GRPCServer["gRPC Server"]
+        HTTPServer["HTTP Server"]
+        WebhookManager["Webhook Manager"]
+        AuthManager["Auth Manager"]
+        SSEHandler["SSE Handler"]
+        MetricsAPI["Metrics API"]
+    end
 
-    PluginLoader -- "Loads" --> Plugin
-    PluginLoader -- "Loads" --> PluginN
-    Plugin -- "Registers Hooks" --> HookManager
-    Plugin -- "Uses Configuration" --> ConfigManager
-    Plugin -- "Creates Tasks" --> TaskManager
-    Plugin -- "Manages Streams" --> StreamManager
-    Plugin -- "Forwards Streams" --> ForwardingManager
-    Plugin -- "Allocates Memory In" --> MemorySpace
-    Plugin -- "Logs Events Via" --> LogHandler
-    Plugin -- "Contributes Metrics To" --> MetricsCollector
+    subgraph Forwarding["Stream Forwarding"]
+        ForwardingManager["Forwarding Manager"]
+        PullManager["Pull Manager"]
+        PushManager["Push Manager"]
+        TranscodeManager["Transcode Manager"]
+    end
 
-    StreamManager -- "Manages" --> Publisher
-    StreamManager -- "Manages" --> Subscriber
-    StreamManager -- "Manages" --> AliasManager
-    StreamManager -- "Uses" --> StreamWaitingQueue
+    %% Core System Relationships
+    Core --> Plugins
+    Core --> API
+    Core --> Streams
+    Core --> Storage
+    Core --> Media
+    Core --> Forwarding
 
-    AliasManager -- "Provides Aliases For" --> Publisher
+    %% Plugin System Relationships
+    PluginLoader --> PluginTypes
+    PluginTypes --> StreamManager
+    PluginTypes --> ForwardingManager
+    PluginTypes --> API
 
-    Subscriber -- "Waits In" --> StreamWaitingQueue
+    %% Stream Management Relationships
+    StreamManager --> Publisher
+    StreamManager --> Subscriber
+    Publisher --> AVTracks
+    Subscriber --> AVTracks
+    Publisher --> StreamEvents
+    Subscriber --> StreamEvents
 
-    ForwardingManager -- "Manages" --> PullJob
-    ForwardingManager -- "Manages" --> PushJob
-    ForwardingManager -- "Manages" --> TransformJob
+    %% Media Processing Relationships
+    MediaEngine --> CodecRegistry
+    MediaEngine --> MediaTransform
+    MediaTransform --> AVTracks
+    MediaFormats --> MediaTransform
 
-    Publisher -- "Forwarded By" --> ForwardingManager
-    Subscriber -- "Receives From" --> ForwardingManager
+    %% API Layer Relationships
+    GRPCServer --> AuthManager
+    HTTPServer --> AuthManager
+    WebhookManager --> EventBus
+    MetricsAPI --> MetricsCollector
 
-    Server -- "Hosts" --> GRPCServer
-    Server -- "Hosts" --> HTTPServer
-    GRPCServer -- "Exposes Services" --> APIReflection
-    HTTPServer -- "Exposes APIs" --> APIReflection
-    GRPCServer -- "Proxied By" --> GRPCGateway
+    %% Forwarding Relationships
+    ForwardingManager --> PullManager
+    ForwardingManager --> PushManager
+    ForwardingManager --> TranscodeManager
+    PullManager --> Publisher
+    PushManager --> Subscriber
 
-    ConfigManager -- "Provides Config To" --> Server
-    ConfigManager -- "Provides Config To" --> Plugins
-    ConfigManager -- "Provides Config To" --> Streams
-    ConfigManager -- "Provides Config To" --> Forwarding
-    ConfigManager -- "Provides Config To" --> API
+    %% Storage Relationships
+    RecordManager --> Publisher
+    FileManager --> StorageEvents
+    StorageQuota --> StorageEvents
 
-    TaskManager -- "Manages" --> PullJob
-    TaskManager -- "Manages" --> PushJob
-    TaskManager -- "Manages" --> TransformJob
+    classDef core fill:#f9f,stroke:#333,stroke-width:2px
+    classDef plugin fill:#bbf,stroke:#333,stroke-width:2px
+    classDef stream fill:#bfb,stroke:#333,stroke-width:2px
+    classDef api fill:#fbb,stroke:#333,stroke-width:2px
+    classDef media fill:#fbf,stroke:#333,stroke-width:2px
+    classDef storage fill:#bff,stroke:#333,stroke-width:2px
+    classDef forward fill:#ffb,stroke:#333,stroke-width:2px
 
-    HookManager -- "Triggers On Events In" --> Streams
-    HookManager -- "Triggers On Events In" --> Forwarding
-    HookManager -- "Triggers On Events In" --> Plugins
-    HookManager -- "Triggers On Events In" --> API
-
-    MetricsCollector -- "Collects From" --> Server
-    MetricsCollector -- "Collects From" --> Plugins
-    MetricsCollector -- "Collects From" --> Streams
+    class Server,ConfigManager,LogManager,TaskManager,PluginRegistry,MetricsCollector,EventBus core
+    class PluginLoader,PluginConfig,PluginLifecycle,PluginAPI,RTSP,HLS,WebRTC,GB28181,RTMP,Room,Debug plugin
+    class StreamManager,Publisher,Subscriber,StreamBuffer,StreamState,StreamEvents,AliasManager stream
+    class GRPCServer,HTTPServer,WebhookManager,AuthManager,SSEHandler,MetricsAPI api
+    class CodecRegistry,MediaEngine,AVTracks,MediaFormats,MediaTransform media
+    class RecordManager,FileManager,StorageQuota,StorageEvents storage
+    class ForwardingManager,PullManager,PushManager,TranscodeManager forward
 ```

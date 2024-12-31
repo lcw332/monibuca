@@ -31,12 +31,12 @@ func (d *Dialog) GetPullJob() *m7s.PullJob {
 }
 
 func (d *Dialog) Start() (err error) {
+	if !d.IsLive() {
+		d.pullCtx.PublishConfig.PubType = m7s.PublishTypeVod
+	}
 	err = d.pullCtx.Publish()
 	if err != nil {
 		return
-	}
-	if !d.IsLive() {
-		d.pullCtx.Publisher.Type = m7s.PublishTypeVod
 	}
 	sss := strings.Split(d.pullCtx.RemoteURL, "/")
 	deviceId, channelId := sss[0], sss[1]
