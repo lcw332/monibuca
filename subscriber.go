@@ -306,13 +306,15 @@ func (handler *SubscribeHandler[A, V]) checkPublishChanged() {
 func (handler *SubscribeHandler[A, V]) sendAudioFrame() (err error) {
 	if handler.awi >= 0 {
 		if len(handler.audioFrame.Wraps) > handler.awi {
+			frame := handler.audioFrame.Wraps[handler.awi]
+			frameSize := frame.GetSize()
 			if handler.s.Enabled(handler.s, task.TraceLevel) {
-				handler.s.Trace("send audio frame", "seq", handler.audioFrame.Sequence)
+				handler.s.Trace("send audio frame", "seq", handler.audioFrame.Sequence, "data", frame.String(), "size", frameSize)
 			}
-			err = handler.OnAudio(handler.audioFrame.Wraps[handler.awi].(A))
+			err = handler.OnAudio(frame.(A))
 			// Calculate BPS
 			if handler.s.AudioReader != nil {
-				handler.bytesRead += uint32(handler.audioFrame.Wraps[handler.awi].GetSize())
+				handler.bytesRead += uint32(frameSize)
 				now := time.Now()
 				if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
 					handler.s.AudioReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
@@ -341,13 +343,15 @@ func (handler *SubscribeHandler[A, V]) sendAudioFrame() (err error) {
 func (handler *SubscribeHandler[A, V]) sendVideoFrame() (err error) {
 	if handler.vwi >= 0 {
 		if len(handler.videoFrame.Wraps) > handler.vwi {
+			frame := handler.videoFrame.Wraps[handler.vwi]
+			frameSize := frame.GetSize()
 			if handler.s.Enabled(handler.s, task.TraceLevel) {
-				handler.s.Trace("send video frame", "seq", handler.videoFrame.Sequence, "data", handler.videoFrame.Wraps[handler.vwi].String(), "size", handler.videoFrame.Wraps[handler.vwi].GetSize())
+				handler.s.Trace("send video frame", "seq", handler.videoFrame.Sequence, "data", frame.String(), "size", frameSize)
 			}
-			err = handler.OnVideo(handler.videoFrame.Wraps[handler.vwi].(V))
+			err = handler.OnVideo(frame.(V))
 			// Calculate BPS
 			if handler.s.VideoReader != nil {
-				handler.bytesRead += uint32(handler.videoFrame.Wraps[handler.vwi].GetSize())
+				handler.bytesRead += uint32(frameSize)
 				now := time.Now()
 				if elapsed := now.Sub(handler.lastBPSTime); elapsed >= time.Second {
 					handler.s.VideoReader.BPS = uint32(float64(handler.bytesRead) / elapsed.Seconds())
