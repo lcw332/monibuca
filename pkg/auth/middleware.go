@@ -30,6 +30,17 @@ func Middleware(validator TokenValidator) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Check if token needs refresh
+			shouldRefresh, err := ShouldRefreshToken(tokenString)
+			if err == nil && shouldRefresh {
+				newToken, err := RefreshToken(tokenString)
+				if err == nil {
+					// Add new token to response headers
+					w.Header().Set("New-Token", newToken)
+					w.Header().Set("Access-Control-Expose-Headers", "New-Token")
+				}
+			}
+
 			// Add claims to context
 			ctx := context.WithValue(r.Context(), "claims", claims)
 			next.ServeHTTP(w, r.WithContext(ctx))

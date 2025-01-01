@@ -654,6 +654,19 @@ func (s *Server) AuthInterceptor() grpc.UnaryServerInterceptor {
 			return nil, errors.New("invalid token")
 		}
 
+		// Check if token needs refresh
+		shouldRefresh, err := auth.ShouldRefreshToken(tokenString)
+		if err == nil && shouldRefresh {
+			newToken, err := auth.RefreshToken(tokenString)
+			if err == nil {
+				// Add new token to response headers
+				header := metadata.New(map[string]string{
+					"new-token": newToken,
+				})
+				grpc.SetHeader(ctx, header)
+			}
+		}
+
 		// Add claims to context
 		newCtx := context.WithValue(ctx, "claims", claims)
 		return handler(newCtx, req)

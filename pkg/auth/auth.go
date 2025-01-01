@@ -11,6 +11,8 @@ import (
 var (
 	jwtSecret = []byte("m7s_secret_key") // In production, this should be properly configured
 	tokenTTL  = 24 * time.Hour
+	// Add refresh threshold - refresh token if it expires in less than 30 minutes
+	refreshThreshold = 30 * time.Minute
 )
 
 // JWTClaims represents the JWT claims
@@ -54,4 +56,31 @@ func ValidateJWT(tokenString string) (*JWTClaims, error) {
 	}
 
 	return nil, errors.New("invalid token")
+}
+
+// ShouldRefreshToken checks if a token should be refreshed based on its expiration time
+func ShouldRefreshToken(tokenString string) (bool, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+		if claims.ExpiresAt != nil {
+			timeUntilExpiry := time.Until(claims.ExpiresAt.Time)
+			return timeUntilExpiry < refreshThreshold, nil
+		}
+	}
+	return false, errors.New("invalid token")
+}
+
+// RefreshToken validates the old token and generates a new one if it's still valid
+func RefreshToken(oldToken string) (string, error) {
+	claims, err := ValidateJWT(oldToken)
+	if err != nil {
+		return "", err
+	}
+	return GenerateToken(claims.Username)
 }
