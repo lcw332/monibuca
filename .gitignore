@@ -12,7 +12,7 @@ bin
 !plugin/record
 *.flv
 pullcf.yaml
-admin.zip
+*.zip
 __debug*
 .cursorrules
 example/default/*
