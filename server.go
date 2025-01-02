@@ -405,6 +405,7 @@ func (s *Server) Start() (err error) {
 		}
 		if s.DB != nil {
 			s.DB.AutoMigrate(&PullProxy{})
+			s.DB.AutoMigrate(&PushProxy{})
 		}
 		for _, d := range s.PullProxy {
 			if d.ID != 0 {
@@ -540,6 +541,7 @@ func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (res *pb.Login
 	res = &pb.LoginResponse{}
 	if !s.ServerConfig.EnableLogin {
 		res.Data = &pb.LoginSuccess{
+			Token: "monibuca",
 			UserInfo: &pb.UserInfo{
 				Username:  "anonymous",
 				ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),

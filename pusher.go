@@ -31,7 +31,7 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 	p.Connection.Init(plugin, streamPath, conf.URL, conf.Proxy, http.Header(conf.Header))
 	p.pusher = pusher
 	if subConf == nil {
-		p.SubConf = plugin.GetCommonConf().Subscribe
+		p.SubConf = plugin.config.Subscribe
 	} else {
 		p.SubConf = *subConf
 	}

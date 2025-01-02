@@ -1,6 +1,6 @@
 global:
   loglevel: debug
-  enablelogin: true
+  enablelogin: false
   # db:
   #   dbtype: mysql
   #   dsn: root:Monibuca#!4@tcp(sh-cynosdbmysql-grp-kxt43lv6.sql.tencentcdb.com:28520)/lkm7s_v5?parseTime=true

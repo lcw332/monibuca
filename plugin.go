@@ -570,6 +570,12 @@ func (p *Plugin) PublishWithConfig(ctx context.Context, streamPath string, conf 
 		}
 	}
 	err = p.Server.Streams.AddTask(publisher, ctx).WaitStarted()
+	if err == nil {
+		publisher.OnDispose(func() {
+			p.sendPublishEndWebhook(publisher)
+		})
+		p.sendPublishWebhook(publisher)
+	}
 	return
 }
 
@@ -604,6 +610,12 @@ func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, con
 		case <-subscriber.Done():
 			err = subscriber.StopReason()
 		}
+	}
+	if err == nil {
+		subscriber.OnDispose(func() {
+			p.sendSubscribeEndWebhook(subscriber)
+		})
+		p.sendSubscribeWebhook(subscriber)
 	}
 	return
 }
@@ -778,14 +790,14 @@ func (p *Plugin) sendPublishEndWebhook(pub *Publisher) {
 	p.SendWebhook(config.HookOnPublishEnd, p.config.Hook[config.HookOnPublishEnd], webhookData)
 }
 
-func (p *Plugin) sendSubscribeWebhook(pub *Publisher, sub *Subscriber) {
+func (p *Plugin) sendSubscribeWebhook(sub *Subscriber) {
 	if p.config.Hook == nil {
 		return
 	}
 	webhookData := map[string]interface{}{
 		"event":        "subscribe",
-		"streamPath":   pub.StreamPath,
-		"publishId":    pub.ID,
+		"streamPath":   sub.StreamPath,
+		"publishId":    sub.Publisher.ID,
 		"subscriberId": sub.ID,
 		"remoteAddr":   sub.RemoteAddr,
 		"type":         sub.Type,
