@@ -15,7 +15,7 @@ import (
 	"m7s.live/v5/pkg/config"
 
 	"github.com/pion/interceptor"
-	. "github.com/pion/webrtc/v3"
+	. "github.com/pion/webrtc/v4"
 	"m7s.live/v5"
 	. "m7s.live/v5/pkg"
 	. "m7s.live/v5/plugin/webrtc/pkg"

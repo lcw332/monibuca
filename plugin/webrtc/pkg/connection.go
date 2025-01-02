@@ -8,7 +8,7 @@ import (
 
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	. "github.com/pion/webrtc/v3"
+	. "github.com/pion/webrtc/v4"
 	"m7s.live/v5"
 	. "m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/codec"
@@ -60,10 +60,6 @@ func (IO *Connection) GetOffer() (*SessionDescription, error) {
 	if err != nil {
 		return nil, err
 	}
-	// IO.LocalSDP, err = offer.Unmarshal()
-	// if err != nil {
-	// 	return "", err
-	// }
 	gatherComplete := GatheringCompletePromise(IO.PeerConnection)
 	if err = IO.SetLocalDescription(offer); err != nil {
 		return nil, err
@@ -73,15 +69,10 @@ func (IO *Connection) GetOffer() (*SessionDescription, error) {
 }
 
 func (IO *Connection) GetAnswer() (*SessionDescription, error) {
-	// Sets the LocalDescription, and starts our UDP listeners
 	answer, err := IO.CreateAnswer(nil)
 	if err != nil {
 		return nil, err
 	}
-	// IO.LocalSDP, err = answer.Unmarshal()
-	// if err != nil {
-	// 	return "", err
-	// }
 	gatherComplete := GatheringCompletePromise(IO.PeerConnection)
 	if err = IO.SetLocalDescription(answer); err != nil {
 		return nil, err
@@ -166,9 +157,7 @@ func (IO *Connection) Receive() {
 					frame.AddRecycleBytes(buf)
 					frame.Packets = append(frame.Packets, &packet)
 				} else {
-					// t := time.Now()
 					err = puber.WriteVideo(frame)
-					// fmt.Println("write video", time.Since(t))
 					frame = &mrtp.Video{}
 					frame.AddRecycleBytes(buf)
 					frame.Packets = []*rtp.Packet{&packet}

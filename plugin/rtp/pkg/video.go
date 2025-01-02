@@ -12,7 +12,7 @@ import (
 	"github.com/deepch/vdk/codec/h265parser"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	. "m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/codec"
 	"m7s.live/v5/pkg/util"

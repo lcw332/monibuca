@@ -1,6 +1,8 @@
 package webrtc
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type SignalType string
 

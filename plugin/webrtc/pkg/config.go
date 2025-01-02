@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	. "github.com/pion/webrtc/v3"
+	. "github.com/pion/webrtc/v4"
 )
 
 func RegisterCodecs(m *MediaEngine) error {

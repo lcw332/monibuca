@@ -378,13 +378,16 @@ func (task *Task) SetDescriptions(value Description) {
 }
 
 func (task *Task) dispose() {
+	taskType, ownerType := task.handler.GetTaskType(), task.GetOwnerType()
 	if task.state < TASK_STATE_STARTED {
+		if task.Logger != nil {
+			task.Debug("task dispose canceled", "taskId", task.ID, "taskType", taskType, "ownerType", ownerType, "state", task.state)
+		}
 		return
 	}
 	reason := task.StopReason()
 	task.state = TASK_STATE_DISPOSING
 	if task.Logger != nil {
-		taskType, ownerType := task.handler.GetTaskType(), task.GetOwnerType()
 		if taskType != TASK_TYPE_CALL {
 			yargs := []any{"reason", reason, "taskId", task.ID, "taskType", taskType, "ownerType", ownerType}
 			task.Debug("task dispose", yargs...)

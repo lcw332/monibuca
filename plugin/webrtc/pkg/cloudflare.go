@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	"m7s.live/v5"
 )
 

@@ -14,7 +14,7 @@ import (
 	"github.com/deepch/vdk/codec/aacparser"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	. "m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/codec"
 	"m7s.live/v5/pkg/util"
@@ -208,6 +208,7 @@ func (r *Audio) Parse(t *AVTrack) (err error) {
 	case webrtc.MimeTypeOpus:
 		var ctx OPUSCtx
 		ctx.parseFmtpLine(r.RTPCodecParameters)
+		ctx.OPUSCtx.Channels = int(ctx.RTPCodecParameters.Channels)
 		t.ICodecCtx = &ctx
 	case webrtc.MimeTypePCMA:
 		var ctx PCMACtx

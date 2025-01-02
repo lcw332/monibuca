@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	. "github.com/pion/webrtc/v3"
+	. "github.com/pion/webrtc/v4"
 	"m7s.live/v5/pkg/task"
 	. "m7s.live/v5/plugin/webrtc/pkg"
 )

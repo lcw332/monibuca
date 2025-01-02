@@ -884,6 +884,9 @@ func (s *Server) AddPullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *
 		return
 	}
 	s.DB.Create(device)
+	if req.StreamPath == "" {
+		device.StreamPath = device.GetStreamPath()
+	}
 	s.PullProxies.Add(device)
 	res = &pb.SuccessResponse{}
 	return
