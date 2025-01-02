@@ -1172,7 +1172,10 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 		return
 	}
 	target := &PushProxy{}
-	s.DB.First(target, req.ID)
+	err = s.DB.First(target, req.ID).Error
+	if err != nil {
+		return
+	}
 	target.Name = req.Name
 	target.URL = req.PushURL
 	target.ParentID = uint(req.ParentID)
@@ -1205,6 +1208,23 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
 	target.StreamPath = req.StreamPath
 	s.DB.Save(target)
+	s.PushProxies.Call(func() error {
+		if device, ok := s.PushProxies.Get(uint(req.ID)); ok {
+			if target.URL != device.URL || device.Audio != target.Audio || device.StreamPath != target.StreamPath {
+				device.Stop(task.ErrStopByUser)
+				device.WaitStopped()
+				s.PushProxies.Add(target)
+				return nil
+			}
+			if device.PushOnStart != target.PushOnStart && target.PushOnStart && device.Handler != nil && device.Status == PushProxyStatusOnline {
+				device.Handler.Push()
+			}
+			device.Name = target.Name
+			device.PushOnStart = target.PushOnStart
+			device.Description = target.Description
+		}
+		return nil
+	})
 	res = &pb.SuccessResponse{}
 	return
 }

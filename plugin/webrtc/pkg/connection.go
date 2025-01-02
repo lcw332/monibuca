@@ -31,9 +31,11 @@ type Connection struct {
 
 func (IO *Connection) Start() (err error) {
 	if IO.Publisher != nil {
+		IO.Depend(IO.Publisher)
 		IO.Receive()
 	}
 	if IO.Subscriber != nil {
+		IO.Depend(IO.Subscriber)
 		IO.Send()
 	}
 	IO.OnICECandidate(func(ice *ICECandidate) {
@@ -90,7 +92,6 @@ func (IO *Connection) GetAnswer() (*SessionDescription, error) {
 
 func (IO *Connection) Receive() {
 	puber := IO.Publisher
-	IO.Depend(puber)
 	IO.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
 		IO.Info("OnTrack", "kind", track.Kind().String(), "payloadType", uint8(track.Codec().PayloadType))
 		var n int
@@ -200,13 +201,11 @@ func (IO *Connection) Receive() {
 	})
 }
 
-func (IO *Connection) Send() (err error) {
-	suber := IO.Subscriber
-	IO.Depend(suber)
+func (IO *Connection) SendSubscriber(subscriber *m7s.Subscriber) (err error) {
 	var useDC bool
 	var audioTLSRTP, videoTLSRTP *TrackLocalStaticRTP
 	var audioSender, videoSender *RTPSender
-	vctx, actx := suber.Publisher.GetVideoCodecCtx(), suber.Publisher.GetAudioCodecCtx()
+	vctx, actx := subscriber.Publisher.GetVideoCodecCtx(), subscriber.Publisher.GetAudioCodecCtx()
 	if IO.EnableDC && vctx != nil && vctx.FourCC() == codec.FourCC_H265 {
 		useDC = true
 	}
@@ -229,7 +228,7 @@ func (IO *Connection) Send() (err error) {
 				return
 			}
 		}
-		videoTLSRTP, err = NewTrackLocalStaticRTP(rcc.RTPCodecCapability, videoCodec.String(), suber.StreamPath)
+		videoTLSRTP, err = NewTrackLocalStaticRTP(rcc.RTPCodecCapability, videoCodec.String(), subscriber.StreamPath)
 		if err != nil {
 			return
 		}
@@ -241,7 +240,7 @@ func (IO *Connection) Send() (err error) {
 			rtcpBuf := make([]byte, 1500)
 			for {
 				if n, _, rtcpErr := videoSender.Read(rtcpBuf); rtcpErr != nil {
-					suber.Warn("rtcp read error", "error", rtcpErr)
+					subscriber.Warn("rtcp read error", "error", rtcpErr)
 					return
 				} else {
 					if p, err := rtcp.Unmarshal(rtcpBuf[:n]); err == nil {
@@ -271,7 +270,7 @@ func (IO *Connection) Send() (err error) {
 				return
 			}
 		}
-		audioTLSRTP, err = NewTrackLocalStaticRTP(rcc.RTPCodecCapability, audioCodec.String(), suber.StreamPath)
+		audioTLSRTP, err = NewTrackLocalStaticRTP(rcc.RTPCodecCapability, audioCodec.String(), subscriber.StreamPath)
 		if err != nil {
 			return
 		}
@@ -282,11 +281,11 @@ func (IO *Connection) Send() (err error) {
 	}
 	var dc *DataChannel
 	if useDC {
-		dc, err = IO.CreateDataChannel(suber.StreamPath, nil)
+		dc, err = IO.CreateDataChannel(subscriber.StreamPath, nil)
 		if err != nil {
 			return
 		}
-		dc.OnOpen(func(){
+		dc.OnOpen(func() {
 			var live flv.Live
 			live.WriteFlvTag = func(buffers net.Buffers) (err error) {
 				r := util.NewReadableBuffersFromBytes(buffers...)
@@ -306,18 +305,18 @@ func (IO *Connection) Send() (err error) {
 				})
 				return
 			}
-			live.Subscriber = suber
+			live.Subscriber = subscriber
 			err = live.Run()
 			dc.Close()
 		})
 	} else {
 		if audioSender == nil {
-			suber.SubAudio = false
+			subscriber.SubAudio = false
 		}
 		if videoSender == nil {
-			suber.SubVideo = false
+			subscriber.SubVideo = false
 		}
-		go m7s.PlayBlock(suber, func(frame *mrtp.Audio) (err error) {
+		go m7s.PlayBlock(subscriber, func(frame *mrtp.Audio) (err error) {
 			for _, p := range frame.Packets {
 				if err = audioTLSRTP.WriteRTP(p); err != nil {
 					return
@@ -336,6 +335,49 @@ func (IO *Connection) Send() (err error) {
 	return
 }
 
+func (IO *Connection) Send() (err error) {
+	if IO.Subscriber != nil {
+		err = IO.SendSubscriber(IO.Subscriber)
+	}
+	return
+}
+
 func (IO *Connection) Dispose() {
 	IO.PeerConnection.Close()
+}
+
+// SingleConnection extends Connection to handle multiple subscribers in a single WebRTC connection
+type SingleConnection struct {
+	Connection
+	Subscribers map[string]*m7s.Subscriber // map streamPath to subscriber
+}
+
+func NewSingleConnection() *SingleConnection {
+	return &SingleConnection{
+		Subscribers: make(map[string]*m7s.Subscriber),
+	}
+}
+
+// AddSubscriber adds a new subscriber to the connection and starts sending
+func (c *SingleConnection) AddSubscriber(streamPath string, subscriber *m7s.Subscriber) {
+	c.Subscribers[streamPath] = subscriber
+	if err := c.SendSubscriber(subscriber); err != nil {
+		c.Error("failed to start subscriber", "error", err, "streamPath", streamPath)
+		subscriber.Stop(err)
+		delete(c.Subscribers, streamPath)
+	}
+}
+
+// RemoveSubscriber removes a subscriber from the connection
+func (c *SingleConnection) RemoveSubscriber(streamPath string) {
+	if subscriber, ok := c.Subscribers[streamPath]; ok {
+		subscriber.Stop(task.ErrStopByUser)
+		delete(c.Subscribers, streamPath)
+	}
+}
+
+// HasSubscriber checks if a stream is already subscribed
+func (c *SingleConnection) HasSubscriber(streamPath string) bool {
+	_, ok := c.Subscribers[streamPath]
+	return ok
 }

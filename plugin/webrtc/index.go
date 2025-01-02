@@ -44,7 +44,9 @@ type WebRTCPlugin struct {
 
 func (p *WebRTCPlugin) RegisterHandler() map[string]http.HandlerFunc {
 	return map[string]http.HandlerFunc{
-		"/test/{name}": p.testPage,
+		"/test/{name}":          p.testPage,
+		"/push/{streamPath...}": p.servePush,
+		"/play/{streamPath...}": p.servePlay,
 	}
 }
 
