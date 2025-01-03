@@ -85,6 +85,7 @@ func (t *eventRecordCheck) Run() (err error) {
 	queryRecord := m7s.RecordStream{
 		EventLevel: m7s.EventLevelHigh,
 		Mode:       m7s.RecordModeEvent,
+		Type:       "mp4",
 	}
 	t.DB.Where(&queryRecord).Find(&eventRecordStreams, "stream_path=?", t.streamPath) //搜索事件录像，且为重要事件（无法自动删除）
 	if len(eventRecordStreams) > 0 {
@@ -157,6 +158,7 @@ func (r *Recorder) createStream(start time.Time) (err error) {
 		BeforeDuration: recordJob.BeforeDuration,
 		AfterDuration:  recordJob.AfterDuration,
 		Mode:           recordJob.Mode,
+		Type:           "mp4",
 	}
 	dir := filepath.Dir(r.stream.FilePath)
 	if err = os.MkdirAll(dir, 0755); err != nil {

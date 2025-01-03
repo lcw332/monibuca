@@ -2,8 +2,6 @@ package flv
 
 import (
 	"errors"
-	"m7s.live/v5/pkg/config"
-	"m7s.live/v5/pkg/task"
 
 	"m7s.live/v5"
 	"m7s.live/v5/pkg/util"
@@ -12,12 +10,6 @@ import (
 
 type Puller struct {
 	m7s.HTTPFilePuller
-}
-
-func NewPuller(_ config.Pull) m7s.IPuller {
-	p := &Puller{}
-	p.SetDescription(task.OwnerTypeKey, "FlvPuller")
-	return p
 }
 
 func (p *Puller) Run() (err error) {
