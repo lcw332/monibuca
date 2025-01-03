@@ -434,7 +434,6 @@ func (handler *SubscribeHandler[A, V]) Run() (err error) {
 				if handler.videoFrame.IDR && vr.DecConfChanged() {
 					vr.LastCodecCtx = vr.Track.ICodecCtx
 					if seqFrame := vr.Track.SequenceFrame; seqFrame != nil {
-						s.Debug("video codec changed", "data", seqFrame.String())
 						if handler.vwi >= 0 {
 							err = handler.OnVideo(seqFrame.(V))
 						}

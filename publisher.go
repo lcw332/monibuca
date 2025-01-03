@@ -403,8 +403,12 @@ func (p *Publisher) WriteVideo(data IAVFrame) (err error) {
 		p.Error("parse", "err", err)
 		return err
 	}
+
 	if t.ICodecCtx == nil {
 		return ErrUnsupportCodec
+	}
+	if codecCtxChanged {
+		p.Info("video codec changed", "width", t.ICodecCtx.(IVideoCodecCtx).Width(), "height", t.ICodecCtx.(IVideoCodecCtx).Height())
 	}
 	var idr *util.Ring[AVFrame]
 	if t.IDRingList.Len() > 0 {
