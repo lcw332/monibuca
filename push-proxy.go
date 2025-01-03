@@ -137,5 +137,7 @@ func (d *TCPPushProxy) Tick(any) {
 	}
 	conn.Close()
 	d.PushProxy.RTT = time.Since(startTime)
-	d.PushProxy.ChangeStatus(PushProxyStatusOnline)
+	if d.PushProxy.Status == PushProxyStatusOffline {
+		d.PushProxy.ChangeStatus(PushProxyStatusOnline)
+	}
 }

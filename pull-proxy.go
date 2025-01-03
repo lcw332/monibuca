@@ -174,5 +174,7 @@ func (d *TCPPullProxy) Tick(any) {
 	}
 	conn.Close()
 	d.PullProxy.RTT = time.Since(startTime)
-	d.PullProxy.ChangeStatus(PullProxyStatusOnline)
+	if d.PullProxy.Status == PullProxyStatusOffline {
+		d.PullProxy.ChangeStatus(PullProxyStatusOnline)
+	}
 }

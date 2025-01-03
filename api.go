@@ -897,7 +897,9 @@ func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (re
 		err = pkg.ErrNoDB
 		return
 	}
-	target := &PullProxy{}
+	target := &PullProxy{
+		server: s,
+	}
 	err = s.DB.First(target, req.ID).Error
 	if err != nil {
 		return
@@ -937,12 +939,12 @@ func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (re
 	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
 	target.StreamPath = req.StreamPath
 	s.DB.Save(target)
+	var needStopOld *PullProxy
 	s.PullProxies.Call(func() error {
 		if device, ok := s.PullProxies.Get(uint(req.ID)); ok {
 			if target.URL != device.URL || device.Audio != target.Audio || device.StreamPath != target.StreamPath || device.Record.FilePath != target.Record.FilePath || device.Record.Fragment != target.Record.Fragment {
 				device.Stop(task.ErrStopByUser)
-				device.WaitStopped()
-				s.PullProxies.Add(target)
+				needStopOld = device
 				return nil
 			}
 			if device.PullOnStart != target.PullOnStart && target.PullOnStart && device.Handler != nil && device.Status == PullProxyStatusOnline {
@@ -955,6 +957,10 @@ func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (re
 		}
 		return nil
 	})
+	if needStopOld != nil {
+		needStopOld.WaitStopped()
+		s.PullProxies.Add(target)
+	}
 	res = &pb.SuccessResponse{}
 	return
 }
@@ -1174,7 +1180,9 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 		err = pkg.ErrNoDB
 		return
 	}
-	target := &PushProxy{}
+	target := &PushProxy{
+		server: s,
+	}
 	err = s.DB.First(target, req.ID).Error
 	if err != nil {
 		return
@@ -1211,12 +1219,12 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
 	target.StreamPath = req.StreamPath
 	s.DB.Save(target)
+	var needStopOld *PushProxy
 	s.PushProxies.Call(func() error {
 		if device, ok := s.PushProxies.Get(uint(req.ID)); ok {
 			if target.URL != device.URL || device.Audio != target.Audio || device.StreamPath != target.StreamPath {
 				device.Stop(task.ErrStopByUser)
-				device.WaitStopped()
-				s.PushProxies.Add(target)
+				needStopOld = device
 				return nil
 			}
 			if device.PushOnStart != target.PushOnStart && target.PushOnStart && device.Handler != nil && device.Status == PushProxyStatusOnline {
@@ -1228,6 +1236,10 @@ func (s *Server) UpdatePushProxy(ctx context.Context, req *pb.PushProxyInfo) (re
 		}
 		return nil
 	})
+	if needStopOld != nil {
+		needStopOld.WaitStopped()
+		s.PushProxies.Add(target)
+	}
 	res = &pb.SuccessResponse{}
 	return
 }
