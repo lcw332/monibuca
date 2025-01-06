@@ -450,6 +450,14 @@ func (s *Server) Start() (err error) {
 				d.ChangeStatus(PullProxyStatusOffline)
 				s.PullProxies.Add(d)
 			}
+			var pushProxies []*PushProxy
+			s.DB.Find(&pushProxies)
+			for _, d := range pushProxies {
+				d.server = s
+				d.Logger = s.Logger.With("pushProxy", d.ID, "type", d.Type, "name", d.Name)
+				d.ChangeStatus(PushProxyStatusOffline)
+				s.PushProxies.Add(d)
+			}
 		}
 		return nil
 	}, "serverStart")
