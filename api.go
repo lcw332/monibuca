@@ -1263,11 +1263,11 @@ func (s *Server) RemovePushProxy(ctx context.Context, req *pb.RequestWithId) (re
 		})
 		return
 	} else if req.StreamPath != "" {
-		var deviceList []PushProxy
+		var deviceList []*PushProxy
 		s.DB.Find(&deviceList, "stream_path=?", req.StreamPath)
 		if len(deviceList) > 0 {
 			for _, device := range deviceList {
-				tx := s.DB.Delete(&PushProxy{}, device.ID)
+				tx := s.DB.Delete(device)
 				err = tx.Error
 				s.PushProxies.Call(func() error {
 					if device, ok := s.PushProxies.Get(uint(device.ID)); ok {
@@ -1282,6 +1282,133 @@ func (s *Server) RemovePushProxy(ctx context.Context, req *pb.RequestWithId) (re
 		res.Message = "parameter wrong"
 		return
 	}
+}
+
+func (s *Server) GetRecordList(ctx context.Context, req *pb.ReqRecordList) (resp *pb.ResponseList, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	if req.PageSize == 0 {
+		req.PageSize = 10
+	}
+	offset := (req.PageNum - 1) * req.PageSize // 计算偏移量
+	var totalCount int64                       //总条数
+
+	var result []*RecordStream
+	query := s.DB.Model(&RecordStream{})
+	if strings.Contains(req.StreamPath, "*") {
+		query = query.Where("stream_path like ?", strings.ReplaceAll(req.StreamPath, "*", "%"))
+	} else if req.StreamPath != "" {
+		query = query.Where("stream_path = ?", req.StreamPath)
+	}
+	if req.Mode != "" {
+		query = query.Where("mode = ?", req.Mode)
+	}
+	if req.Type != "" {
+		query = query.Where("type = ?", req.Type)
+	}
+	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
+	if err != nil {
+		return
+	}
+	if !startTime.IsZero() {
+		query = query.Where("start_time >= ?", startTime)
+	}
+	if !endTime.IsZero() {
+		query = query.Where("end_time <= ?", endTime)
+	}
+	query.Count(&totalCount)
+	err = query.Offset(int(offset)).Limit(int(req.PageSize)).Order("start_time desc").Find(&result).Error
+	if err != nil {
+		return
+	}
+	resp = &pb.ResponseList{
+		TotalCount: uint32(totalCount),
+		PageNum:    req.PageNum,
+		PageSize:   req.PageSize,
+	}
+	for _, recordFile := range result {
+		resp.Data = append(resp.Data, &pb.RecordFile{
+			Id:         uint32(recordFile.ID),
+			StartTime:  timestamppb.New(recordFile.StartTime),
+			EndTime:    timestamppb.New(recordFile.EndTime),
+			FilePath:   recordFile.FilePath,
+			StreamPath: recordFile.StreamPath,
+		})
+	}
+	return
+}
+
+func (s *Server) GetRecordCatalog(ctx context.Context, req *pb.ReqRecordCatalog) (resp *pb.ResponseCatalog, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	resp = &pb.ResponseCatalog{}
+	var result []struct {
+		StreamPath string
+		Count      uint
+		StartTime  time.Time
+		EndTime    time.Time
+	}
+	query := s.DB.Model(&RecordStream{})
+	if req.Type != "" {
+		query = query.Where("type = ?", req.Type)
+	}
+	err = query.Select("stream_path,count(id) as count,min(start_time) as start_time,max(end_time) as end_time").Group("stream_path").Find(&result).Error
+	if err != nil {
+		return
+	}
+	for _, row := range result {
+		resp.Data = append(resp.Data, &pb.Catalog{
+			StreamPath: row.StreamPath,
+			Count:      uint32(row.Count),
+			StartTime:  timestamppb.New(row.StartTime),
+			EndTime:    timestamppb.New(row.EndTime),
+		})
+	}
+	return
+}
+
+func (s *Server) DeleteRecord(ctx context.Context, req *pb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	ids := req.GetIds()
+	var result []*RecordStream
+	if len(ids) > 0 {
+		s.DB.Find(&result, "stream_path=? AND type=? AND id IN ?", req.StreamPath, req.Type, ids)
+	} else {
+		startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.StartTime}, "end": []string{req.EndTime}})
+		if err != nil {
+			return nil, err
+		}
+		s.DB.Find(&result, "stream_path=? AND type=? AND start_time>=? AND end_time<=?", req.StreamPath, req.Type, startTime, endTime)
+	}
+	err = s.DB.Delete(result).Error
+	if err != nil {
+		return
+	}
+	var apiResult []*pb.RecordFile
+	for _, recordFile := range result {
+		apiResult = append(apiResult, &pb.RecordFile{
+			Id:         uint32(recordFile.ID),
+			StartTime:  timestamppb.New(recordFile.StartTime),
+			EndTime:    timestamppb.New(recordFile.EndTime),
+			FilePath:   recordFile.FilePath,
+			StreamPath: recordFile.StreamPath,
+		})
+		err = os.Remove(recordFile.FilePath)
+		if err != nil {
+			return
+		}
+	}
+	resp = &pb.ResponseDelete{
+		Data: apiResult,
+	}
+	return
 }
 
 func (s *Server) GetTransformList(ctx context.Context, req *emptypb.Empty) (res *pb.TransformListResponse, err error) {

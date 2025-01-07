@@ -229,6 +229,22 @@ service api {
       get: "/api/transform/list"
     };
   }
+  rpc GetRecordList (ReqRecordList) returns (ResponseList) {
+    option (google.api.http) = {
+      get: "/api/record/{type}/list/{streamPath=**}"
+    };
+  }
+  rpc GetRecordCatalog (ReqRecordCatalog) returns (ResponseCatalog) {
+    option (google.api.http) = {
+      get: "/api/record/{type}/catalog"
+    };
+  }
+  rpc DeleteRecord (ReqRecordDelete) returns (ResponseDelete) {
+    option (google.api.http) = {
+      post: "/api/record/{type}/delete/{streamPath=**}"
+      body: "*"
+    };
+  }
 }
 
 message DisabledPluginsResponse {
@@ -644,4 +660,64 @@ message TransformListResponse {
   int32 code = 1;
   string message = 2;
   repeated Transform data = 3;
+}
+
+message ReqRecordList {
+  string streamPath = 1;
+  string range = 2;
+  string start = 3;
+  string end = 4;
+  uint32 pageNum = 5;
+  uint32 pageSize = 6;
+  string mode = 7;
+  string type = 8;
+}
+
+message RecordFile {
+  uint32 id = 1;
+  string filePath = 2;
+  string streamPath = 3;
+  google.protobuf.Timestamp startTime = 4;
+  google.protobuf.Timestamp endTime = 5;
+}
+
+message ResponseList {
+  int32 code = 1;
+  string message = 2;
+  uint32 totalCount = 3;
+  uint32 pageNum = 4;
+  uint32 pageSize = 5;
+  repeated RecordFile data = 6;
+}
+
+message Catalog {
+  string streamPath = 1;
+  uint32 count = 2;
+  google.protobuf.Timestamp startTime = 3;
+  google.protobuf.Timestamp endTime = 4;
+}
+
+message ResponseCatalog {
+  int32 code = 1;
+  string message = 2;
+  repeated Catalog data = 3;
+}
+
+message ReqRecordDelete {
+  string streamPath = 1;
+  repeated uint32 ids = 2;
+  string startTime = 3;
+  string endTime = 4;
+  string range = 5;
+  string type = 6;
+}
+
+message ResponseDelete {
+  int32 code = 1;
+  string message = 2;
+  repeated RecordFile data = 3;
+}
+
+message ReqRecordCatalog {
+  string type = 1;
 }

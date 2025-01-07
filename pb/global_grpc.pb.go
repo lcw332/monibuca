@@ -61,6 +61,9 @@ type ApiClient interface {
 	UpdatePushProxy(ctx context.Context, in *PushProxyInfo, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetRecording(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RecordingListResponse, error)
 	GetTransformList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TransformListResponse, error)
+	GetRecordList(ctx context.Context, in *ReqRecordList, opts ...grpc.CallOption) (*ResponseList, error)
+	GetRecordCatalog(ctx context.Context, in *ReqRecordCatalog, opts ...grpc.CallOption) (*ResponseCatalog, error)
+	DeleteRecord(ctx context.Context, in *ReqRecordDelete, opts ...grpc.CallOption) (*ResponseDelete, error)
 }
 
 type apiClient struct {
@@ -413,6 +416,33 @@ func (c *apiClient) GetTransformList(ctx context.Context, in *emptypb.Empty, opt
 	return out, nil
 }
 
+func (c *apiClient) GetRecordList(ctx context.Context, in *ReqRecordList, opts ...grpc.CallOption) (*ResponseList, error) {
+	out := new(ResponseList)
+	err := c.cc.Invoke(ctx, "/global.api/GetRecordList", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) GetRecordCatalog(ctx context.Context, in *ReqRecordCatalog, opts ...grpc.CallOption) (*ResponseCatalog, error) {
+	out := new(ResponseCatalog)
+	err := c.cc.Invoke(ctx, "/global.api/GetRecordCatalog", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiClient) DeleteRecord(ctx context.Context, in *ReqRecordDelete, opts ...grpc.CallOption) (*ResponseDelete, error) {
+	out := new(ResponseDelete)
+	err := c.cc.Invoke(ctx, "/global.api/DeleteRecord", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ApiServer is the server API for Api service.
 // All implementations must embed UnimplementedApiServer
 // for forward compatibility
@@ -455,6 +485,9 @@ type ApiServer interface {
 	UpdatePushProxy(context.Context, *PushProxyInfo) (*SuccessResponse, error)
 	GetRecording(context.Context, *emptypb.Empty) (*RecordingListResponse, error)
 	GetTransformList(context.Context, *emptypb.Empty) (*TransformListResponse, error)
+	GetRecordList(context.Context, *ReqRecordList) (*ResponseList, error)
+	GetRecordCatalog(context.Context, *ReqRecordCatalog) (*ResponseCatalog, error)
+	DeleteRecord(context.Context, *ReqRecordDelete) (*ResponseDelete, error)
 	mustEmbedUnimplementedApiServer()
 }
 
@@ -575,6 +608,15 @@ func (UnimplementedApiServer) GetRecording(context.Context, *emptypb.Empty) (*Re
 }
 func (UnimplementedApiServer) GetTransformList(context.Context, *emptypb.Empty) (*TransformListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTransformList not implemented")
+}
+func (UnimplementedApiServer) GetRecordList(context.Context, *ReqRecordList) (*ResponseList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRecordList not implemented")
+}
+func (UnimplementedApiServer) GetRecordCatalog(context.Context, *ReqRecordCatalog) (*ResponseCatalog, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRecordCatalog not implemented")
+}
+func (UnimplementedApiServer) DeleteRecord(context.Context, *ReqRecordDelete) (*ResponseDelete, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteRecord not implemented")
 }
 func (UnimplementedApiServer) mustEmbedUnimplementedApiServer() {}
 
@@ -1273,6 +1315,60 @@ func _Api_GetTransformList_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Api_GetRecordList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReqRecordList)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetRecordList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetRecordList",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetRecordList(ctx, req.(*ReqRecordList))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_GetRecordCatalog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReqRecordCatalog)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).GetRecordCatalog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/GetRecordCatalog",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).GetRecordCatalog(ctx, req.(*ReqRecordCatalog))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Api_DeleteRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReqRecordDelete)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiServer).DeleteRecord(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/global.api/DeleteRecord",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiServer).DeleteRecord(ctx, req.(*ReqRecordDelete))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Api_ServiceDesc is the grpc.ServiceDesc for Api service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1431,6 +1527,18 @@ var Api_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTransformList",
 			Handler:    _Api_GetTransformList_Handler,
+		},
+		{
+			MethodName: "GetRecordList",
+			Handler:    _Api_GetRecordList_Handler,
+		},
+		{
+			MethodName: "GetRecordCatalog",
+			Handler:    _Api_GetRecordCatalog_Handler,
+		},
+		{
+			MethodName: "DeleteRecord",
+			Handler:    _Api_DeleteRecord_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

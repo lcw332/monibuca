@@ -150,7 +150,7 @@ var CustomFileName = func(job *m7s.RecordJob) string {
 	if job.Fragment == 0 || job.Append {
 		return fmt.Sprintf("%s.flv", job.FilePath)
 	}
-	return filepath.Join(job.FilePath, time.Now().Local().Format("2006-01-02T15:04:05")+".flv")
+	return filepath.Join(job.FilePath, fmt.Sprintf("%d.flv", time.Now().Unix()))
 }
 
 func (r *Recorder) Start() (err error) {
@@ -319,6 +319,14 @@ func (r *Recorder) Run() (err error) {
 				seq := vr.Track.SequenceFrame.(*rtmp.RTMPVideo)
 				err = writer.WriteTag(FLV_TAG_TYPE_VIDEO, 0, uint32(seq.Size), seq.Buffers...)
 				offset = int64(seq.Size + 15)
+			}
+			if ar := suber.AudioReader; ar != nil {
+				ar.ResetAbsTime()
+				if ar.Track.SequenceFrame != nil {
+					seq := ar.Track.SequenceFrame.(*rtmp.RTMPAudio)
+					err = writer.WriteTag(FLV_TAG_TYPE_AUDIO, 0, uint32(seq.Size), seq.Buffers...)
+					offset += int64(seq.Size + 15)
+				}
 			}
 		}
 	}

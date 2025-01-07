@@ -380,7 +380,7 @@ func (task *Task) SetDescriptions(value Description) {
 func (task *Task) dispose() {
 	taskType, ownerType := task.handler.GetTaskType(), task.GetOwnerType()
 	if task.state < TASK_STATE_STARTED {
-		if task.Logger != nil {
+		if task.Logger != nil && taskType != TASK_TYPE_CALL {
 			task.Debug("task dispose canceled", "taskId", task.ID, "taskType", taskType, "ownerType", ownerType, "state", task.state)
 		}
 		return

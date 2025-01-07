@@ -5,22 +5,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 	"unsafe"
 
 	"github.com/mcuadros/go-defaults"
-	"m7s.live/v5/pkg/config"
-
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	m7s "m7s.live/v5"
+	"m7s.live/v5/pb"
 	"m7s.live/v5/pkg"
+	"m7s.live/v5/pkg/config"
 	"m7s.live/v5/pkg/util"
-	"m7s.live/v5/plugin/mp4/pb"
+	mp4pb "m7s.live/v5/plugin/mp4/pb"
 	mp4 "m7s.live/v5/plugin/mp4/pkg"
 	"m7s.live/v5/plugin/mp4/pkg/box"
 )
@@ -29,130 +26,6 @@ type ContentPart struct {
 	*os.File
 	Start int64
 	Size  int
-}
-
-func (p *MP4Plugin) List(ctx context.Context, req *pb.ReqRecordList) (resp *pb.ResponseList, err error) {
-	var streams []m7s.RecordStream
-	if p.DB == nil {
-		err = pkg.ErrNoDB
-		return
-	}
-
-	offset := (req.PageNum - 1) * req.PageSize // 计算偏移量
-	var totalCount int64                       //总条数
-
-	// 查询总记录数
-	countQuery := p.DB.Model(&m7s.RecordStream{})
-	// 查询当前页的数据
-	query := p.DB.Model(&m7s.RecordStream{})
-	if req.PageSize > 0 {
-		query = query.Limit(int(req.PageSize)).Offset(int(offset))
-	}
-	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
-	if err != nil {
-		return
-	}
-	var condition string = "end_time>? AND start_time<?"
-	var values []any = []any{startTime, endTime}
-	if strings.Contains(req.StreamPath, "*") {
-		condition += " AND stream_path like ?"
-		values = append(values, strings.ReplaceAll(req.StreamPath, "*", "%"))
-	} else if req.StreamPath != "" {
-		condition += " AND stream_path=?"
-		values = append(values, req.StreamPath)
-	}
-	if req.Mode != "" {
-		condition += " AND mode=?"
-		values = append(values, req.Mode)
-	}
-	values = append([]any{condition}, values...)
-	err = countQuery.Find(&streams, values...).Count(&totalCount).Error
-	if err != nil {
-		return
-	}
-	query.Find(&streams, values...)
-	resp = &pb.ResponseList{
-		PageSize:   req.PageSize,
-		PageNum:    req.PageNum,
-		TotalCount: uint32(totalCount),
-	}
-	for _, stream := range streams {
-		resp.Data = append(resp.Data, &pb.RecordFile{
-			Id:         uint32(stream.ID),
-			StartTime:  timestamppb.New(stream.StartTime),
-			EndTime:    timestamppb.New(stream.EndTime),
-			FilePath:   stream.FilePath,
-			StreamPath: stream.StreamPath,
-		})
-	}
-	return
-}
-
-func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.ResponseCatalog, err error) {
-	if p.DB == nil {
-		err = pkg.ErrNoDB
-		return
-	}
-	resp = &pb.ResponseCatalog{}
-	var result []struct {
-		StreamPath string
-		Count      uint
-		StartTime  time.Time
-		EndTime    time.Time
-	}
-	err = p.DB.Model(&m7s.RecordStream{}).Select("stream_path,count(id) as count,min(start_time) as start_time,max(end_time) as end_time").Group("stream_path").Find(&result).Error
-	if err != nil {
-		return
-	}
-	for _, row := range result {
-		resp.Data = append(resp.Data, &pb.Catalog{
-			StreamPath: row.StreamPath,
-			Count:      uint32(row.Count),
-			StartTime:  timestamppb.New(row.StartTime),
-			EndTime:    timestamppb.New(row.EndTime),
-		})
-	}
-	return
-}
-
-func (p *MP4Plugin) Delete(ctx context.Context, req *pb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
-	if p.DB == nil {
-		err = pkg.ErrNoDB
-		return
-	}
-	ids := req.GetIds()
-	var result []*m7s.RecordStream
-	if len(ids) > 0 {
-		p.DB.Find(&result, "stream_path=? AND id IN ?", req.StreamPath, ids)
-	} else {
-		startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.StartTime}, "end": []string{req.EndTime}})
-		if err != nil {
-			return nil, err
-		}
-		p.DB.Find(&result, "stream_path=? AND start_time>=? AND end_time<=?", req.StreamPath, startTime, endTime)
-	}
-	err = p.DB.Delete(result).Error
-	if err != nil {
-		return
-	}
-	var apiResult []*pb.RecordFile
-	for _, recordFile := range result {
-		apiResult = append(apiResult, &pb.RecordFile{
-			Id:         uint32(recordFile.ID),
-			StartTime:  timestamppb.New(recordFile.StartTime),
-			EndTime:    timestamppb.New(recordFile.EndTime),
-			FilePath:   recordFile.FilePath,
-			StreamPath: recordFile.StreamPath,
-		})
-		err = os.Remove(recordFile.FilePath)
-		if err != nil {
-			return
-		}
-	}
-	resp = &pb.ResponseDelete{
-		Data: apiResult,
-	}
-	return
 }
 
 func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
@@ -298,9 +171,9 @@ func (p *MP4Plugin) download(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *MP4Plugin) StartRecord(ctx context.Context, req *pb.ReqStartRecord) (res *pb.ResponseStartRecord, err error) {
+func (p *MP4Plugin) StartRecord(ctx context.Context, req *mp4pb.ReqStartRecord) (res *mp4pb.ResponseStartRecord, err error) {
 	var recordExists bool
-	res = &pb.ResponseStartRecord{}
+	res = &mp4pb.ResponseStartRecord{}
 	p.Server.Records.Call(func() error {
 		_, recordExists = p.Server.Records.Find(func(job *m7s.RecordJob) bool {
 			return job.StreamPath == req.StreamPath && job.FilePath == req.FilePath
@@ -326,10 +199,10 @@ func (p *MP4Plugin) StartRecord(ctx context.Context, req *pb.ReqStartRecord) (re
 	return
 }
 
-func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res *pb.ResponseEventRecord, err error) {
+func (p *MP4Plugin) EventStart(ctx context.Context, req *mp4pb.ReqEventRecord) (res *mp4pb.ResponseEventRecord, err error) {
 	beforeDuration := p.BeforeDuration
 	afterDuration := p.AfterDuration
-	res = &pb.ResponseEventRecord{}
+	res = &mp4pb.ResponseEventRecord{}
 	if req.BeforeDuration != "" {
 		beforeDuration, err = time.ParseDuration(req.BeforeDuration)
 		if err != nil {
@@ -398,4 +271,34 @@ func (p *MP4Plugin) EventStart(ctx context.Context, req *pb.ReqEventRecord) (res
 		}
 	}
 	return res, err
+}
+
+func (p *MP4Plugin) List(ctx context.Context, req *mp4pb.ReqRecordList) (resp *pb.ResponseList, err error) {
+	globalReq := &pb.ReqRecordList{
+		StreamPath: req.StreamPath,
+		Range:      req.Range,
+		Start:      req.Start,
+		End:        req.End,
+		PageNum:    req.PageNum,
+		PageSize:   req.PageSize,
+		Mode:       req.Mode,
+		Type:       "mp4",
+	}
+	return p.Server.GetRecordList(ctx, globalReq)
+}
+
+func (p *MP4Plugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.ResponseCatalog, err error) {
+	return p.Server.GetRecordCatalog(ctx, &pb.ReqRecordCatalog{Type: "mp4"})
+}
+
+func (p *MP4Plugin) Delete(ctx context.Context, req *mp4pb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
+	globalReq := &pb.ReqRecordDelete{
+		StreamPath: req.StreamPath,
+		Ids:        req.Ids,
+		StartTime:  req.StartTime,
+		EndTime:    req.EndTime,
+		Range:      req.Range,
+		Type:       "mp4",
+	}
+	return p.Server.DeleteRecord(ctx, globalReq)
 }

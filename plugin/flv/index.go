@@ -10,12 +10,13 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	m7s "m7s.live/v5"
-
 	"m7s.live/v5/pkg/util"
+	"m7s.live/v5/plugin/flv/pb"
 	. "m7s.live/v5/plugin/flv/pkg"
 )
 
 type FLVPlugin struct {
+	pb.UnimplementedApiServer
 	m7s.Plugin
 	Path string
 }
@@ -23,7 +24,7 @@ type FLVPlugin struct {
 const defaultConfig m7s.DefaultYaml = `publish:
   speed: 1`
 
-var _ = m7s.InstallPlugin[FLVPlugin](defaultConfig, NewPuller, NewRecorder)
+var _ = m7s.InstallPlugin[FLVPlugin](defaultConfig, NewPuller, NewRecorder, pb.RegisterApiServer, &pb.Api_ServiceDesc)
 
 func (plugin *FLVPlugin) OnInit() (err error) {
 	_, port, _ := strings.Cut(plugin.GetCommonConf().HTTP.ListenAddr, ":")

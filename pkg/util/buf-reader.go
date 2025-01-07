@@ -13,6 +13,7 @@ const defaultBufSize = 1 << 14
 type BufReader struct {
 	Allocator *ScalableMemoryAllocator
 	buf       MemoryReader
+	totalRead int
 	BufLen    int
 	feedData  func() error
 	Dump      *os.File
@@ -28,6 +29,7 @@ func NewBufReaderWithBufLen(reader io.Reader, bufLen int) (r *BufReader) {
 				return err
 			}
 			n := len(buf)
+			r.totalRead += n
 			r.buf.Buffers = append(r.buf.Buffers, buf)
 			r.buf.Size += n
 			r.buf.Length += n
@@ -48,6 +50,7 @@ func NewBufReaderBuffersChan(feedChan chan net.Buffers) (r *BufReader) {
 			}
 			for _, buf := range data {
 				n := len(buf)
+				r.totalRead += n
 				r.buf.Size += n
 				r.buf.Length += n
 			}
@@ -67,6 +70,7 @@ func NewBufReaderChan(feedChan chan []byte) (r *BufReader) {
 				return io.EOF
 			}
 			n := len(data)
+			r.totalRead += n
 			r.buf.Buffers = append(r.buf.Buffers, data)
 			r.buf.Size += n
 			r.buf.Length += n

@@ -24,44 +24,6 @@ type Tag struct {
 	Timestamp uint32
 }
 
-type FlvReader struct {
-	reader io.Reader
-	buf    [11]byte
-}
-
-func NewFlvReader(r io.Reader) *FlvReader {
-	return &FlvReader{reader: r}
-}
-
-func (r *FlvReader) ReadHeader() (err error) {
-	var header [13]byte
-	if _, err = io.ReadFull(r.reader, header[:]); err != nil {
-		return
-	}
-	if header[0] != 'F' || header[1] != 'L' || header[2] != 'V' {
-		return io.ErrUnexpectedEOF
-	}
-	return
-}
-
-func (r *FlvReader) ReadTag() (tag *Tag, err error) {
-	tag = &Tag{}
-	if _, err = io.ReadFull(r.reader, r.buf[:]); err != nil {
-		return
-	}
-	tmp := util.Buffer(r.buf[:])
-	tag.Type = tmp.ReadByte()
-	dataSize := tmp.ReadUint24()
-	tag.Timestamp = tmp.ReadUint24() | (uint32(tmp.ReadByte()) << 24)
-	tmp.ReadUint24() // streamID always 0
-
-	tag.Data = make([]byte, dataSize+4) // +4 for previous tag size
-	if _, err = io.ReadFull(r.reader, tag.Data); err != nil {
-		return
-	}
-	return
-}
-
 type FlvWriter struct {
 	io.Writer
 	buf [15]byte

@@ -2,19 +2,54 @@ package plugin_flv
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"io"
 	"io/fs"
-	"m7s.live/v5/pkg/util"
-	flv "m7s.live/v5/plugin/flv/pkg"
-	rtmp "m7s.live/v5/plugin/rtmp/pkg"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"google.golang.org/protobuf/types/known/emptypb"
+	"m7s.live/v5/pb"
+	"m7s.live/v5/pkg/util"
+	flvpb "m7s.live/v5/plugin/flv/pb"
+	flv "m7s.live/v5/plugin/flv/pkg"
+	rtmp "m7s.live/v5/plugin/rtmp/pkg"
 )
+
+func (p *FLVPlugin) List(ctx context.Context, req *flvpb.ReqRecordList) (resp *pb.ResponseList, err error) {
+	globalReq := &pb.ReqRecordList{
+		StreamPath: req.StreamPath,
+		Range:      req.Range,
+		Start:      req.Start,
+		End:        req.End,
+		PageNum:    req.PageNum,
+		PageSize:   req.PageSize,
+		Mode:       req.Mode,
+		Type:       "flv",
+	}
+	return p.Server.GetRecordList(ctx, globalReq)
+}
+
+func (p *FLVPlugin) Catalog(ctx context.Context, req *emptypb.Empty) (resp *pb.ResponseCatalog, err error) {
+	return p.Server.GetRecordCatalog(ctx, &pb.ReqRecordCatalog{Type: "flv"})
+}
+
+func (p *FLVPlugin) Delete(ctx context.Context, req *flvpb.ReqRecordDelete) (resp *pb.ResponseDelete, err error) {
+	globalReq := &pb.ReqRecordDelete{
+		StreamPath: req.StreamPath,
+		Ids:        req.Ids,
+		StartTime:  req.StartTime,
+		EndTime:    req.EndTime,
+		Range:      req.Range,
+		Type:       "flv",
+	}
+	return p.Server.DeleteRecord(ctx, globalReq)
+}
 
 func (plugin *FLVPlugin) Download_(w http.ResponseWriter, r *http.Request) {
 	streamPath := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/download/"), ".flv")
