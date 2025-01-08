@@ -135,7 +135,7 @@ func (a *AnnexB) Demux(codecCtx codec.ICodecCtx) (ret any, err error) {
 			} else if [3]byte(lastFourBytes[1:]) == codec.NALU_Delimiter1 {
 				startCode = 3
 			}
-			if startCode > 0 {
+			if startCode > 0 && reader.Offset() >= 3 {
 				if reader.Offset() == 3 {
 					startCode = 3
 				}

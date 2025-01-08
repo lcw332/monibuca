@@ -84,12 +84,14 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				defer s.OnSubscribe(req.StreamPath, u.Query())
 			}
 			if aliasInfo, ok := s.AliasStreams.Get(req.Alias); ok { //modify alias
+				oldStreamPath := aliasInfo.StreamPath
 				aliasInfo.AutoRemove = req.AutoRemove
 				if aliasInfo.StreamPath != req.StreamPath {
 					aliasInfo.StreamPath = req.StreamPath
 					if canReplace {
 						if aliasInfo.Publisher != nil {
 							aliasInfo.TransferSubscribers(publisher) // replace stream
+							aliasInfo.Publisher = publisher
 						} else {
 							s.Waiting.WakeUp(req.Alias, publisher)
 						}
@@ -103,6 +105,7 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 					dbAlias.AutoRemove = req.AutoRemove
 					s.DB.Save(&dbAlias)
 				}
+				s.Info("modify alias", "alias", req.Alias, "oldStreamPath", oldStreamPath, "streamPath", req.StreamPath, "replace", ok && canReplace)
 			} else { // create alias
 				aliasInfo := &AliasStream{
 					AutoRemove: req.AutoRemove,
@@ -162,5 +165,83 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 		}
 		return nil
 	})
+	return
+}
+
+func (p *Publisher) processAliasOnStart() {
+	s := p.Plugin.Server
+	for alias := range s.AliasStreams.Range {
+		if alias.StreamPath != p.StreamPath {
+			continue
+		}
+		if alias.Publisher == nil {
+			alias.Publisher = p
+			s.Waiting.WakeUp(alias.Alias, p)
+		} else if alias.Publisher.StreamPath != alias.StreamPath {
+			alias.Publisher.TransferSubscribers(p)
+			alias.Publisher = p
+		}
+	}
+}
+
+func (p *Publisher) processAliasOnDispose() {
+	s := p.Plugin.Server
+	var relatedAlias []*AliasStream
+	for alias := range s.AliasStreams.Range {
+		if alias.StreamPath == p.StreamPath {
+			if alias.AutoRemove {
+				defer s.AliasStreams.Remove(alias)
+			}
+			alias.Publisher = nil
+			relatedAlias = append(relatedAlias, alias)
+		}
+	}
+	if p.Subscribers.Length > 0 {
+	SUBSCRIBER:
+		for subscriber := range p.SubscriberRange {
+			for _, alias := range relatedAlias {
+				if subscriber.StreamPath == alias.Alias {
+					if originStream, ok := s.Streams.Get(alias.Alias); ok {
+						originStream.AddSubscriber(subscriber)
+						continue SUBSCRIBER
+					}
+				}
+			}
+			s.Waiting.Wait(subscriber)
+		}
+		p.Subscribers.Clear()
+	}
+}
+
+func (s *Subscriber) processAliasOnStart() (hasInvited bool, done bool) {
+	server := s.Plugin.Server
+	if alias, ok := server.AliasStreams.Get(s.StreamPath); ok {
+		if alias.Publisher != nil {
+			alias.Publisher.AddSubscriber(s)
+			done = true
+			return
+		} else {
+			server.OnSubscribe(alias.StreamPath, s.Args)
+			hasInvited = true
+		}
+	} else {
+		for reg, alias := range server.StreamAlias {
+			if streamPath := reg.Replace(s.StreamPath, alias); streamPath != "" {
+				server.AliasStreams.Set(&AliasStream{
+					StreamPath: streamPath,
+					Alias:      s.StreamPath,
+				})
+				if publisher, ok := server.Streams.Get(streamPath); ok {
+					publisher.AddSubscriber(s)
+					done = true
+					return
+				} else {
+					server.OnSubscribe(streamPath, s.Args)
+					hasInvited = true
+				}
+				break
+			}
+		}
+	}
 	return
 }

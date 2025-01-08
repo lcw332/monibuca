@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"log/slog"
-
 	"github.com/mcuadros/go-defaults"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -45,13 +43,13 @@ type (
 		PullOnStart, Audio, StopOnIdle bool
 		config.Pull                    `gorm:"embedded;embeddedPrefix:pull_"`
 		config.Record                  `gorm:"embedded;embeddedPrefix:record_"`
+		RecordType                     string
 		ParentID                       uint
 		Type                           string
 		Status                         byte
 		Description                    string
 		RTT                            time.Duration
-		Handler                        IPullProxy   `gorm:"-:all" yaml:"-"`
-		Logger                         *slog.Logger `gorm:"-:all" yaml:"-"`
+		Handler                        IPullProxy `gorm:"-:all" yaml:"-"`
 	}
 	PullProxyManager struct {
 		task.Manager[uint, *PullProxy]
@@ -213,6 +211,28 @@ func (d *TCPPullProxy) Tick(any) {
 	d.PullProxy.RTT = time.Since(startTime)
 	if d.PullProxy.Status == PullProxyStatusOffline {
 		d.PullProxy.ChangeStatus(PullProxyStatusOnline)
+	}
+}
+
+func (p *Publisher) processPullProxyOnStart() {
+	s := p.Plugin.Server
+	if pullProxy, ok := s.PullProxies.Find(func(pullProxy *PullProxy) bool {
+		return pullProxy.GetStreamPath() == p.StreamPath
+	}); ok {
+		p.PullProxy = pullProxy
+		if pullProxy.Status == PullProxyStatusOnline {
+			pullProxy.ChangeStatus(PullProxyStatusPulling)
+			if mp4Plugin, ok := s.Plugins.Get("MP4"); ok && pullProxy.FilePath != "" {
+				mp4Plugin.Record(p, pullProxy.Record, nil)
+			}
+		}
+	}
+}
+
+func (p *Publisher) processPullProxyOnDispose() {
+	s := p.Plugin.Server
+	if p.PullProxy != nil && p.PullProxy.Status == PullProxyStatusPulling && s.PullProxies.Has(p.PullProxy.GetKey()) {
+		p.PullProxy.ChangeStatus(PullProxyStatusOnline)
 	}
 }
 

@@ -105,33 +105,11 @@ func (s *Subscriber) Start() (err error) {
 	server := s.Plugin.Server
 	server.Subscribers.Add(s)
 	s.Info("subscribe")
-	hasInvited := false
-	if alias, ok := server.AliasStreams.Get(s.StreamPath); ok {
-		if alias.Publisher != nil {
-			alias.Publisher.AddSubscriber(s)
-			return
-		} else {
-			server.OnSubscribe(alias.StreamPath, s.Args)
-			hasInvited = true
-		}
-	} else {
-		for reg, alias := range server.StreamAlias {
-			if streamPath := reg.Replace(s.StreamPath, alias); streamPath != "" {
-				server.AliasStreams.Set(&AliasStream{
-					StreamPath: streamPath,
-					Alias:      s.StreamPath,
-				})
-				if publisher, ok := server.Streams.Get(streamPath); ok {
-					publisher.AddSubscriber(s)
-					return
-				} else {
-					server.OnSubscribe(streamPath, s.Args)
-					hasInvited = true
-				}
-				break
-			}
-		}
+	hasInvited, done := s.processAliasOnStart()
+	if done {
+		return
 	}
+
 	if publisher, ok := server.Streams.Get(s.StreamPath); ok {
 		publisher.AddSubscriber(s)
 	} else {

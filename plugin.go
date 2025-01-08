@@ -674,7 +674,7 @@ func (p *Plugin) registerHandler(handlers map[string]http.HandlerFunc) {
 	for patten, handler := range handlers {
 		p.handle(patten, handler)
 	}
-	if p.config.EnableAuth && p.Server.ServerConfig.EnableLogin {
+	if p.config.EnableAuth && p.Server.ServerConfig.Admin.EnableLogin {
 		p.handle("/api/secret/{type}/{streamPath...}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {

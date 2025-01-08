@@ -62,12 +62,16 @@ type (
 		StreamAlias   map[config.Regexp]string `desc:"流别名"`
 		PullProxy     []*PullProxy
 		PushProxy     []*PushProxy
-		EnableLogin   bool `default:"false" desc:"启用登录机制"` //启用登录机制
-		Users         []struct {
-			Username string `desc:"用户名"`
-			Password string `desc:"密码"`
-			Role     string `default:"user" desc:"角色,可选值:admin,user"`
-		} `desc:"用户列表,仅在启用登录机制时生效"`
+		Admin         struct {
+			EnableLogin bool   `default:"false" desc:"启用登录机制"` //启用登录机制
+			FilePath    string `default:"admin.zip" desc:"管理员界面文件路径"`
+			HomePage    string `default:"home" desc:"管理员界面首页"`
+			Users       []struct {
+				Username string `desc:"用户名"`
+				Password string `desc:"密码"`
+				Role     string `default:"user" desc:"角色,可选值:admin,user"`
+			} `desc:"用户列表,仅在启用登录机制时生效"`
+		} `desc:"管理员界面配置"`
 	}
 	WaitStream struct {
 		StreamPath string
@@ -278,8 +282,8 @@ func (s *Server) Start() (err error) {
 				return
 			}
 			// Create users from configuration if EnableLogin is true
-			if s.ServerConfig.EnableLogin {
-				for _, userConfig := range s.ServerConfig.Users {
+			if s.ServerConfig.Admin.EnableLogin {
+				for _, userConfig := range s.ServerConfig.Admin.Users {
 					var user db.User
 					// Check if user exists
 					if err = s.DB.Where("username = ?", userConfig.Username).First(&user).Error; err != nil {
@@ -601,7 +605,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // ValidateToken implements auth.TokenValidator
 func (s *Server) ValidateToken(tokenString string) (*auth.JWTClaims, error) {
-	if !s.ServerConfig.EnableLogin {
+	if !s.ServerConfig.Admin.EnableLogin {
 		return &auth.JWTClaims{Username: "anonymous"}, nil
 	}
 	return auth.ValidateJWT(tokenString)
@@ -610,7 +614,7 @@ func (s *Server) ValidateToken(tokenString string) (*auth.JWTClaims, error) {
 // Login implements the Login RPC method
 func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (res *pb.LoginResponse, err error) {
 	res = &pb.LoginResponse{}
-	if !s.ServerConfig.EnableLogin {
+	if !s.ServerConfig.Admin.EnableLogin {
 		res.Data = &pb.LoginSuccess{
 			Token: "monibuca",
 			UserInfo: &pb.UserInfo{
@@ -663,7 +667,7 @@ func (s *Server) Logout(ctx context.Context, req *pb.LogoutRequest) (res *pb.Log
 
 // GetUserInfo implements the GetUserInfo RPC method
 func (s *Server) GetUserInfo(ctx context.Context, req *pb.UserInfoRequest) (res *pb.UserInfoResponse, err error) {
-	if !s.ServerConfig.EnableLogin {
+	if !s.ServerConfig.Admin.EnableLogin {
 		res = &pb.UserInfoResponse{
 			Code:    0,
 			Message: "success",
@@ -702,7 +706,7 @@ func (s *Server) GetUserInfo(ctx context.Context, req *pb.UserInfoRequest) (res 
 // AuthInterceptor creates a new unary interceptor for authentication
 func (s *Server) AuthInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		if !s.ServerConfig.EnableLogin {
+		if !s.ServerConfig.Admin.EnableLogin {
 			return handler(ctx, req)
 		}
 
