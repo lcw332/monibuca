@@ -15,7 +15,7 @@ type AliasStream struct {
 	*Publisher `gorm:"-:all"`
 	AutoRemove bool
 	StreamPath string
-	Alias      string
+	Alias      string `gorm:"primarykey"`
 }
 
 func (a *AliasStream) GetKey() string {
@@ -24,11 +24,10 @@ func (a *AliasStream) GetKey() string {
 
 // StreamAliasDB 用于存储流别名的数据库模型
 type StreamAliasDB struct {
-	ID        uint           `gorm:"primarykey"`
+	AliasStream
 	CreatedAt time.Time      `yaml:"-"`
 	UpdatedAt time.Time      `yaml:"-"`
 	DeletedAt gorm.DeletedAt `yaml:"-"`
-	AliasStream
 }
 
 func (StreamAliasDB) TableName() string {
