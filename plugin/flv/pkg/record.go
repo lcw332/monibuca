@@ -153,16 +153,6 @@ var CustomFileName = func(job *m7s.RecordJob) string {
 	return filepath.Join(job.FilePath, fmt.Sprintf("%d.flv", time.Now().Unix()))
 }
 
-func (r *Recorder) Start() (err error) {
-	if r.RecordJob.Plugin.DB != nil {
-		err = r.RecordJob.Plugin.DB.AutoMigrate(&r.stream)
-		if err != nil {
-			return
-		}
-	}
-	return r.DefaultRecorder.Start()
-}
-
 func (r *Recorder) createStream(start time.Time) (err error) {
 	recordJob := &r.RecordJob
 	sub := recordJob.Subscriber

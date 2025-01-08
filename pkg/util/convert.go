@@ -15,6 +15,7 @@ const (
 	StartKey        = "start"
 	EndKey          = "end"
 	RangeKey        = "range"
+	LoopKey         = "loop"
 	LocalTimeFormat = "2006-01-02T15:04:05"
 )
 

@@ -147,17 +147,6 @@ type Publisher struct {
 	dumpFile               *os.File
 }
 
-type AliasStream struct {
-	*Publisher
-	AutoRemove bool
-	StreamPath string
-	Alias      string
-}
-
-func (a *AliasStream) GetKey() string {
-	return a.Alias
-}
-
 func (p *Publisher) SubscriberRange(yield func(sub *Subscriber) bool) {
 	p.Subscribers.Range(yield)
 }
@@ -606,6 +595,7 @@ func (p *Publisher) Dispose() {
 			if alias.AutoRemove {
 				defer s.AliasStreams.Remove(alias)
 			}
+			alias.Publisher = nil
 			relatedAlias = append(relatedAlias, alias)
 		}
 	}

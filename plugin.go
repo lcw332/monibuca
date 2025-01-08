@@ -166,6 +166,12 @@ func (plugin *PluginMeta) Init(s *Server, userConfig map[string]any) (p *Plugin)
 			}
 		}
 	}
+	if p.DB != nil && p.Meta.Recorder != nil {
+		if err = p.DB.AutoMigrate(&RecordStream{}); err != nil {
+			p.disable(fmt.Sprintf("auto migrate record stream failed %v", err))
+			return
+		}
+	}
 	s.AddTask(instance)
 	return
 }

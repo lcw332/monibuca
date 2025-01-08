@@ -105,13 +105,14 @@ func (s *Subscriber) Start() (err error) {
 	server := s.Plugin.Server
 	server.Subscribers.Add(s)
 	s.Info("subscribe")
-
+	hasInvited := false
 	if alias, ok := server.AliasStreams.Get(s.StreamPath); ok {
 		if alias.Publisher != nil {
 			alias.Publisher.AddSubscriber(s)
 			return
 		} else {
 			server.OnSubscribe(alias.StreamPath, s.Args)
+			hasInvited = true
 		}
 	} else {
 		for reg, alias := range server.StreamAlias {
@@ -125,6 +126,7 @@ func (s *Subscriber) Start() (err error) {
 					return
 				} else {
 					server.OnSubscribe(streamPath, s.Args)
+					hasInvited = true
 				}
 				break
 			}
@@ -132,10 +134,11 @@ func (s *Subscriber) Start() (err error) {
 	}
 	if publisher, ok := server.Streams.Get(s.StreamPath); ok {
 		publisher.AddSubscriber(s)
-		return
 	} else {
 		server.Waiting.Wait(s)
-		server.OnSubscribe(s.StreamPath, s.Args)
+		if !hasInvited {
+			server.OnSubscribe(s.StreamPath, s.Args)
+		}
 	}
 	return
 }

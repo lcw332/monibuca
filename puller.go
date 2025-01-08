@@ -2,9 +2,11 @@ package m7s
 
 import (
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +56,9 @@ type (
 		Streams                    []RecordStream
 		File                       *os.File
 		MaxTS                      int64
+		seekChan                   chan time.Time
+		Type                       string
+		Loop                       int
 	}
 
 	wsReadCloser struct {
@@ -196,6 +201,25 @@ func (p *RecordFilePuller) GetPullJob() *PullJob {
 	return &p.PullJob
 }
 
+func (p *RecordFilePuller) queryRecordStreams(startTime, endTime time.Time) (err error) {
+	if p.PullJob.Plugin.DB == nil {
+		return pkg.ErrNoDB
+	}
+	queryRecord := RecordStream{
+		Mode: RecordModeAuto,
+		Type: p.Type,
+	}
+	tx := p.PullJob.Plugin.DB.Where(&queryRecord).Find(&p.Streams, "end_time>=? AND start_time<=? AND stream_path=?", startTime, endTime, p.PullJob.RemoteURL)
+	if tx.Error != nil {
+		return tx.Error
+	}
+	if len(p.Streams) == 0 {
+		return pkg.ErrNotFound
+	}
+	p.MaxTS = endTime.Sub(startTime).Milliseconds()
+	return nil
+}
+
 func (p *RecordFilePuller) Start() (err error) {
 	p.SetRetry(0, 0)
 	if p.PullJob.Plugin.DB == nil {
@@ -208,26 +232,38 @@ func (p *RecordFilePuller) Start() (err error) {
 	if p.PullStartTime, p.PullEndTime, err = util.TimeRangeQueryParse(p.PullJob.Args); err != nil {
 		return
 	}
-	queryRecord := RecordStream{
-		Mode: RecordModeAuto,
+	p.seekChan = make(chan time.Time, 1)
+	loop := p.PullJob.Args.Get(util.LoopKey)
+	p.Loop, err = strconv.Atoi(loop)
+	if err != nil || p.Loop < 0 {
+		p.Loop = math.MaxInt32
 	}
-	tx := p.PullJob.Plugin.DB.Where(&queryRecord).Find(&p.Streams, "end_time>=? AND start_time<=? AND stream_path=?", p.PullStartTime, p.PullEndTime, p.PullJob.RemoteURL)
-	if tx.Error != nil {
-		return tx.Error
+	publisher := p.PullJob.Publisher
+	publisher.OnSeek = func(seekTime time.Time) {
+		// p.PullStartTime = seekTime
+		// p.SetRetry(1, 0)
+		// if util.UnixTimeReg.MatchString(p.PullJob.Args.Get(util.EndKey)) {
+		// 	p.PullJob.Args.Set(util.StartKey, strconv.FormatInt(seekTime.Unix(), 10))
+		// } else {
+		// 	p.PullJob.Args.Set(util.StartKey, seekTime.Local().Format(util.LocalTimeFormat))
+		// }
+		select {
+		case p.seekChan <- seekTime:
+		default:
+		}
 	}
-	p.MaxTS = p.PullEndTime.Sub(p.PullStartTime).Milliseconds()
+	return p.queryRecordStreams(p.PullStartTime, p.PullEndTime)
+}
 
-	if len(p.Streams) == 0 {
-		return pkg.ErrNotFound
-	}
-	p.Info("vod", "streams", p.Streams)
-	return
+func (p *RecordFilePuller) GetSeekChan() chan time.Time {
+	return p.seekChan
 }
 
 func (p *RecordFilePuller) Dispose() {
 	if p.File != nil {
 		p.File.Close()
 	}
+	close(p.seekChan)
 }
 
 func (w *wsReadCloser) Read(p []byte) (n int, err error) {
@@ -240,4 +276,20 @@ func (w *wsReadCloser) Read(p []byte) (n int, err error) {
 
 func (w *wsReadCloser) Close() error {
 	return w.ws.Close()
+}
+
+func (p *RecordFilePuller) CheckSeek() (needSeek bool, err error) {
+	select {
+	case p.PullStartTime = <-p.seekChan:
+		if err = p.queryRecordStreams(p.PullStartTime, p.PullEndTime); err != nil {
+			return
+		}
+		if p.File != nil {
+			p.File.Close()
+			p.File = nil
+		}
+		needSeek = true
+	default:
+	}
+	return
 }

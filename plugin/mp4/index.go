@@ -93,7 +93,6 @@ func (p *MP4Plugin) RegisterHandler() map[string]http.HandlerFunc {
 func (p *MP4Plugin) OnInit() (err error) {
 	if p.DB != nil {
 		err = p.DB.AutoMigrate(&Exception{})
-		p.DB.AutoMigrate(&m7s.RecordStream{})
 		var deleteRecordTask DeleteRecordTask
 		deleteRecordTask.DB = p.DB
 		deleteRecordTask.DiskMaxPercent = p.DiskMaxPercent

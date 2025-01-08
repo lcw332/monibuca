@@ -180,16 +180,6 @@ func (r *Recorder) createStream(start time.Time) (err error) {
 	return
 }
 
-func (r *Recorder) Start() (err error) {
-	if r.RecordJob.Plugin.DB != nil {
-		err = r.RecordJob.Plugin.DB.AutoMigrate(&r.stream)
-		if err != nil {
-			return
-		}
-	}
-	return r.DefaultRecorder.Start()
-}
-
 func (r *Recorder) Dispose() {
 	if r.muxer != nil {
 		r.writeTailer(time.Now())

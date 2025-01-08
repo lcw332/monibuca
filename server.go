@@ -61,6 +61,7 @@ type (
 		DisableAll    bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
 		StreamAlias   map[config.Regexp]string `desc:"流别名"`
 		PullProxy     []*PullProxy
+		PushProxy     []*PushProxy
 		EnableLogin   bool `default:"false" desc:"启用登录机制"` //启用登录机制
 		Users         []struct {
 			Username string `desc:"用户名"`
@@ -271,9 +272,9 @@ func (s *Server) Start() (err error) {
 				s.Error("failed to connect database", "error", err, "dsn", s.config.DSN, "type", s.config.DBType)
 				return
 			}
-			// Auto-migrate the User model
-			if err = s.DB.AutoMigrate(&db.User{}); err != nil {
-				s.Error("failed to auto-migrate User model", "error", err)
+			// Auto-migrate models
+			if err = s.DB.AutoMigrate(&db.User{}, &PullProxy{}, &PushProxy{}, &StreamAliasDB{}); err != nil {
+				s.Error("failed to auto-migrate models", "error", err)
 				return
 			}
 			// Create users from configuration if EnableLogin is true
@@ -406,62 +407,121 @@ func (s *Server) Start() (err error) {
 				}
 			}
 		}
-		if s.DB != nil {
-			s.DB.AutoMigrate(&PullProxy{})
-			s.DB.AutoMigrate(&PushProxy{})
-		}
-		for _, d := range s.PullProxy {
-			if d.ID != 0 {
-				d.server = s
-				if d.Type == "" {
-					u, err := url.Parse(d.URL)
-					if err != nil {
-						s.Error("parse pull url failed", "error", err)
-						continue
-					}
-					switch u.Scheme {
-					case "srt", "rtsp", "rtmp":
-						d.Type = u.Scheme
-					default:
-						ext := filepath.Ext(u.Path)
-						switch ext {
-						case ".m3u8":
-							d.Type = "hls"
-						case ".flv":
-							d.Type = "flv"
-						case ".mp4":
-							d.Type = "mp4"
-						}
-					}
-				}
-				if s.DB != nil {
-					s.DB.Save(d)
-				} else {
-					s.PullProxies.Add(d, s.Logger.With("pullProxy", d.ID, "type", d.Type, "name", d.Name))
-				}
-			}
-		}
-		if s.DB != nil {
-			var pullProxies []*PullProxy
-			s.DB.Find(&pullProxies)
-			for _, d := range pullProxies {
-				d.server = s
-				d.Logger = s.Logger.With("pullProxy", d.ID, "type", d.Type, "name", d.Name)
-				d.ChangeStatus(PullProxyStatusOffline)
-				s.PullProxies.Add(d)
-			}
-			var pushProxies []*PushProxy
-			s.DB.Find(&pushProxies)
-			for _, d := range pushProxies {
-				d.server = s
-				d.Logger = s.Logger.With("pushProxy", d.ID, "type", d.Type, "name", d.Name)
-				d.ChangeStatus(PushProxyStatusOffline)
-				s.PushProxies.Add(d)
-			}
-		}
+		s.initDB()
 		return nil
 	}, "serverStart")
 	return
+}
+
+func (s *Server) initPullProxies() {
+	// 1. First read all pull proxies from database
+	var pullProxies []*PullProxy
+	s.DB.Find(&pullProxies)
+
+	// Create a map for quick lookup of existing proxies
+	existingPullProxies := make(map[uint]*PullProxy)
+	for _, proxy := range pullProxies {
+		existingPullProxies[proxy.ID] = proxy
+		proxy.InitializeWithServer(s)
+		proxy.ChangeStatus(PullProxyStatusOffline)
+	}
+
+	// 2. Process and override with config data
+	for _, configProxy := range s.PullProxy {
+		if configProxy.ID != 0 {
+			configProxy.InitializeWithServer(s)
+			// Update or insert into database
+			s.DB.Save(configProxy)
+
+			// Override existing proxy or add to list
+			if existing, ok := existingPullProxies[configProxy.ID]; ok {
+				// Update existing proxy with config values
+				existing.URL = configProxy.URL
+				existing.Type = configProxy.Type
+				existing.Name = configProxy.Name
+				existing.PullOnStart = configProxy.PullOnStart
+			} else {
+				pullProxies = append(pullProxies, configProxy)
+			}
+		}
+	}
+
+	// 3. Finally add all proxies to collections
+	for _, proxy := range pullProxies {
+		s.PullProxies.Add(proxy)
+	}
+}
+
+func (s *Server) initPushProxies() {
+	// 1. Read all push proxies from database
+	var pushProxies []*PushProxy
+	s.DB.Find(&pushProxies)
+
+	// Create a map for quick lookup of existing proxies
+	existingPushProxies := make(map[uint]*PushProxy)
+	for _, proxy := range pushProxies {
+		existingPushProxies[proxy.ID] = proxy
+		proxy.InitializeWithServer(s)
+		proxy.ChangeStatus(PushProxyStatusOffline)
+	}
+
+	// 2. Process and override with config data
+	for _, configProxy := range s.PushProxy {
+		if configProxy.ID != 0 {
+			configProxy.InitializeWithServer(s)
+			// Update or insert into database
+			s.DB.Save(configProxy)
+
+			// Override existing proxy or add to list
+			if existing, ok := existingPushProxies[configProxy.ID]; ok {
+				// Update existing proxy with config values
+				existing.URL = configProxy.URL
+				existing.Type = configProxy.Type
+				existing.Name = configProxy.Name
+				existing.PushOnStart = configProxy.PushOnStart
+				existing.Audio = configProxy.Audio
+			} else {
+				pushProxies = append(pushProxies, configProxy)
+			}
+		}
+	}
+
+	// 3. Finally add all proxies to collections
+	for _, proxy := range pushProxies {
+		s.PushProxies.Add(proxy)
+	}
+}
+
+func (s *Server) initPullProxiesWithoutDB() {
+	// Process config proxies without database
+	for _, proxy := range s.PullProxy {
+		if proxy.ID != 0 {
+			proxy.InitializeWithServer(s)
+			s.PullProxies.Add(proxy, proxy.Logger)
+		}
+	}
+}
+
+func (s *Server) initPushProxiesWithoutDB() {
+	// Process config proxies without database
+	for _, proxy := range s.PushProxy {
+		if proxy.ID != 0 {
+			proxy.InitializeWithServer(s)
+			s.PushProxies.Add(proxy, proxy.Logger)
+		}
+	}
+}
+
+func (s *Server) initDB() {
+	if s.DB != nil {
+
+		s.initPullProxies()
+		s.initPushProxies()
+		s.initStreamAlias()
+	} else {
+		s.initPullProxiesWithoutDB()
+		s.initPushProxiesWithoutDB()
+	}
 }
 
 func (c *CheckSubWaitTimeout) GetTickInterval() time.Duration {

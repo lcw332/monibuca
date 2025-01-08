@@ -1,13 +1,23 @@
 package m7s
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"log/slog"
+
+	"github.com/mcuadros/go-defaults"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
+	"m7s.live/v5/pb"
+	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/config"
 	"m7s.live/v5/pkg/task"
 	"m7s.live/v5/pkg/util"
@@ -40,7 +50,8 @@ type (
 		Status                         byte
 		Description                    string
 		RTT                            time.Duration
-		Handler                        IPullProxy `gorm:"-:all" yaml:"-"`
+		Handler                        IPullProxy   `gorm:"-:all" yaml:"-"`
+		Logger                         *slog.Logger `gorm:"-:all" yaml:"-"`
 	}
 	PullProxyManager struct {
 		task.Manager[uint, *PullProxy]
@@ -129,6 +140,32 @@ func (d *PullProxyTask) Dispose() {
 	})
 }
 
+func (d *PullProxy) InitializeWithServer(s *Server) {
+	d.server = s
+	d.Logger = s.Logger.With("pullProxy", d.ID, "type", d.Type, "name", d.Name)
+	if d.Type == "" {
+		u, err := url.Parse(d.URL)
+		if err != nil {
+			d.Logger.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			d.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				d.Type = "hls"
+			case ".flv":
+				d.Type = "flv"
+			case ".mp4":
+				d.Type = "mp4"
+			}
+		}
+	}
+}
+
 func (d *PullProxyTask) Pull() {
 	var pubConf = d.Plugin.config.Publish
 	pubConf.PubAudio = d.PullProxy.Audio
@@ -176,5 +213,198 @@ func (d *TCPPullProxy) Tick(any) {
 	d.PullProxy.RTT = time.Since(startTime)
 	if d.PullProxy.Status == PullProxyStatusOffline {
 		d.PullProxy.ChangeStatus(PullProxyStatusOnline)
+	}
+}
+
+func (s *Server) GetPullProxyList(ctx context.Context, req *emptypb.Empty) (res *pb.PullProxyListResponse, err error) {
+	res = &pb.PullProxyListResponse{}
+	s.PullProxies.Call(func() error {
+		for device := range s.PullProxies.Range {
+			res.Data = append(res.Data, &pb.PullProxyInfo{
+				Name:           device.Name,
+				CreateTime:     timestamppb.New(device.CreatedAt),
+				UpdateTime:     timestamppb.New(device.UpdatedAt),
+				Type:           device.Type,
+				PullURL:        device.URL,
+				ParentID:       uint32(device.ParentID),
+				Status:         uint32(device.Status),
+				ID:             uint32(device.ID),
+				PullOnStart:    device.PullOnStart,
+				StopOnIdle:     device.StopOnIdle,
+				Audio:          device.Audio,
+				RecordPath:     device.Record.FilePath,
+				RecordFragment: durationpb.New(device.Record.Fragment),
+				Description:    device.Description,
+				Rtt:            uint32(device.RTT.Milliseconds()),
+				StreamPath:     device.GetStreamPath(),
+			})
+		}
+		return nil
+	})
+	return
+}
+
+func (s *Server) AddPullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *pb.SuccessResponse, err error) {
+	device := &PullProxy{
+		server:      s,
+		Name:        req.Name,
+		Type:        req.Type,
+		ParentID:    uint(req.ParentID),
+		PullOnStart: req.PullOnStart,
+		Description: req.Description,
+		StreamPath:  req.StreamPath,
+	}
+	if device.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PullURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			device.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				device.Type = "hls"
+			case ".flv":
+				device.Type = "flv"
+			case ".mp4":
+				device.Type = "mp4"
+			}
+		}
+	}
+	defaults.SetDefaults(&device.Pull)
+	defaults.SetDefaults(&device.Record)
+	device.URL = req.PullURL
+	device.Audio = req.Audio
+	device.StopOnIdle = req.StopOnIdle
+	device.Record.FilePath = req.RecordPath
+	device.Record.Fragment = req.RecordFragment.AsDuration()
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	s.DB.Create(device)
+	if req.StreamPath == "" {
+		device.StreamPath = device.GetStreamPath()
+	}
+	s.PullProxies.Add(device)
+	res = &pb.SuccessResponse{}
+	return
+}
+
+func (s *Server) UpdatePullProxy(ctx context.Context, req *pb.PullProxyInfo) (res *pb.SuccessResponse, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	target := &PullProxy{
+		server: s,
+	}
+	err = s.DB.First(target, req.ID).Error
+	if err != nil {
+		return
+	}
+	target.Name = req.Name
+	target.URL = req.PullURL
+	target.ParentID = uint(req.ParentID)
+	target.Type = req.Type
+	if target.Type == "" {
+		var u *url.URL
+		u, err = url.Parse(req.PullURL)
+		if err != nil {
+			s.Error("parse pull url failed", "error", err)
+			return
+		}
+		switch u.Scheme {
+		case "srt", "rtsp", "rtmp":
+			target.Type = u.Scheme
+		default:
+			ext := filepath.Ext(u.Path)
+			switch ext {
+			case ".m3u8":
+				target.Type = "hls"
+			case ".flv":
+				target.Type = "flv"
+			case ".mp4":
+				target.Type = "mp4"
+			}
+		}
+	}
+	target.PullOnStart = req.PullOnStart
+	target.StopOnIdle = req.StopOnIdle
+	target.Audio = req.Audio
+	target.Description = req.Description
+	target.Record.FilePath = req.RecordPath
+	target.Record.Fragment = req.RecordFragment.AsDuration()
+	target.RTT = time.Duration(int(req.Rtt)) * time.Millisecond
+	target.StreamPath = req.StreamPath
+	s.DB.Save(target)
+	var needStopOld *PullProxy
+	s.PullProxies.Call(func() error {
+		if device, ok := s.PullProxies.Get(uint(req.ID)); ok {
+			if target.URL != device.URL || device.Audio != target.Audio || device.StreamPath != target.StreamPath || device.Record.FilePath != target.Record.FilePath || device.Record.Fragment != target.Record.Fragment {
+				device.Stop(task.ErrStopByUser)
+				needStopOld = device
+				return nil
+			}
+			if device.PullOnStart != target.PullOnStart && target.PullOnStart && device.Handler != nil && device.Status == PullProxyStatusOnline {
+				device.Handler.Pull()
+			}
+			device.Name = target.Name
+			device.PullOnStart = target.PullOnStart
+			device.StopOnIdle = target.StopOnIdle
+			device.Description = target.Description
+		}
+		return nil
+	})
+	if needStopOld != nil {
+		needStopOld.WaitStopped()
+		s.PullProxies.Add(target)
+	}
+	res = &pb.SuccessResponse{}
+	return
+}
+
+func (s *Server) RemovePullProxy(ctx context.Context, req *pb.RequestWithId) (res *pb.SuccessResponse, err error) {
+	if s.DB == nil {
+		err = pkg.ErrNoDB
+		return
+	}
+	res = &pb.SuccessResponse{}
+	if req.Id > 0 {
+		tx := s.DB.Delete(&PullProxy{
+			ID: uint(req.Id),
+		})
+		err = tx.Error
+		s.PullProxies.Call(func() error {
+			if device, ok := s.PullProxies.Get(uint(req.Id)); ok {
+				device.Stop(task.ErrStopByUser)
+			}
+			return nil
+		})
+		return
+	} else if req.StreamPath != "" {
+		var deviceList []PullProxy
+		s.DB.Find(&deviceList, "stream_path=?", req.StreamPath)
+		if len(deviceList) > 0 {
+			for _, device := range deviceList {
+				tx := s.DB.Delete(&PullProxy{}, device.ID)
+				err = tx.Error
+				s.PullProxies.Call(func() error {
+					if device, ok := s.PullProxies.Get(uint(device.ID)); ok {
+						device.Stop(task.ErrStopByUser)
+					}
+					return nil
+				})
+			}
+		}
+		return
+	} else {
+		res.Message = "parameter wrong"
+		return
 	}
 }
