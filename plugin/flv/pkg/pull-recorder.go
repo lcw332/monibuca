@@ -97,11 +97,11 @@ func (p *RecordReader) Run() (err error) {
 				}
 
 				if _, err = p.reader.ReadBE(4); err != nil { // previous tag size
-					return
+					break
 				}
 				// Read tag header (11 bytes total)
 				if err = p.reader.ReadNto(11, tagHeader[:]); err != nil {
-					return
+					break
 				}
 
 				t := tagHeader[0]                                                                      // tag type (1 byte)
@@ -114,7 +114,7 @@ func (p *RecordReader) Run() (err error) {
 				frame.SetAllocator(allocator)
 
 				if err = p.reader.ReadNto(dataSize, frame.NextN(dataSize)); err != nil {
-					return
+					break
 				}
 				ts = int64(timestamp) + tsOffset
 				realTime = stream.StartTime.Add(time.Duration(timestamp) * time.Millisecond)

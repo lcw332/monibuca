@@ -186,6 +186,9 @@ func (r *Recorder) createStream(start time.Time) (err error) {
 }
 
 func (r *Recorder) writeTailer(end time.Time) {
+	if r.stream.EndTime.After(r.stream.StartTime) {
+		return
+	}
 	r.stream.EndTime = end
 	if r.RecordJob.Plugin.DB != nil {
 		r.RecordJob.Plugin.DB.Save(&r.stream)
@@ -194,6 +197,10 @@ func (r *Recorder) writeTailer(end time.Time) {
 			streamPath: r.stream.StreamPath,
 		})
 	}
+}
+
+func (r *Recorder) Dispose() {
+	r.writeTailer(time.Now())
 }
 
 type eventRecordCheck struct {
