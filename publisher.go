@@ -578,6 +578,7 @@ func (p *Publisher) Dispose() {
 }
 
 func (p *Publisher) TransferSubscribers(newPublisher *Publisher) {
+	p.Info("transfer subscribers", "newPublisher", newPublisher.ID, "newStreamPath", newPublisher.StreamPath)
 	for subscriber := range p.SubscriberRange {
 		if subscriber.Type != SubscribeTypeServer {
 			continue

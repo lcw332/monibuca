@@ -1,4 +1,6 @@
 global:
+  location:
+    "^/hdl/(.*)": "/flv/$1"
   loglevel: debug
   enablelogin: false
   # db:
@@ -19,12 +21,13 @@ gb28181:
     pull:
       .* : $0
 mp4:
-  publish:
-    delayclosetimeout: 3s
+  # enable: false
+  # publish:
+  #   delayclosetimeout: 3s
 
   onsub:
     pull:
-      ^vod/(.+)$: $1
+      ^vod\d+/(.+)$: $1
 cascadeserver:
   quic:
     listenaddr: :44944
@@ -32,10 +35,20 @@ cascadeserver:
 #   onpub:
 #     transform:
 #       .* : 1s x 7
-# flv:
+flv:
+  # onpub:
+  #   record:
+  #     ^live/.+:
+  #         fragment: 1m
+  #         filepath: record/$0
+  # onsub:
+  #   pull:
+  #     ^vod\d+/(.+)$: $1
 #   pull:
 #     live/test: https://livecb.alicdn.com/mediaplatform/afb241b3-408c-42dd-b665-04d22b64f9df.flv?auth_key=1734575216-0-0-c62721303ce751c8e5b2c95a2ec242a0&F=pc&source=34675810_null_live_detail&ali_flv_retain=2
-# hls:
+hls:
+  # pull:
+  #   live/test: https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear3/prog_index.m3u8
 #   onpub:
 #     transform:
 #       .* : 5s x 3

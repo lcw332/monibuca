@@ -60,6 +60,7 @@ type (
 		PulseInterval time.Duration            `default:"5s" desc:"心跳事件间隔"`    //心跳事件间隔
 		DisableAll    bool                     `default:"false" desc:"禁用所有插件"` //禁用所有插件
 		StreamAlias   map[config.Regexp]string `desc:"流别名"`
+		Location      map[config.Regexp]string `desc:"HTTP路由转发规则,key为正则表达式,value为目标地址"`
 		PullProxy     []*PullProxy
 		PushProxy     []*PushProxy
 		Admin         struct {
@@ -576,6 +577,19 @@ func (s *Server) OnSubscribe(streamPath string, args url.Values) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check for location-based forwarding first
+	if s.Location != nil {
+		for pattern, target := range s.Location {
+			if pattern.MatchString(r.URL.Path) {
+				// Rewrite the URL path and handle locally
+				r.URL.Path = pattern.ReplaceAllString(r.URL.Path, target)
+				// Forward to local handler
+				s.config.HTTP.GetHandler().ServeHTTP(w, r)
+				return
+			}
+		}
+	}
+
 	// 检查 admin.zip 是否需要重新加载
 	now := time.Now()
 	if now.Sub(lastCheckTime) > checkInterval {
