@@ -27,7 +27,7 @@ mp4:
 
   onsub:
     pull:
-      ^vod\d+/(.+)$: $1
+      ^vod\d+/(.+)/mp4$: $1
 cascadeserver:
   quic:
     listenaddr: :44944
@@ -41,9 +41,9 @@ flv:
   #     ^live/.+:
   #         fragment: 1m
   #         filepath: record/$0
-  # onsub:
-  #   pull:
-  #     ^vod\d+/(.+)$: $1
+  onsub:
+    pull:
+      ^vod\d+/(.+)/flv$: $1
 #   pull:
 #     live/test: https://livecb.alicdn.com/mediaplatform/afb241b3-408c-42dd-b665-04d22b64f9df.flv?auth_key=1734575216-0-0-c62721303ce751c8e5b2c95a2ec242a0&F=pc&source=34675810_null_live_detail&ali_flv_retain=2
 hls:

@@ -812,6 +812,9 @@ func (s *Server) GetRecordList(ctx context.Context, req *pb.ReqRecordList) (resp
 	if req.PageSize == 0 {
 		req.PageSize = 10
 	}
+	if req.PageNum == 0 {
+		req.PageNum = 1
+	}
 	offset := (req.PageNum - 1) * req.PageSize // 计算偏移量
 	var totalCount int64                       //总条数
 
@@ -829,15 +832,15 @@ func (s *Server) GetRecordList(ctx context.Context, req *pb.ReqRecordList) (resp
 		query = query.Where("type = ?", req.Type)
 	}
 	startTime, endTime, err := util.TimeRangeQueryParse(url.Values{"range": []string{req.Range}, "start": []string{req.Start}, "end": []string{req.End}})
-	if err != nil {
-		return
+	if err == nil {
+		if !startTime.IsZero() {
+			query = query.Where("start_time >= ?", startTime)
+		}
+		if !endTime.IsZero() {
+			query = query.Where("end_time <= ?", endTime)
+		}
 	}
-	if !startTime.IsZero() {
-		query = query.Where("start_time >= ?", startTime)
-	}
-	if !endTime.IsZero() {
-		query = query.Where("end_time <= ?", endTime)
-	}
+
 	query.Count(&totalCount)
 	err = query.Offset(int(offset)).Limit(int(req.PageSize)).Order("start_time desc").Find(&result).Error
 	if err != nil {
