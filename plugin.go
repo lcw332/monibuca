@@ -531,8 +531,8 @@ func (p *Plugin) OnSubscribe(streamPath string, args url.Values) {
 	//		}
 	//	}
 	for reg, conf := range p.config.OnSub.Pull {
-		if p.Meta.Puller != nil {
-			conf.Args = config.HTTPValus(args)
+		if p.Meta.Puller != nil && reg.MatchString(streamPath) {
+			conf.Args = config.HTTPValues(args)
 			conf.URL = reg.Replace(streamPath, conf.URL)
 			p.handler.Pull(streamPath, conf, nil)
 		}

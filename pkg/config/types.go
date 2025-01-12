@@ -57,21 +57,21 @@ type (
 		Key             string        `desc:"订阅鉴权key"`                                      // 订阅鉴权key
 		SubType         string        `desc:"订阅类型"`                                         // 订阅类型
 	}
-	HTTPValus map[string][]string
-	Pull      struct {
+	HTTPValues map[string][]string
+	Pull       struct {
 		URL           string        `desc:"拉流地址"`
 		MaxRetry      int           `default:"-1" desc:"断开后自动重试次数,0:不重试,-1:无限重试"` // 断开后自动重拉,0 表示不自动重拉，-1 表示无限重拉，高于0 的数代表最大重拉次数
 		RetryInterval time.Duration `default:"5s" desc:"重试间隔"`                    // 重试间隔
 		Proxy         string        `desc:"代理地址"`                                 // 代理地址
-		Header        HTTPValus
-		Args          HTTPValus `gorm:"-:all"` // 拉流参数
+		Header        HTTPValues
+		Args          HTTPValues `gorm:"-:all"` // 拉流参数
 	}
 	Push struct {
 		URL           string        `desc:"推送地址"`                    // 推送地址
 		MaxRetry      int           `desc:"断开后自动重试次数,0:不重试,-1:无限重试"` // 断开后自动重推,0 表示不自动重推，-1 表示无限重推，高于0 的数代表最大重推次数
 		RetryInterval time.Duration `default:"5s" desc:"重试间隔"`       // 重试间隔
 		Proxy         string        `desc:"代理地址"`                    // 代理地址
-		Header        HTTPValus
+		Header        HTTPValues
 	}
 	Record struct {
 		FilePath string        `desc:"录制文件路径"` // 录制文件路径
@@ -139,7 +139,7 @@ func (p *Record) GetRecordConfig() *Record {
 	return p
 }
 
-func (v *HTTPValus) Scan(value any) error {
+func (v *HTTPValues) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("failed to unmarshal yaml value: %v", value)
@@ -147,16 +147,16 @@ func (v *HTTPValus) Scan(value any) error {
 	return yaml.Unmarshal(bytes, v)
 }
 
-func (v HTTPValus) Value() (driver.Value, error) {
+func (v HTTPValues) Value() (driver.Value, error) {
 	return yaml.Marshal(v)
 }
 
-func (v HTTPValus) Get(key string) string {
+func (v HTTPValues) Get(key string) string {
 	return url.Values(v).Get(key)
 }
 
-func (v HTTPValus) DeepClone() (ret HTTPValus) {
-	ret = make(HTTPValus)
+func (v HTTPValues) DeepClone() (ret HTTPValues) {
+	ret = make(HTTPValues)
 	for k, v := range v {
 		ret[k] = append([]string(nil), v...)
 	}
