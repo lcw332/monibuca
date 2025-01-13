@@ -158,16 +158,17 @@ func (p *RecordReader) Run() (err error) {
 										if err != nil {
 											return err
 										}
-										if _, err = p.File.Seek(int64(filepositions[i].(float64)), io.SeekStart); err != nil {
-											return err
-										}
+										// if _, err = p.File.Seek(int64(filepositions[i].(float64)), io.SeekStart); err != nil {
+										// 	return err
+										// }
+										p.reader.Skip(int(filepositions[i].(float64)) - int(currentPos))
 										tsOffset = -int64(t.(float64) * 1000)
 										break
 									}
 								}
-								if _, err = p.File.Seek(currentPos, io.SeekStart); err != nil {
-									return err
-								}
+								// if _, err = p.File.Seek(currentPos, io.SeekStart); err != nil {
+								// 	return err
+								// }
 							}
 						}
 					} else {
