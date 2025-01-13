@@ -216,6 +216,9 @@ func (p *RecordFilePuller) queryRecordStreams(startTime, endTime time.Time) (err
 	if len(p.Streams) == 0 {
 		return pkg.ErrNotFound
 	}
+	for _, stream := range p.Streams {
+		p.Debug("queryRecordStreams", "filePath", stream.FilePath)
+	}
 	p.MaxTS = endTime.Sub(startTime).Milliseconds()
 	return nil
 }

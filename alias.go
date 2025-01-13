@@ -146,18 +146,18 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				if aliasStream.Publisher != nil {
 					if publisher, hasTarget := s.Streams.Get(req.Alias); hasTarget { // restore stream
 						aliasStream.TransferSubscribers(publisher)
-					}
-				} else {
-					var args url.Values
-					for sub := range aliasStream.Publisher.SubscriberRange {
-						if sub.StreamPath == req.Alias {
-							aliasStream.Publisher.RemoveSubscriber(sub)
-							s.Waiting.Wait(sub)
-							args = sub.Args
+					} else {
+						var args url.Values
+						for sub := range aliasStream.Publisher.SubscriberRange {
+							if sub.StreamPath == req.Alias {
+								aliasStream.Publisher.RemoveSubscriber(sub)
+								s.Waiting.Wait(sub)
+								args = sub.Args
+							}
 						}
-					}
-					if args != nil {
-						s.OnSubscribe(req.Alias, args)
+						if args != nil {
+							s.OnSubscribe(req.Alias, args)
+						}
 					}
 				}
 			}

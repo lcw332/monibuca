@@ -634,6 +634,20 @@ func (p *Publisher) WaitTrack() (err error) {
 	return
 }
 
+func (p *Publisher) NoVideo() {
+	p.PubVideo = false
+	if p.videoReady != nil {
+		p.videoReady.Reject(ErrMuted)
+	}
+}
+
+func (p *Publisher) NoAudio() {
+	p.PubAudio = false
+	if p.audioReady != nil {
+		p.audioReady.Reject(ErrMuted)
+	}
+}
+
 func (p *Publisher) Pause() {
 	p.Paused = util.NewPromise(p)
 	p.pauseTime = time.Now()

@@ -2,6 +2,7 @@ package flv
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -36,27 +37,42 @@ func NewPuller(conf config.Pull) m7s.IPuller {
 	return nil
 }
 
+func (p *RecordReader) Dispose() {
+	if p.reader != nil {
+		p.reader.Recycle()
+	}
+	p.RecordFilePuller.Dispose()
+}
+
 func (p *RecordReader) Run() (err error) {
 	pullJob := &p.PullJob
 	publisher := pullJob.Publisher
 	allocator := util.NewScalableMemoryAllocator(1 << 10)
 	var tagHeader [11]byte
-	var ts, tsOffset int64
+	var ts int64
 	var realTime time.Time
-	defer allocator.Recycle()
+	var seekPosition int64
+	var seekTsOffset int64
+	// defer allocator.Recycle()
+	defer func() {
+		allocator.Recycle()
+	}()
 	publisher.OnGetPosition = func() time.Time {
 		return realTime
 	}
 	for loop := 0; loop < p.Loop; loop++ {
 	nextStream:
 		for i, stream := range p.Streams {
-			tsOffset = ts
+			seekTsOffset = ts
 			if p.File != nil {
 				p.File.Close()
 			}
 			p.File, err = os.Open(stream.FilePath)
 			if err != nil {
 				continue
+			}
+			if p.reader != nil {
+				p.reader.Recycle()
 			}
 			p.reader = util.NewBufReader(p.File)
 			var head util.Memory
@@ -67,6 +83,14 @@ func (p *RecordReader) Run() (err error) {
 			var flvHead [3]byte
 			var version, flag byte
 			err = head.NewReader().ReadByteTo(&flvHead[0], &flvHead[1], &flvHead[2], &version, &flag)
+			hasAudio := (flag & 0x04) != 0
+			hasVideo := (flag & 0x01) != 0
+			if !hasAudio {
+				publisher.NoAudio()
+			}
+			if !hasVideo {
+				publisher.NoVideo()
+			}
 			if err != nil {
 				return
 			}
@@ -103,11 +127,9 @@ func (p *RecordReader) Run() (err error) {
 				if err = p.reader.ReadNto(11, tagHeader[:]); err != nil {
 					break
 				}
-
-				t := tagHeader[0]                                                                      // tag type (1 byte)
-				dataSize := int(tagHeader[1])<<16 | int(tagHeader[2])<<8 | int(tagHeader[3])           // data size (3 bytes)
-				timestamp := uint32(tagHeader[4])<<16 | uint32(tagHeader[5])<<8 | uint32(tagHeader[6]) // timestamp (3 bytes)
-				timestamp |= uint32(tagHeader[7]) << 24                                                // timestamp extended (1 byte)
+				t := tagHeader[0]                                                            // tag type (1 byte)
+				dataSize := int(tagHeader[1])<<16 | int(tagHeader[2])<<8 | int(tagHeader[3]) // data size (3 bytes)
+				timestamp := uint32(tagHeader[4])<<16 | uint32(tagHeader[5])<<8 | uint32(tagHeader[6]) | uint32(tagHeader[7])<<24
 				// stream id is tagHeader[8:11] (3 bytes), always 0
 
 				var frame rtmp.RTMPData
@@ -116,12 +138,8 @@ func (p *RecordReader) Run() (err error) {
 				if err = p.reader.ReadNto(dataSize, frame.NextN(dataSize)); err != nil {
 					break
 				}
-				ts = int64(timestamp) + tsOffset
+				ts = int64(timestamp) + seekTsOffset
 				realTime = stream.StartTime.Add(time.Duration(timestamp) * time.Millisecond)
-				if p.MaxTS > 0 && ts > p.MaxTS {
-					return
-				}
-
 				frame.Timestamp = uint32(ts)
 				switch t {
 				case FLV_TAG_TYPE_AUDIO:
@@ -131,6 +149,16 @@ func (p *RecordReader) Run() (err error) {
 				case FLV_TAG_TYPE_VIDEO:
 					if publisher.PubVideo {
 						err = publisher.WriteVideo(frame.WrapVideo())
+						// After processing the first video frame, check if we need to seek
+						if i == 0 && seekPosition > 0 {
+							_, err = p.File.Seek(seekPosition, io.SeekStart)
+							if err != nil {
+								return
+							}
+							p.reader.Recycle()
+							p.reader = util.NewBufReader(p.File)
+							seekPosition = 0 // Reset to avoid seeking again
+						}
 					}
 				case FLV_TAG_TYPE_SCRIPT:
 					r := frame.NewReader()
@@ -151,31 +179,28 @@ func (p *RecordReader) Run() (err error) {
 							if keyframes, ok := metaData["keyframes"].(map[string]any); ok {
 								filepositions := keyframes["filepositions"].([]any)
 								times := keyframes["times"].([]any)
-								currentPos, err := p.File.Seek(0, io.SeekCurrent)
 								for i, t := range times {
-									if int64(t.(float64)*1000) >= startTimestamp {
-
-										if err != nil {
-											return err
+									if ts := int64(t.(float64) * 1000); ts > startTimestamp {
+										if i < 2 {
+											break
 										}
-										// if _, err = p.File.Seek(int64(filepositions[i].(float64)), io.SeekStart); err != nil {
-										// 	return err
-										// }
-										p.reader.Skip(int(filepositions[i].(float64)) - int(currentPos))
-										tsOffset = -int64(t.(float64) * 1000)
+										seekPosition = int64(filepositions[i-1].(float64) - 4)
+										seekTsOffset = -int64(times[i-1].(float64) * 1000)
 										break
 									}
 								}
-								// if _, err = p.File.Seek(currentPos, io.SeekStart); err != nil {
-								// 	return err
-								// }
 							}
 						}
 					} else {
 						publisher.Info("script", name, obj)
 					}
+				default:
+					err = fmt.Errorf("unknown tag type: %d", t)
 				}
 				if err != nil {
+					return
+				}
+				if p.MaxTS > 0 && ts > p.MaxTS {
 					return
 				}
 			}
