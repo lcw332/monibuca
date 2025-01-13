@@ -555,6 +555,7 @@ func (s *Server) SetStreamSpeed(ctx context.Context, req *pb.SetStreamSpeedReque
 	s.Streams.Call(func() error {
 		if s, ok := s.Streams.Get(req.StreamPath); ok {
 			s.Speed = float64(req.Speed)
+			s.Scale = float64(req.Speed)
 		}
 		return nil
 	})

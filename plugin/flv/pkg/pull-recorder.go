@@ -131,14 +131,16 @@ func (p *RecordReader) Run() (err error) {
 				dataSize := int(tagHeader[1])<<16 | int(tagHeader[2])<<8 | int(tagHeader[3]) // data size (3 bytes)
 				timestamp := uint32(tagHeader[4])<<16 | uint32(tagHeader[5])<<8 | uint32(tagHeader[6]) | uint32(tagHeader[7])<<24
 				// stream id is tagHeader[8:11] (3 bytes), always 0
-
 				var frame rtmp.RTMPData
 				frame.SetAllocator(allocator)
 
 				if err = p.reader.ReadNto(dataSize, frame.NextN(dataSize)); err != nil {
 					break
 				}
-				ts = int64(timestamp) + seekTsOffset
+				ts = int64(timestamp)
+				if i != 0 || seekPosition == 0 {
+					ts += seekTsOffset
+				}
 				realTime = stream.StartTime.Add(time.Duration(timestamp) * time.Millisecond)
 				frame.Timestamp = uint32(ts)
 				switch t {

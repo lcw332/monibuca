@@ -126,7 +126,7 @@ func (t *Track) Trace(msg string, fields ...any) {
 	t.Log(context.TODO(), task.TraceLevel, msg, fields...)
 }
 
-func (t *TsTamer) Tame(ts time.Duration, fps int) (result time.Duration) {
+func (t *TsTamer) Tame(ts time.Duration, fps int, scale float64) (result time.Duration) {
 	if t.LastTs == 0 {
 		t.BaseTs -= ts
 	}
@@ -140,5 +140,6 @@ func (t *TsTamer) Tame(ts time.Duration, fps int) (result time.Duration) {
 		}
 	}
 	t.LastTs = result
+	result = time.Duration(float64(result) / scale)
 	return
 }

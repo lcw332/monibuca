@@ -145,6 +145,8 @@ type Publisher struct {
 	OnGetPosition          func() time.Time
 	PullProxy              *PullProxy
 	dumpFile               *os.File
+	MaxFPS                 float64
+	dropRate               float64 // 丢帧率，0-1之间
 }
 
 func (p *Publisher) SubscriberRange(yield func(sub *Subscriber) bool) {
@@ -324,7 +326,7 @@ func (p *Publisher) writeAV(t *AVTrack, data IAVFrame) {
 	frame.CTS = data.GetCTS()
 	bytesIn := frame.Wraps[0].GetSize()
 	t.AddBytesIn(bytesIn)
-	frame.Timestamp = t.Tame(ts, t.FPS)
+	frame.Timestamp = t.Tame(ts, t.FPS, p.Scale)
 	if p.Enabled(p, task.TraceLevel) {
 		codec := t.FourCC().String()
 		data := frame.Wraps[0].String()
@@ -339,6 +341,40 @@ func (p *Publisher) trackAdded() error {
 		p.State = PublisherStateTrackAdded
 	}
 	return nil
+}
+
+func (p *Publisher) dropFrame(t *AVTrack, idr *util.Ring[AVFrame]) (drop bool) {
+	// Frame dropping logic based on MaxFPS
+	if p.MaxFPS > 0 && float64(t.FPS) > p.MaxFPS {
+		dropRatio := float64(t.FPS)/p.MaxFPS - 1 // How many frames to drop for each frame kept
+		p.dropRate = dropRatio / (dropRatio + 1) // 计算丢帧率
+		if p.Scale >= 8 {
+			// Only keep I-frames when Scale >= 8
+			if !t.Value.IDR {
+				// Drop all P-frames
+				return true
+			}
+			// Drop I-frames based on FPS ratio
+			if dropRatio > 1 && t.Value.IDR && t.Value.Sequence%uint32(dropRatio+1) != 0 {
+				return true
+			}
+		} else {
+			// Normal frame dropping strategy
+			if !t.Value.IDR {
+				// Drop P-frames based on position in GOP and FPS ratio
+				if idr != nil {
+					posInGOP := int(t.Value.Sequence - idr.Value.Sequence)
+					gopThreshold := int(float64(p.GOP) / (dropRatio + 1))
+					if posInGOP > gopThreshold {
+						return true
+					}
+				}
+			}
+		}
+	} else {
+		p.dropRate = 0
+	}
+	return
 }
 
 func (p *Publisher) WriteVideo(data IAVFrame) (err error) {
@@ -373,12 +409,20 @@ func (p *Publisher) WriteVideo(data IAVFrame) (err error) {
 	if t.ICodecCtx == nil {
 		return ErrUnsupportCodec
 	}
-	if codecCtxChanged {
-		p.Info("video codec changed", "width", t.ICodecCtx.(IVideoCodecCtx).Width(), "height", t.ICodecCtx.(IVideoCodecCtx).Height())
+	if codecCtxChanged && oldCodecCtx != nil {
+		oldWidth, oldHeight := oldCodecCtx.(IVideoCodecCtx).Width(), oldCodecCtx.(IVideoCodecCtx).Height()
+		newWidth, newHeight := t.ICodecCtx.(IVideoCodecCtx).Width(), t.ICodecCtx.(IVideoCodecCtx).Height()
+		if oldWidth != newWidth || oldHeight != newHeight {
+			p.Info("video resolution changed", "oldWidth", oldWidth, "oldHeight", oldHeight, "newWidth", newWidth, "newHeight", newHeight)
+		}
 	}
 	var idr *util.Ring[AVFrame]
 	if t.IDRingList.Len() > 0 {
 		idr = t.IDRingList.Back().Value
+		if p.dropFrame(t, idr) {
+			data.Recycle()
+			return nil
+		}
 	}
 	if t.Value.IDR {
 		if !t.IsReady() {
@@ -435,6 +479,7 @@ func (p *Publisher) WriteVideo(data IAVFrame) (err error) {
 		}
 	}
 	t.Step()
+
 	p.VideoTrack.speedControl(p.Speed, t.LastTs)
 	return
 }
@@ -453,6 +498,17 @@ func (p *Publisher) WriteAudio(data IAVFrame) (err error) {
 	}
 	if !p.PubAudio {
 		return ErrMuted
+	}
+	// 根据丢帧率进行音频帧丢弃
+	if p.dropRate > 0 {
+		t := p.AudioTrack.AVTrack
+		if t != nil {
+			// 使用序列号进行平均丢帧
+			if t.Value.Sequence%uint32(1/p.dropRate) != 0 {
+				data.Recycle()
+				return nil
+			}
+		}
 	}
 	t := p.AudioTrack.AVTrack
 	if t == nil {
