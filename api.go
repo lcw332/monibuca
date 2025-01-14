@@ -556,6 +556,7 @@ func (s *Server) SetStreamSpeed(ctx context.Context, req *pb.SetStreamSpeedReque
 		if s, ok := s.Streams.Get(req.StreamPath); ok {
 			s.Speed = float64(req.Speed)
 			s.Scale = float64(req.Speed)
+			s.Info("set stream speed", "speed", req.Speed)
 		}
 		return nil
 	})

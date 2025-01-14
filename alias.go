@@ -121,7 +121,7 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 					} else {
 						s.Waiting.WakeUp(req.Alias, publisher)
 					}
-				} else {
+				} else if ok {
 					aliasInfo.Publisher = aliasStream
 				}
 				if aliasInfo.Publisher != nil {

@@ -58,7 +58,7 @@ func GetVideoFrame(streamPath string, server *m7s.Server) (pkg.AnnexB, *pkg.AVTr
 		return pkg.AnnexB{}, nil, err
 	}
 	if track.ICodecCtx == nil {
-		return pkg.AnnexB{}, nil, fmt.Errorf("unsupported codec")
+		return pkg.AnnexB{}, nil, pkg.ErrUnsupportCodec
 	}
 	annexb.Mux(track.ICodecCtx, &reader.Value)
 

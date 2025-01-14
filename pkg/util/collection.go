@@ -130,9 +130,9 @@ func (c *Collection[K, T]) Get(key K) (item T, ok bool) {
 	}
 	if c.m != nil {
 		item, ok = c.m[key]
-		return item, ok
+		return
 	}
-	for _, item = range c.Items {
+	for _, item := range c.Items {
 		if item.GetKey() == key {
 			return item, true
 		}
@@ -145,7 +145,7 @@ func (c *Collection[K, T]) Find(f func(T) bool) (item T, ok bool) {
 		c.L.RLock()
 		defer c.L.RUnlock()
 	}
-	for _, item = range c.Items {
+	for _, item := range c.Items {
 		if f(item) {
 			return item, true
 		}

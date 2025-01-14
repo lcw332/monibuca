@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"google.golang.org/protobuf/proto"
 
@@ -268,6 +271,7 @@ func (s *Server) Start() (err error) {
 		"/api/stream/annexb/{streamPath...}":  s.api_Stream_AnnexB_,
 		"/api/videotrack/sse/{streamPath...}": s.api_VideoTrack_SSE,
 		"/api/audiotrack/sse/{streamPath...}": s.api_AudioTrack_SSE,
+		"/annexb/{streamPath...}":             s.annexB,
 	})
 
 	if s.config.DSN != "" {
@@ -762,4 +766,42 @@ func (s *Server) AuthInterceptor() grpc.UnaryServerInterceptor {
 		newCtx := context.WithValue(ctx, "claims", claims)
 		return handler(newCtx, req)
 	}
+}
+
+func (s *Server) annexB(w http.ResponseWriter, r *http.Request) {
+	streamPath := r.PathValue("streamPath")
+
+	if r.URL.RawQuery != "" {
+		streamPath += "?" + r.URL.RawQuery
+	}
+	var conf = s.config.Subscribe
+	conf.SubType = SubscribeTypeServer
+	conf.SubAudio = false
+	suber, err := s.SubscribeWithConfig(r.Context(), streamPath, conf)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var conn net.Conn
+	conn, err = suber.CheckWebSocket(w, r)
+	if err != nil {
+		return
+	}
+	if conn == nil {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Transfer-Encoding", "identity")
+		w.WriteHeader(http.StatusOK)
+	}
+
+	PlayBlock(suber, func(frame *pkg.AVFrame) (err error) {
+		return nil
+	}, func(frame *pkg.AnnexB) (err error) {
+		if conn != nil {
+			return wsutil.WriteServerMessage(conn, ws.OpBinary, util.ConcatBuffers(frame.Memory.Buffers))
+		}
+		var buf net.Buffers
+		buf = append(buf, frame.Memory.Buffers...)
+		buf.WriteTo(w)
+		return nil
+	})
 }
