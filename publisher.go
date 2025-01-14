@@ -635,13 +635,15 @@ func (p *Publisher) Dispose() {
 
 func (p *Publisher) TransferSubscribers(newPublisher *Publisher) {
 	p.Info("transfer subscribers", "newPublisher", newPublisher.ID, "newStreamPath", newPublisher.StreamPath)
+	var remain SubscriberCollection
 	for subscriber := range p.SubscriberRange {
 		if subscriber.Type != SubscribeTypeServer {
-			continue
+			remain.Add(subscriber)
+		} else {
+			newPublisher.AddSubscriber(subscriber)
 		}
-		newPublisher.AddSubscriber(subscriber)
-		p.Subscribers.Remove(subscriber)
 	}
+	p.Subscribers = remain
 	p.BufferTime = p.Plugin.GetCommonConf().Publish.BufferTime
 	p.AudioTrack.SetMinBuffer(p.BufferTime)
 	p.VideoTrack.SetMinBuffer(p.BufferTime)

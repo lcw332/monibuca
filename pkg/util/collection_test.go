@@ -15,10 +15,8 @@ func (n *Class) GetKey() string {
 	return n.name
 }
 
-var cc Collection[string, *Class]
-
 func TestCollection(t *testing.T) {
-
+	var cc Collection[string, *Class]
 	for i := 0; i < 10; i++ {
 		cc.Add(&Class{name: fmt.Sprintf("%d", i), Id: i})
 	}
@@ -27,6 +25,17 @@ func TestCollection(t *testing.T) {
 		fmt.Println(item)
 	} else {
 		fmt.Println("not found", item)
+	}
+}
+
+func TestCollection_Range(t *testing.T) {
+	var cc Collection[string, *Class]
+	for i := 0; i < 10; i++ {
+		cc.Add(&Class{name: fmt.Sprintf("%d", i), Id: i})
+	}
+	for item := range cc.Range {
+		fmt.Println(item)
+		cc.Remove(item)
 	}
 }
 
