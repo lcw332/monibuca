@@ -99,21 +99,17 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				}
 				// 更新数据库中的别名
 				if s.DB != nil {
-					var dbAlias StreamAliasDB
-					s.DB.Where("alias = ?", req.Alias).First(&dbAlias)
-					dbAlias.StreamPath = req.StreamPath
-					dbAlias.AutoRemove = req.AutoRemove
-					s.DB.Save(&dbAlias)
+					s.DB.Model(&StreamAliasDB{}).Where("alias = ?", req.Alias).Updates(req)
 				}
 				s.Info("modify alias", "alias", req.Alias, "oldStreamPath", oldStreamPath, "streamPath", req.StreamPath, "replace", ok && canReplace)
 			} else { // create alias
-				aliasInfo := &AliasStream{
+				aliasInfo := AliasStream{
 					AutoRemove: req.AutoRemove,
 					StreamPath: req.StreamPath,
 					Alias:      req.Alias,
 				}
 				var pubId uint32
-				s.AliasStreams.Add(aliasInfo)
+				s.AliasStreams.Add(&aliasInfo)
 				aliasStream, ok := s.Streams.Get(aliasInfo.Alias)
 				if canReplace {
 					aliasInfo.Publisher = publisher
@@ -131,7 +127,7 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				// 保存到数据库
 				if s.DB != nil {
 					s.DB.Create(&StreamAliasDB{
-						AliasStream: *aliasInfo,
+						AliasStream: aliasInfo,
 					})
 				}
 				s.Info("add alias", "alias", req.Alias, "streamPath", req.StreamPath, "replace", ok && canReplace, "pub", pubId)
@@ -191,6 +187,9 @@ func (p *Publisher) processAliasOnDispose() {
 		if alias.StreamPath == p.StreamPath {
 			if alias.AutoRemove {
 				defer s.AliasStreams.Remove(alias)
+				if s.DB != nil {
+					defer s.DB.Where("alias = ?", alias.Alias).Delete(&StreamAliasDB{})
+				}
 			}
 			alias.Publisher = nil
 			relatedAlias = append(relatedAlias, alias)
@@ -227,10 +226,14 @@ func (s *Subscriber) processAliasOnStart() (hasInvited bool, done bool) {
 	} else {
 		for reg, alias := range server.StreamAlias {
 			if streamPath := reg.Replace(s.StreamPath, alias); streamPath != "" {
-				server.AliasStreams.Set(&AliasStream{
+				as := AliasStream{
 					StreamPath: streamPath,
 					Alias:      s.StreamPath,
-				})
+				}
+				server.AliasStreams.Set(&as)
+				if server.DB != nil {
+					server.DB.Where("alias = ?", s.StreamPath).Assign(as).FirstOrCreate(&StreamAliasDB{})
+				}
 				if publisher, ok := server.Streams.Get(streamPath); ok {
 					publisher.AddSubscriber(s)
 					done = true

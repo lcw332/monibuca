@@ -16,6 +16,8 @@ type ReadWriteSeekCloser interface {
 	io.Closer
 }
 
+type Object = map[string]any
+
 func Conditional[T any](cond bool, t, f T) T {
 	if cond {
 		return t
