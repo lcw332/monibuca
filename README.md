@@ -15,6 +15,8 @@
   <p align="center">
     A highly scalable high-performance streaming server development framework developed purely in Go
     <br />
+    <a href="./README_CN.md">中文文档</a>
+    ·
     <a href="https://github.com/Monibuca/v5/wiki"><strong>Explore the docs »</strong></a>
     <br />
     <br />
@@ -43,10 +45,27 @@
 
 Monibuca is a powerful streaming server framework written entirely in Go. It's designed to be:
 
-- 🚀 **High Performance** - Built for maximum efficiency and speed
-- 📦 **Modular** - Plugin-based architecture for easy extensibility
-- 🔧 **Flexible** - Highly configurable to meet various streaming needs
-- 💪 **Scalable** - Designed to handle large-scale deployments
+- 🚀 **High Performance** - Lock-free design, partial manual memory management, multi-core computing
+- ⚡ **Low Latency** - Zero-wait forwarding, sub-second latency across the entire chain
+- 📦 **Modular** - Load on demand, unlimited extensibility
+- 🔧 **Flexible** - Highly configurable to meet various streaming scenarios
+- 💪 **Scalable** - Supports distributed deployment, easily handles large-scale scenarios
+- 🔍 **Debug Friendly** - Built-in debug plugin, real-time performance monitoring and analysis
+- 🎥 **Media Processing** - Supports screenshot, transcoding, SEI data processing
+- 🔄 **Cluster Capability** - Built-in cascade and room management
+- 🎮 **Preview Features** - Supports video preview, multi-screen preview, custom screen layouts
+- 🔐 **Security** - Provides encrypted transmission and stream authentication
+- 📊 **Performance Monitoring** - Supports stress testing and performance metrics collection
+- 📝 **Log Management** - Log rotation, auto cleanup, custom extensions
+- 🎬 **Recording & Playback** - Supports MP4, HLS, FLV formats, speed control, seeking, pause
+- ⏱️ **Dynamic Time-Shift** - Dynamic cache design, supports live time-shift playback
+- 🌐 **Remote Call** - Supports gRPC interface for cross-language integration
+- 🏷️ **Stream Alias** - Supports dynamic stream alias, flexible multi-stream management
+- 🤖 **AI Capabilities** - Integrated inference engine, ONNX model support, custom pre/post processing
+- 🪝 **WebHook** - Subscribe to stream lifecycle events for business system integration
+- 🔒 **Private Protocol** - Supports custom private protocols for special business needs
+
+- 🔄 **Supported Protocols**: RTMP, RTSP, HTTP-FLV, WS-FLV, HLS, WebRTC, GB28181, ONVIF, SRT
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -54,41 +73,27 @@ Monibuca is a powerful streaming server framework written entirely in Go. It's d
 
 ### Prerequisites
 
-- Go 1.18 or higher
+- Go 1.23 or higher
 - Basic understanding of streaming protocols
 
-### Installation
+### Run with Default Configuration
 
-1. Create a new Go project
-2. Add Monibuca as a dependency:
-   ```sh
-   go get m7s.live/v5
-   ```
+```bash
+cd example/default
+go run -tags sqlite main.go
+```
+
+### Web UI
+
+Place the `admin.zip` file (do not unzip) in the same directory as your configuration file.
+
+Then visit http://localhost:8080 to access the UI.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Usage
+## Examples
 
-Here's a basic example to get you started:
-
-```go
-package main
-
-import (
-	"context"
-
-	"m7s.live/v5"
-	_ "m7s.live/v5/plugin/debug"
-	_ "m7s.live/v5/plugin/flv"
-	_ "m7s.live/v5/plugin/rtmp"
-)
-
-func main() {
-	m7s.Run(context.Background(), "config.yaml")
-}
-```
-
-For more examples, check out the [example directory](./example).
+For more examples, please check out the [example](./example) documentation.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -146,14 +151,24 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- CONTACT -->
+## Contact
+
+monibuca - [@m7server](https://x.com/m7server) - service@monibuca.com
+
+Project Link: [https://github.com/langhuihui/monibuca](https://github.com/langhuihui/monibuca)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 <!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/Monibuca/v5.svg?style=for-the-badge
-[contributors-url]: https://github.com/Monibuca/v5/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/Monibuca/v5.svg?style=for-the-badge
-[forks-url]: https://github.com/Monibuca/v5/network/members
-[stars-shield]: https://img.shields.io/github/stars/Monibuca/v5.svg?style=for-the-badge
-[stars-url]: https://github.com/Monibuca/v5/stargazers
-[issues-shield]: https://img.shields.io/github/issues/Monibuca/v5.svg?style=for-the-badge
-[issues-url]: https://github.com/Monibuca/v5/issues
-[license-shield]: https://img.shields.io/github/license/Monibuca/v5.svg?style=for-the-badge
-[license-url]: https://github.com/Monibuca/v5/blob/master/LICENSE
+[contributors-shield]: https://img.shields.io/github/contributors/langhuihui/monibuca.svg?style=for-the-badge
+[contributors-url]: https://github.com/langhuihui/monibuca/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/langhuihui/monibuca.svg?style=for-the-badge
+[forks-url]: https://github.com/langhuihui/monibuca/network/members
+[stars-shield]: https://img.shields.io/github/stars/langhuihui/monibuca.svg?style=for-the-badge
+[stars-url]: https://github.com/langhuihui/monibuca/stargazers
+[issues-shield]: https://img.shields.io/github/issues/langhuihui/monibuca.svg?style=for-the-badge
+[issues-url]: https://github.com/langhuihui/monibuca/issues
+[license-shield]: https://img.shields.io/github/license/langhuihui/monibuca.svg?style=for-the-badge
+[license-url]: https://github.com/langhuihui/monibuca/blob/v5/LICENSE
