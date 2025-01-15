@@ -707,11 +707,17 @@ func (p *Publisher) NoAudio() {
 }
 
 func (p *Publisher) Pause() {
+	if p.Paused != nil {
+		return
+	}
 	p.Paused = util.NewPromise(p)
 	p.pauseTime = time.Now()
 }
 
 func (p *Publisher) Resume() {
+	if p.Paused == nil {
+		return
+	}
 	p.Paused.Resolve()
 	p.Paused = nil
 	p.VideoTrack.pausedTime += time.Since(p.pauseTime)

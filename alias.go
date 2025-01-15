@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
-	"gorm.io/gorm"
 	"m7s.live/v5/pb"
 )
 
@@ -25,9 +24,8 @@ func (a *AliasStream) GetKey() string {
 // StreamAliasDB 用于存储流别名的数据库模型
 type StreamAliasDB struct {
 	AliasStream
-	CreatedAt time.Time      `yaml:"-"`
-	UpdatedAt time.Time      `yaml:"-"`
-	DeletedAt gorm.DeletedAt `yaml:"-"`
+	CreatedAt time.Time `yaml:"-"`
+	UpdatedAt time.Time `yaml:"-"`
 }
 
 func (StreamAliasDB) TableName() string {
@@ -99,7 +97,9 @@ func (s *Server) SetStreamAlias(ctx context.Context, req *pb.SetStreamAliasReque
 				}
 				// 更新数据库中的别名
 				if s.DB != nil {
-					s.DB.Model(&StreamAliasDB{}).Where("alias = ?", req.Alias).Updates(req)
+					s.DB.Where("alias = ?", req.Alias).Assign(aliasInfo).FirstOrCreate(&StreamAliasDB{
+						AliasStream: *aliasInfo,
+					})
 				}
 				s.Info("modify alias", "alias", req.Alias, "oldStreamPath", oldStreamPath, "streamPath", req.StreamPath, "replace", ok && canReplace)
 			} else { // create alias
@@ -232,7 +232,9 @@ func (s *Subscriber) processAliasOnStart() (hasInvited bool, done bool) {
 				}
 				server.AliasStreams.Set(&as)
 				if server.DB != nil {
-					server.DB.Where("alias = ?", s.StreamPath).Assign(as).FirstOrCreate(&StreamAliasDB{})
+					server.DB.Where("alias = ?", s.StreamPath).Assign(as).FirstOrCreate(&StreamAliasDB{
+						AliasStream: as,
+					})
 				}
 				if publisher, ok := server.Streams.Get(streamPath); ok {
 					publisher.AddSubscriber(s)
