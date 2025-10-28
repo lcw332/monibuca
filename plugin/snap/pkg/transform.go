@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image/color"
+	"m7s.live/v5/plugin/snap/pkg/compress"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -79,6 +80,7 @@ func saveSnapshot(annexb []*format.AnnexB, savePath string, plugin *m7s.Plugin, 
 			return err
 		}
 	} else {
+		// 未添加水印，保存原图
 		err := os.WriteFile(savePath, buf.Bytes(), 0644)
 		if err != nil {
 			return err
@@ -115,6 +117,13 @@ type SnapConfig struct {
 		OffsetX     int     `json:"offsetX" default:"0" desc:"水印位置X"`
 		OffsetY     int     `json:"offsetY" default:"0" desc:"水印位置Y"`
 	} `json:"watermark" desc:"水印配置"`
+	ImgCompress struct {
+		Enable     bool                    `json:"enable" default:"false" desc:"是否启用图片压缩"`
+		SaveOrigin bool                    `json:"saveOrigin" default:"true" desc:"是否保存原图"`
+		Resolution string                  `json:"resolution" desc:"图片分辨率, 1920:1080"`
+		Quality    int                     `json:"quality" default:"2" desc:"图片质量, 范围1~31"`
+		Method     compress.CompressMethod `json:"method" default:"letterbox" desc:"压缩方法"`
+	} `json:"imgCompress" desc:"图片压缩配置"`
 }
 
 // SnapTask 基础截图任务结构
@@ -149,6 +158,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, snapMode int) error {
 			return err
 		}
 	} else {
+		// 未配置水印，保存原图
 		err := os.WriteFile(savePath, buf.Bytes(), 0644)
 		if err != nil {
 			return err
@@ -189,7 +199,7 @@ func (t *TimeSnapTask) Tick(any) {
 		t.Error("get video frame failed", "error", err.Error())
 		return
 	}
-
+	// 定时截图
 	if err := t.saveSnap(annexb, SnapModeTimeInterval); err != nil {
 		t.Error("save snapshot failed", "error", err.Error())
 	}
@@ -212,9 +222,12 @@ func (t *IFrameSnapTask) Start() (err error) {
 
 func (t *IFrameSnapTask) Go() (err error) {
 	iframeCount := 0
+	// go 函数为任务生命周期开始，设置回调函数
 	err = m7s.PlayBlock(t.subscriber, (func(audio *pkg.AVFrame) error)(nil), func(video *format.AnnexB) error {
 		iframeCount++
+		// 当前帧为配置中的关键帧间隔
 		if iframeCount%t.config.IFrameInterval == 0 {
+			// 保存截图
 			if err := t.saveSnap([]*format.AnnexB{video}, SnapModeIFrameInterval); err != nil {
 				t.Error("save snapshot failed", "error", err.Error())
 			}
