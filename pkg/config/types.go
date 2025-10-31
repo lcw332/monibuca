@@ -35,6 +35,7 @@ const (
 	HookOnTransformEnd    HookType = "transform_end"
 	HookOnSystemStart     HookType = "system_start"
 	HookDefault           HookType = "default"
+	HookOnDetection       HookType = "detection"
 
 	EventLevelLow  EventLevel = "low"
 	EventLevelHigh EventLevel = "high"
