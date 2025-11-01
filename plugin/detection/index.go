@@ -31,8 +31,9 @@ type DetectionPlugin struct {
 
 // Start 插件初始化
 func (p *DetectionPlugin) Start() (err error) {
+	// 数据库初始化
 	if p.DB != nil {
-		// TODO: 从 DB 中创建配置
+		err = p.DB.AutoMigrate(&detection.DetectionConfig{})
 	}
 
 	// 创建对象存储

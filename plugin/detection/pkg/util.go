@@ -1,12 +1,15 @@
 package pkg
 
 import (
+	"fmt"
+	"io"
 	"m7s.live/v5"
 	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/format"
+	"os/exec"
 )
 
-// 获取视频帧
+// GetVideoFrame 获取当前视频帧
 func GetVideoFrame(publisher *m7s.Publisher, server *m7s.Server) ([]*format.AnnexB, error) {
 	if publisher.VideoTrack.AVTrack == nil {
 		return nil, pkg.ErrNotFound
@@ -36,4 +39,59 @@ func GetVideoFrame(publisher *m7s.Publisher, server *m7s.Server) ([]*format.Anne
 		annexbList = append(annexbList, &annexb)
 	}
 	return annexbList, nil
+}
+
+// SnapFrameToBase64WithFFmpeg 使用FFmpeg将视频帧处理为Base64编码的图片
+func SnapFrameToBase64WithFFmpeg(annexb *format.AnnexB, output io.Writer) (string, error) {
+	return "nil", nil
+}
+
+// SnapFrameWithFFmpeg 使用 FFmpeg 处理视频帧并生成截图
+func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer) error {
+	// 创建ffmpeg命令，使用select过滤器选择最后一帧
+	cmd := exec.Command(
+		"ffmpeg",
+		"-hide_banner",
+		"-i",
+		"pipe:0",
+		"-vf",
+		fmt.Sprintf("select='eq(n,%d)'", len(annexb)-1),
+		"-vframes",
+		"1",
+		"-f",
+		"mjpeg",
+		"pipe:1",
+	)
+
+	// 获取输入和输出pipe
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	// 启动ffmpeg进程
+	if err = cmd.Start(); err != nil {
+		return err
+	}
+
+	// 将annexb数据写入到ffmpeg的stdin
+	for _, annex := range annexb {
+		if _, err = annex.WriteTo(stdin); err != nil {
+			stdin.Close()
+			return err
+		}
+	}
+	stdin.Close()
+
+	// 从ffmpeg的stdout读取图片数据并写入到输出
+	if _, err = io.Copy(output, stdout); err != nil {
+		return err
+	}
+
+	// 等待ffmpeg进程结束
+	return cmd.Wait()
 }
