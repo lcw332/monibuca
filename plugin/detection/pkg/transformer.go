@@ -1,11 +1,16 @@
 package detection
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	task "github.com/langhuihui/gotask"
 	"m7s.live/v5"
+	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/config"
+	"m7s.live/v5/pkg/format"
+	"m7s.live/v5/pkg/storage"
 )
 
 type SnapMode int
@@ -70,8 +75,9 @@ type Transformer struct {
 }
 
 type SnapTask struct {
-	job    *m7s.TransformJob
-	config SnapConfig
+	job       *m7s.TransformJob
+	ossPlugin storage.Storage
+	config    SnapConfig
 }
 
 type AlgTask struct {
@@ -90,9 +96,9 @@ func NewTransform() m7s.ITransformer {
 func (t *Transformer) Start() error {
 	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
-		//var task task.ITask
+		var task task.ITask
 		var snapConfig SnapConfig
-		t.Logger.Info("output.Conf", output.Conf)
+
 		if output.Conf != nil {
 			switch v := output.Conf.(type) {
 			case SnapConfig:
@@ -100,6 +106,32 @@ func (t *Transformer) Start() error {
 			case map[string]any:
 				config.Parse(&snapConfig, v)
 			}
+		}
+
+		switch snapConfig.SnapMode {
+		case SnapModeTimeInterval:
+			// 时间间隔模式截图逻辑
+			timeTask := &TimeSnapTask{
+				SnapTask: SnapTask{
+					config: snapConfig,
+					job:    &t.TransformJob,
+				},
+			}
+			task = timeTask
+		case SnapModeIFrameInterval:
+			// 关键帧间隔模式截图逻辑
+			iframeTask := &IFrameSnapTask{
+				SnapTask: SnapTask{
+					config: snapConfig,
+					job:    &t.TransformJob,
+				},
+			}
+			task = iframeTask
+		case SnapModeManual:
+			// 手动触发模式截图逻辑
+		}
+		if task != nil {
+			t.AddTask(task)
 		}
 	}
 	return nil
@@ -121,6 +153,24 @@ func (t *IFrameSnapTask) Start() (err error) {
 	return
 }
 
+// Go #TaskRunner 帧间隔截图任务执行逻辑
+func (t *IFrameSnapTask) Go() (err error) {
+	iframeCount := 0
+	err = m7s.PlayBlock(t.subscriber, (func(audio *pkg.AVFrame) error)(nil), func(video *format.AnnexB) error {
+		iframeCount++
+		if iframeCount%t.config.IFrameInterval == 0 {
+			if err := t.saveSnap([]*format.AnnexB{video}, SnapModeIFrameInterval); err != nil {
+				t.Error("save snapshot failed", "error", err.Error())
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error("iframe interval snap error", "error", err.Error())
+	}
+	return
+}
+
 // TimeSnapTask #ITask 定时截图任务
 type TimeSnapTask struct {
 	task.TickTask
@@ -135,13 +185,31 @@ func (t *TimeSnapTask) GetTickInterval() time.Duration {
 // Tick #TaskTicker 定时截图任务执行逻辑
 func (t *TimeSnapTask) Tick(any) {
 	// 获取视频帧
-	//annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
-	//if err != nil {
-	//	t.Error("get video frame failed", "error", err.Error())
-	//	return
-	//}
+	annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
+	if err != nil {
+		t.Error("get video frame failed", "error", err.Error())
+		return
+	}
 
-	//if err := t.saveSnap(annexb, SnapModeTimeInterval); err != nil {
-	//	t.Error("save snapshot failed", "error", err.Error())
-	//}
+	if err := t.saveSnap(annexb, SnapModeTimeInterval); err != nil {
+		t.Error("save snapshot failed", "error", err.Error())
+	}
+}
+
+// saveSnap 保存截图，核心实现逻辑
+func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
+	// 生成文件名
+	now := time.Now()
+	filename := fmt.Sprintf("%s_%s.jpg", t.job.StreamPath, now.Format("20060102150405.000"))
+	filename = strings.ReplaceAll(filename, "/", "_")
+	//savePath := filepath.Join(t.config.SavePath, filename)
+	ossConfig := t.job.Plugin.Config.Get("Oss")
+	if ossConfig != nil && ossConfig.File == true {
+		t.ossPlugin, err = storage.CreateStorage("s3", ossConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

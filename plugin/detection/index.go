@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"m7s.live/v5"
-	"m7s.live/v5/pkg/storage"
 	detection "m7s.live/v5/plugin/detection/pkg"
 )
 
@@ -24,7 +23,6 @@ type (
 		Threshold    float64   `default:"0.5" desc:"全局阈值"`
 		Oss          Oss       `default:"{}" desc:"对象存储公共配置"`
 		AlgorithmMap Algorithm `default:"{}" desc:"算法映射配置"`
-		ossPlugin    storage.Storage
 	}
 
 	Oss struct {
@@ -58,24 +56,5 @@ func (p *DetectionPlugin) Start() (err error) {
 			return err
 		}
 	}
-	// 创建对象存储
-	if p.Oss.Enable {
-		s3Config := map[string]interface{}{
-			"endpoint":        p.Oss.Endpoint,
-			"region":          p.Oss.Region,
-			"accessKeyID":     p.Oss.AccessKeyID,
-			"secretAccessKey": p.Oss.SecretAccessKey,
-			"bucket":          p.Oss.Bucket,
-			"pathPrefix":      p.Oss.PathPrefix,
-			"forcePathStyle":  p.Oss.ForcePathStyle,
-			"useSSL":          p.Oss.UseSSL,
-			"timeout":         p.Oss.Timeout,
-		}
-		p.ossPlugin, err = storage.CreateStorage("s3", s3Config)
-		if err != nil {
-			return err
-		}
-	}
-
 	return
 }
