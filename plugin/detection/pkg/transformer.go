@@ -1,4 +1,4 @@
-package pkg
+package detection
 
 import (
 	"time"
@@ -17,18 +17,21 @@ type (
 		AlgorithmAPI   AlgorithmAPI  `default:"{}" desc:"算法API配置"`
 		SnapCompress   SnapCompress  `default:"{}" desc:"图片压缩配置"`
 		Watermark      Watermark     `default:"{}" desc:"水印配置"`
+		MaxSnapshots   int           `default:"100" desc:"最大保存截图数量"`
+		ImageQuality   int           `default:"90" desc:"截图质量(1-100)"`
 	}
 
 	AlgorithmAPI struct {
-		Enable        bool          `default:"false" desc:"是否启用算法分析"`
-		Url           string        `default:"" desc:"算法服务地址"`
-		Method        string        `default:"POST" desc:"算法服务请求方式"`
-		Timeout       time.Duration `default:"30s" desc:"请求超时时间"`
-		ApiKey        string        `default:"" desc:"认证密钥"`
-		RetryCount    int           `default:"3" desc:"失败重试次数"`
-		RetryInterval time.Duration `default:"5s" desc:"重试间隔"`
-		AsyncMode     bool          `default:"true" desc:"是否异步调用"`
-		CallbackURL   string        `default:"" desc:"回调地址"`
+		Enable        bool              `default:"false" desc:"是否启用算法分析"`
+		Url           string            `default:"" desc:"算法服务地址"`
+		Method        string            `default:"POST" desc:"算法服务请求方式"`
+		Headers       map[string]string `default:"{}" desc:"自定义请求头"`
+		Timeout       time.Duration     `default:"30s" desc:"请求超时时间"`
+		ApiKey        string            `default:"" desc:"认证密钥"`
+		RetryCount    int               `default:"3" desc:"失败重试次数"`
+		RetryInterval time.Duration     `default:"5s" desc:"重试间隔"`
+		AsyncMode     bool              `default:"true" desc:"是否异步调用"`
+		CallbackURL   string            `default:"" desc:"回调地址"`
 	}
 
 	SnapCompress struct {
@@ -38,6 +41,8 @@ type (
 		Mode         string  `default:"none" desc:"图片裁剪模式: none,letterbox、cover、contain等"`
 		ResizeWidth  int     `default:"1920" desc:"图片裁剪宽度"`
 		ResizeHeight int     `default:"1080" desc:"图片裁剪高度"`
+		TargetWidth  int     `default:"0" desc:"目标宽度(0表示不调整)"`
+		TargetHeight int     `default:"0" desc:"目标高度(0表示不调整)"`
 	}
 
 	Watermark struct {
@@ -49,6 +54,8 @@ type (
 		FontSpacing float64 `default:"2" desc:"水印字体间距"`
 		OffsetX     int     `default:"0" desc:"水印位置X"`
 		OffsetY     int     `default:"0" desc:"水印位置Y"`
+		Position    string  `default:"bottom-right" desc:"水印位置: top-left,top-right,bottom-left,bottom-right,center"`
+		Opacity     float64 `default:"1.0" desc:"水印透明度(0-1)"`
 	}
 )
 

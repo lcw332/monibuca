@@ -1,4 +1,4 @@
-package pkg
+package detection
 
 import (
 	"bytes"
@@ -38,30 +38,52 @@ var AlgorithmMap = map[int]string{
 
 // DetectionRequest 定义请求结构体
 type DetectionRequest struct {
-	AlgorithmID   int     `json:"algorithm_id"`
-	Image         string  `json:"image"`
-	ConfThreshold float64 `json:"conf_threshold,omitempty"`
+	AlgorithmID   int                    `json:"algorithm_id"`
+	Image         string                 `json:"image"`
+	ConfThreshold float64                `json:"conf_threshold,omitempty"`
+	CustomParams  map[string]interface{} `json:"custom_params,omitempty"`
+	StreamID      string                 `json:"stream_id,omitempty"`
+	RequestID     string                 `json:"request_id,omitempty"`
+	Timestamp     int64                  `json:"timestamp,omitempty"`
 }
 
 // DetectionResult 定义检测结果结构
 type DetectionResult struct {
-	ClassID    int       `json:"class_id"`
-	ClassName  string    `json:"class_name"`
-	Confidence float64   `json:"confidence"`
-	BBox       []float64 `json:"bbox"`
+	ClassID     int       `json:"class_id"`
+	ClassName   string    `json:"class_name"`
+	Confidence  float64   `json:"confidence"`
+	BBox        []float64 `json:"bbox"`
+	Mask        string    `json:"mask,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Severity    string    `json:"severity,omitempty"`
 }
 
 // DetectionResponse 定义响应结构体
 type DetectionResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
+	Code      int    `json:"code"`
+	Message   string `json:"message"`
+	RequestID string `json:"request_id,omitempty"`
+	Data      struct {
 		AlgorithmID   int               `json:"algorithm_id"`
 		AlgorithmName string            `json:"algorithm_name"`
 		Detections    []DetectionResult `json:"detections"`
 		TotalCount    int               `json:"total_count"`
 		DetectTime    float64           `json:"detect_time"`
+		ProcessedAt   int64             `json:"processed_at"`
 	} `json:"data"`
+}
+
+// BatchDetectionRequest 批量检测请求
+type BatchDetectionRequest struct {
+	Requests []DetectionRequest `json:"requests"`
+}
+
+// BatchDetectionResponse 批量检测响应
+type BatchDetectionResponse struct {
+	Code      int                 `json:"code"`
+	Message   string              `json:"message"`
+	RequestID string              `json:"request_id,omitempty"`
+	Data      []DetectionResponse `json:"data"`
 }
 
 // DetectionClient 封装检测客户端
@@ -98,7 +120,12 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 
 	// 设置请求头
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-API-Key", c.APIKey)
+	if c.APIKey != "" {
+		httpReq.Header.Set("X-API-Key", c.APIKey)
+	}
+
+	// 添加自定义请求头
+	// 这里可以扩展支持从配置中读取自定义请求头
 
 	// 发送请求
 	resp, err := c.HTTPClient.Do(httpReq)
@@ -120,6 +147,52 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 	}
 
 	return &detectionResp, nil
+}
+
+// BatchDetect 发送批量检测请求
+func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
+	batchReq := BatchDetectionRequest{
+		Requests: reqs,
+	}
+
+	// 序列化请求体
+	body, err := json.Marshal(batchReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch request: %v", err)
+	}
+
+	// 创建HTTP请求
+	httpReq, err := http.NewRequest("POST", c.BaseURL+"/api/v1/batch_detect", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create batch request: %v", err)
+	}
+
+	// 设置请求头
+	httpReq.Header.Set("Content-Type", "application/json")
+	if c.APIKey != "" {
+		httpReq.Header.Set("X-API-Key", c.APIKey)
+	}
+
+	// 发送请求
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send batch request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read batch response body: %v", err)
+	}
+
+	// 解析响应
+	var batchResp BatchDetectionResponse
+	if err := json.Unmarshal(respBody, &batchResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch response: %v", err)
+	}
+
+	return &batchResp, nil
 }
 
 // ImageToBase64 将图片文件转换为base64编码（无前缀）

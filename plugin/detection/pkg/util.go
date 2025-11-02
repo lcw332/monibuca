@@ -1,12 +1,13 @@
-package pkg
+package detection
 
 import (
 	"fmt"
 	"io"
+	"os/exec"
+
 	"m7s.live/v5"
 	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/format"
-	"os/exec"
 )
 
 // GetVideoFrame 获取当前视频帧
