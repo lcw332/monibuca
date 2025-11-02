@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os/exec"
@@ -43,8 +44,8 @@ func GetVideoFrame(publisher *m7s.Publisher, server *m7s.Server) ([]*format.Anne
 }
 
 // SnapFrameToBase64WithFFmpeg 使用FFmpeg将视频帧处理为Base64编码的图片
-func SnapFrameToBase64WithFFmpeg(annexb *format.AnnexB, output io.Writer) (string, error) {
-	return "nil", nil
+func SnapFrameToBase64WithFFmpeg(buf []byte) string {
+	return base64.StdEncoding.EncodeToString(buf)
 }
 
 // SnapFrameWithFFmpeg 使用 FFmpeg 处理视频帧并生成截图

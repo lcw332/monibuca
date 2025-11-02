@@ -2,17 +2,17 @@ package detection
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"time"
 )
 
 // AlgorithmMap 定义算法映射关系
-var AlgorithmMap = map[int]string{
+type AlgorithmId map[int]string
+
+var AlgorithmMap = AlgorithmId{
 	1:  "松线虫害识别",
 	2:  "河道淤积识别",
 	3:  "漂浮物识别",
@@ -38,13 +38,9 @@ var AlgorithmMap = map[int]string{
 
 // DetectionRequest 定义请求结构体
 type DetectionRequest struct {
-	AlgorithmID   int                    `json:"algorithm_id"`
-	Image         string                 `json:"image"`
-	ConfThreshold float64                `json:"conf_threshold,omitempty"`
-	CustomParams  map[string]interface{} `json:"custom_params,omitempty"`
-	StreamID      string                 `json:"stream_id,omitempty"`
-	RequestID     string                 `json:"request_id,omitempty"`
-	Timestamp     int64                  `json:"timestamp,omitempty"`
+	AlgorithmID   int     `json:"algorithm_id"`
+	Image         string  `json:"image"`
+	ConfThreshold float64 `json:"conf_threshold,omitempty"`
 }
 
 // DetectionResult 定义检测结果结构
@@ -69,8 +65,26 @@ type DetectionResponse struct {
 		Detections    []DetectionResult `json:"detections"`
 		TotalCount    int               `json:"total_count"`
 		DetectTime    float64           `json:"detect_time"`
-		ProcessedAt   int64             `json:"processed_at"`
 	} `json:"data"`
+}
+
+// CallbackDetection 回调结构体
+type CallbackDetection struct {
+	Event      string `json:"event"`
+	StreamPath string `json:"streamPath"`
+	Args       struct {
+		AccessUrl     string            `json:"access_url" desc:"对象存储访问链接"`
+		AlgorithmID   int               `json:"algorithm_id"`
+		AlgorithmName string            `json:"algorithm_name"`
+		Detections    []DetectionResult `json:"detections"`
+		TotalCount    int               `json:"total_count"`
+		DetectTime    float64           `json:"detect_time"`
+	} `json:"args"`
+	PublishId  uint32 `json:"publishId"`
+	RemoteAddr string `json:"remoteAddr"`
+	Type       string `json:"type"`
+	PluginName string `json:"pluginName"`
+	Timestamp  int    `json:"timestamp"`
 }
 
 // BatchDetectionRequest 批量检测请求
@@ -88,16 +102,18 @@ type BatchDetectionResponse struct {
 
 // DetectionClient 封装检测客户端
 type DetectionClient struct {
-	BaseURL    string
+	URL        string
+	Method     string
 	APIKey     string
 	HTTPClient *http.Client
 }
 
 // NewDetectionClient 创建新的检测客户端
-func NewDetectionClient(baseURL, apiKey string) *DetectionClient {
+func NewDetectionClient(URL, Method, apiKey string) *DetectionClient {
 	return &DetectionClient{
-		BaseURL: baseURL,
-		APIKey:  apiKey,
+		URL:    URL,
+		Method: Method,
+		APIKey: apiKey,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -113,7 +129,7 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 	}
 
 	// 创建HTTP请求
-	httpReq, err := http.NewRequest("POST", c.BaseURL+"/api/v1/detect", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequest(c.Method, c.URL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -162,7 +178,7 @@ func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionR
 	}
 
 	// 创建HTTP请求
-	httpReq, err := http.NewRequest("POST", c.BaseURL+"/api/v1/batch_detect", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequest(c.Method, c.URL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create batch request: %v", err)
 	}
@@ -195,31 +211,27 @@ func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionR
 	return &batchResp, nil
 }
 
-// ImageToBase64 将图片文件转换为base64编码（无前缀）
-func ImageToBase64(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+// IsSuccess 判断响应是否成功
+func (resp *DetectionResponse) IsSuccess() bool {
+	return resp.Code == 200
+}
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return "", err
-	}
-
-	// 检查文件大小
-	if fileInfo.Size() > 2*1024*1024 { // 2MB
-		return "", fmt.Errorf("image file too large: %d bytes", fileInfo.Size())
-	}
-
-	// 读取文件内容
-	fileBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return "", err
+// ToCallback converts a DetectionResponse to a CallbackDetection
+func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName string, publishId uint32) *CallbackDetection {
+	callback := &CallbackDetection{
+		Event:      "detection",
+		StreamPath: streamPath,
+		PublishId:  publishId,
+		RemoteAddr: remoteAddr,
+		Type:       "detection",
+		PluginName: pluginName,
+		Timestamp:  int(time.Now().Unix()),
 	}
 
-	// 转换为base64
-	encoded := base64.StdEncoding.EncodeToString(fileBytes)
-	return encoded, nil
+	callback.Args.AlgorithmID = resp.Data.AlgorithmID
+	callback.Args.AlgorithmName = resp.Data.AlgorithmName
+	callback.Args.Detections = resp.Data.Detections
+	callback.Args.TotalCount = resp.Data.TotalCount
+	callback.Args.DetectTime = resp.Data.DetectTime
+	return callback
 }

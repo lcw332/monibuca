@@ -1,7 +1,11 @@
 package detection
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,9 +28,9 @@ const (
 type (
 	SnapConfig struct {
 		SnapshotFormat string        `desc:"截图文件格式(jpg/png)"`
-		SnapMode       SnapMode      `desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
-		TimeInterval   time.Duration `desc:"截图时间间隔, 仅在SnapMode为0时生效"`
-		IFrameInterval int           `desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+		SnapMode       SnapMode      `default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+		TimeInterval   time.Duration `default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
+		IFrameInterval int           `default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `desc:"截图保存路径"`
 		AlgorithmAPI   AlgorithmAPI  `default:"{}" desc:"算法API配置"`
 		SnapCompress   SnapCompress  `default:"{}" desc:"图片压缩配置"`
@@ -93,21 +97,24 @@ func NewTransform() m7s.ITransformer {
 }
 
 // Start #TaskStarter 启动一个定时任务
-func (t *Transformer) Start() error {
+func (t *Transformer) Start() (err error) {
 	// 为每个输出配置创建一个截图任务
+	// 创建一个公共的 OssPlugin
+
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
 		var snapConfig SnapConfig
 
-		if output.Conf != nil {
-			switch v := output.Conf.(type) {
+		outputConf := output.Conf
+		if outputConf != nil {
+			switch v := outputConf.(type) {
 			case SnapConfig:
 				snapConfig = v
 			case map[string]any:
 				config.Parse(&snapConfig, v)
 			}
 		}
-
+		// TODO: 水印配置
 		switch snapConfig.SnapMode {
 		case SnapModeTimeInterval:
 			// 时间间隔模式截图逻辑
@@ -200,7 +207,7 @@ func (t *TimeSnapTask) Tick(any) {
 func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
 	// 生成文件名
 	now := time.Now()
-	filename := fmt.Sprintf("%s_%s.jpg", t.job.StreamPath, now.Format("20060102150405.000"))
+	filename := fmt.Sprintf("%s_%s.%s", t.job.StreamPath, now.Format("20060102150405.000"), t.config.SnapshotFormat)
 	filename = strings.ReplaceAll(filename, "/", "_")
 	//savePath := filepath.Join(t.config.SavePath, filename)
 	ossConfig := t.job.Plugin.Config.Get("Oss")
@@ -208,6 +215,46 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		t.ossPlugin, err = storage.CreateStorage("s3", ossConfig)
 		if err != nil {
 			return err
+		}
+	}
+
+	// 处理视频帧
+	var buf bytes.Buffer
+	if err := SnapFrameWithFFmpeg(annexb, &buf); err != nil {
+		return fmt.Errorf("process with ffmpeg error: %w", err)
+	}
+
+	// 请求yolo算法接口，获取检测结果，然后hook到指定url
+	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
+
+		detectClient := NewDetectionClient(
+			t.config.AlgorithmAPI.Url,
+			t.config.AlgorithmAPI.Method,
+			t.config.AlgorithmAPI.ApiKey,
+		)
+		result, err := detectClient.Detect(DetectionRequest{
+			AlgorithmID:   1,
+			Image:         SnapFrameToBase64WithFFmpeg(buf.Bytes()),
+			ConfThreshold: 0.5,
+		})
+		if err != nil {
+			return err
+		}
+		if result.IsSuccess() == false {
+			return fmt.Errorf("请求算法接口异常")
+		}
+		// Todo: 将检测成功的结果保存到 对象存储中去
+		file, err := t.ossPlugin.CreateFile(context.Background(), filename)
+		file.Write(buf.Bytes())
+		file.Close()
+
+		callbackEntity := result.ToCallback(t.job.StreamPath, "", "detection", 0)
+		if t.config.AlgorithmAPI.CallbackURL != "" {
+			jsonData, _ := json.Marshal(callbackEntity)
+			_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
+			if err != nil {
+				return fmt.Errorf("callback error")
+			}
 		}
 	}
 
