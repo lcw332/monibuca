@@ -5,12 +5,21 @@ import (
 
 	task "github.com/langhuihui/gotask"
 	"m7s.live/v5"
+	"m7s.live/v5/pkg/config"
+)
+
+type SnapMode int
+
+const (
+	SnapModeTimeInterval SnapMode = iota
+	SnapModeIFrameInterval
+	SnapModeManual
 )
 
 type (
 	SnapConfig struct {
 		SnapshotFormat string        `desc:"截图文件格式(jpg/png)"`
-		SnapMode       string        `desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+		SnapMode       SnapMode      `desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
 		TimeInterval   time.Duration `desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 		IFrameInterval int           `desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `desc:"截图保存路径"`
@@ -61,7 +70,8 @@ type Transformer struct {
 }
 
 type SnapTask struct {
-	job *m7s.TransformJob
+	job    *m7s.TransformJob
+	config SnapConfig
 }
 
 type AlgTask struct {
@@ -76,30 +86,62 @@ func NewTransform() m7s.ITransformer {
 	return &Transformer{}
 }
 
-// Tick #IChannelTask 定时任务执行逻辑
-func (t *Transformer) Tick(a any) {
-	//annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
-
-	panic("implement me")
-}
-
-func (t *Transformer) GetTickInterval() time.Duration {
-	//TODO implement me
-	// 定时的interval
-	panic("implement me")
-}
-
-func (t *Transformer) GetTicker() *time.Ticker {
-	//TODO implement me
-	panic("implement me")
-}
-
 // Start #TaskStarter 启动一个定时任务
 func (t *Transformer) Start() error {
 	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
-		t.Logger.Info("output.StreamPath", output.StreamPath)
+		//var task task.ITask
+		var snapConfig SnapConfig
+		t.Logger.Info("output.Conf", output.Conf)
+		if output.Conf != nil {
+			switch v := output.Conf.(type) {
+			case SnapConfig:
+				snapConfig = v
+			case map[string]any:
+				config.Parse(&snapConfig, v)
+			}
+		}
 	}
 	return nil
+}
 
+// IFrameSnapTask #ITask 帧间隔截图任务
+type IFrameSnapTask struct {
+	task.Task
+	SnapTask
+	subscriber *m7s.Subscriber
+}
+
+// Start #TaskStarter 启动一个帧间隔截图任务
+func (t *IFrameSnapTask) Start() (err error) {
+	subConfig := t.job.Plugin.GetCommonConf().Subscribe
+	subConfig.SubType = m7s.SubscribeTypeTransform
+	subConfig.IFrameOnly = true
+	t.subscriber, err = t.job.Plugin.SubscribeWithConfig(t, t.job.StreamPath, subConfig)
+	return
+}
+
+// TimeSnapTask #ITask 定时截图任务
+type TimeSnapTask struct {
+	task.TickTask
+	SnapTask
+}
+
+// GetTickInterval #TaskTicker 获取定时截图间隔
+func (t *TimeSnapTask) GetTickInterval() time.Duration {
+	return t.config.TimeInterval
+}
+
+// Tick #TaskTicker 定时截图任务执行逻辑
+func (t *TimeSnapTask) Tick(any) {
+	// 获取视频帧
+	//annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
+	//if err != nil {
+	//	t.Error("get video frame failed", "error", err.Error())
+	//	return
+	//}
+
+	//if err := t.saveSnap(annexb, SnapModeTimeInterval); err != nil {
+	//	t.Error("save snapshot failed", "error", err.Error())
+	//}
 }
