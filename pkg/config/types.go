@@ -35,7 +35,7 @@ const (
 	HookOnTransformEnd    HookType = "transform_end"
 	HookOnSystemStart     HookType = "system_start"
 	HookDefault           HookType = "default"
-	HookOnDetectResult    HookType = "detect_result"
+	//HookOnDetectResult    HookType = "detect_result"
 
 	EventLevelLow  EventLevel = "low"
 	EventLevelHigh EventLevel = "high"
@@ -133,14 +133,14 @@ type (
 		Storage           map[string]any `json:"storage" desc:"存储配置" gorm:"-"` // 存储配置
 		SecondaryFilePath string         `json:"secondaryFilePath" desc:"录制文件次级路径" gorm:"-"`
 	}
-	TransfromOutput struct {
+	TransformOutput struct {
 		Target     string `desc:"转码目标"` // 转码目标
 		StreamPath string
 		Conf       any
 	}
 	Transform struct {
 		Input  any
-		Output []TransfromOutput
+		Output []TransformOutput
 	}
 	OnPublish struct {
 		Push      map[Regexp]Push
@@ -219,7 +219,7 @@ func (v HTTPValues) DeepClone() (ret HTTPValues) {
 	return
 }
 
-func (r *TransfromOutput) UnmarshalYAML(node *yaml.Node) error {
+func (r *TransformOutput) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		// If it's a string, assign it to Target
 		return node.Decode(&r.Target)

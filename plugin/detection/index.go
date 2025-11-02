@@ -1,49 +1,71 @@
-package detection
+package plugin_detection
 
 import (
-	"context"
-	m7s "m7s.live/v5"
-	storage "m7s.live/v5/pkg/storage"
-	detection "m7s.live/v5/plugin/detection/pkg"
+	"time"
+
+	"m7s.live/v5"
+	"m7s.live/v5/pkg/storage"
+	. "m7s.live/v5/plugin/detection/pkg"
 )
 
-var _ = m7s.InstallPlugin[DetectionPlugin](m7s.PluginMeta{
-	NewTransformer: detection.NewTransform,
-})
+var (
+	_ = m7s.InstallPlugin[DetectionPlugin](m7s.PluginMeta{
+		Name:           "Detection",
+		Version:        "v0.0.1",
+		NewTransformer: NewTransform,
+	})
+)
 
-// DetectionPlugin 图像插件
-type DetectionPlugin struct {
-	m7s.Plugin
-	Algorithms string  `json:"algorithms" default:"1-24" desc:"全局算法配置"`
-	Threshold  float64 `json:"threshold" default:"0.5" desc:"全局阈值"`
-	Oss        struct {
-		Enable          bool   `json:"enable" desc:"算法识别图片是否开启 OSS 保存"`
-		Endpoint        string `json:"endpoint" desc:"OSS服务端点"`
-		AccessKeyId     string `json:"accessKeyId" desc:"访问密钥ID"`
-		AccessSecretKey string `json:"accessSecretKey" desc:"访问密钥Secret"`
-		Bucket          string `json:"bucket" desc:"存储桶名称"`
-		PathPrefix      string `json:"pathPrefix" desc:"文件路径前缀"`
-		ForcePathStyle  bool   `json:"forcePathStyle" desc:"强制路径样式（MinIO需要）"`
-		UseSSL          bool   `json:"useSSL" desc:"是否使用SSL" default:"false"`
-		Timeout         int    `json:"timeout" desc:"上传超时时间（秒）" default:"30"`
-	} `json:"ossConfig" desc:"OSS存储配置"`
-}
+type (
+	// DetectionPlugin 图像插件
+	DetectionPlugin struct {
+		m7s.Plugin
+		Algorithms string  `default:"1~24" desc:"全局算法配置"`
+		Threshold  float64 `default:"0.5" desc:"全局阈值"`
+		Oss        Oss     `default:"{}" desc:"对象存储公共配置"`
+		ossPlugin  storage.Storage
+	}
+
+	Oss struct {
+		Enable          bool          `default:"false" desc:"是否启用Oss配置" `
+		Endpoint        string        `desc:"S3服务端点"`
+		Region          string        `desc:"AWS区域" default:"us-east-1"`
+		AccessKeyID     string        `desc:"S3访问密钥ID"`
+		SecretAccessKey string        `desc:"S3秘密访问密钥"`
+		Bucket          string        `desc:"S3存储桶名称"`
+		PathPrefix      string        `desc:"文件路径前缀"`
+		ForcePathStyle  bool          `desc:"强制路径样式（MinIO需要）"`
+		UseSSL          bool          `desc:"是否使用SSL" default:"true"`
+		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
+	}
+)
 
 // Start 插件初始化
 func (p *DetectionPlugin) Start() (err error) {
 	// 数据库初始化
 	if p.DB != nil {
-		err = p.DB.AutoMigrate(&detection.DetectionConfig{})
-	}
-
-	// 创建对象存储
-	if p.Oss.Enable {
-		s, err := storage.CreateStorage("s3", p.Oss)
+		err = p.DB.AutoMigrate(&DetectionConfig{})
 		if err != nil {
 			return err
 		}
-		_, err = s.CreateFile(context.Background(), "test.txt")
-		// TODO: 存储s3Storage供后续使用
+	}
+	// 创建对象存储
+	if p.Oss.Enable {
+		s3Config := map[string]interface{}{
+			"endpoint":        p.Oss.Endpoint,
+			"region":          p.Oss.Region,
+			"accessKeyID":     p.Oss.AccessKeyID,
+			"secretAccessKey": p.Oss.SecretAccessKey,
+			"bucket":          p.Oss.Bucket,
+			"pathPrefix":      p.Oss.PathPrefix,
+			"forcePathStyle":  p.Oss.ForcePathStyle,
+			"useSSL":          p.Oss.UseSSL,
+			"timeout":         p.Oss.Timeout,
+		}
+		p.ossPlugin, err = storage.CreateStorage("s3", s3Config)
+		if err != nil {
+			return err
+		}
 	}
 
 	return

@@ -114,7 +114,7 @@ func (p *TransformJob) Init(transformer ITransformer, plugin *Plugin, pub *Publi
 
 func (p *TransformJob) Start() (err error) {
 	s := p.Plugin.Server
-	if slices.ContainsFunc(p.Config.Output, func(to config.TransfromOutput) bool {
+	if slices.ContainsFunc(p.Config.Output, func(to config.TransformOutput) bool {
 		return s.Transforms.Has(to.Target)
 	}) {
 		return pkg.ErrTransformSame
