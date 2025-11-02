@@ -226,7 +226,8 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
 	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
-
+		// TODO: 查看配置了哪些算法
+		//var algorithmIDs []int
 		detectClient := NewDetectionClient(
 			t.config.AlgorithmAPI.Url,
 			t.config.AlgorithmAPI.Method,
@@ -247,8 +248,13 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		file, err := t.ossPlugin.CreateFile(context.Background(), filename)
 		file.Write(buf.Bytes())
 		file.Close()
+		accessUrl, err := t.ossPlugin.GetURL(context.Background(), filename)
+		if err != nil {
+			return err
+		}
+		callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+		callbackEntity.Args.AccessUrl = accessUrl
 
-		callbackEntity := result.ToCallback(t.job.StreamPath, "", "detection", 0)
 		if t.config.AlgorithmAPI.CallbackURL != "" {
 			jsonData, _ := json.Marshal(callbackEntity)
 			_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
