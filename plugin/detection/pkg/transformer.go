@@ -18,7 +18,6 @@ type (
 		SnapCompress   SnapCompress  `default:"{}" desc:"图片压缩配置"`
 		Watermark      Watermark     `default:"{}" desc:"水印配置"`
 		MaxSnapshots   int           `default:"100" desc:"最大保存截图数量"`
-		ImageQuality   int           `default:"90" desc:"截图质量(1-100)"`
 	}
 
 	AlgorithmAPI struct {
@@ -39,8 +38,6 @@ type (
 		Quality      float64 `default:"1" desc:"图片压缩质量"`
 		MaxSize      int     `default:"2097152" desc:"图片文件大小, 单位字节"`
 		Mode         string  `default:"none" desc:"图片裁剪模式: none,letterbox、cover、contain等"`
-		ResizeWidth  int     `default:"1920" desc:"图片裁剪宽度"`
-		ResizeHeight int     `default:"1080" desc:"图片裁剪高度"`
 		TargetWidth  int     `default:"0" desc:"目标宽度(0表示不调整)"`
 		TargetHeight int     `default:"0" desc:"目标高度(0表示不调整)"`
 	}
@@ -54,7 +51,6 @@ type (
 		FontSpacing float64 `default:"2" desc:"水印字体间距"`
 		OffsetX     int     `default:"0" desc:"水印位置X"`
 		OffsetY     int     `default:"0" desc:"水印位置Y"`
-		Position    string  `default:"bottom-right" desc:"水印位置: top-left,top-right,bottom-left,bottom-right,center"`
 		Opacity     float64 `default:"1.0" desc:"水印透明度(0-1)"`
 	}
 )
