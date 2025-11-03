@@ -68,7 +68,16 @@ func SnapFrameToBase64WithFFmpeg(buf []byte) string {
 }
 
 // SnapFrameWithFFmpeg 使用 FFmpeg 处理视频帧并生成截图
-func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer) error {
+func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format string) error {
+	// 根据format参数确定输出格式
+	var outputFileFormat string
+	switch strings.ToLower(format) {
+	case "png":
+		outputFileFormat = "png"
+	default: // 默认为JPEG格式
+		outputFileFormat = "mjpeg"
+	}
+
 	// 创建ffmpeg命令，使用select过滤器选择最后一帧
 	cmd := exec.Command(
 		"ffmpeg",
@@ -80,7 +89,7 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer) error {
 		"-vframes",
 		"1",
 		"-f",
-		"mjpeg",
+		outputFileFormat,
 		"pipe:1",
 	)
 
@@ -118,10 +127,22 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer) error {
 }
 
 // DrawDetectionBBox 在图像上绘制检测框和标签
-func DrawDetectionBBox(imgBytes []byte, bbox BBox, label string, confidence float64) ([]byte, error) {
+func DrawDetectionBBox(imgBytes []byte, format string, bbox BBox, label string, confidence float64) ([]byte, error) {
 	// 转义文本中的特殊字符
 	escapedLabel := strings.ReplaceAll(label, "'", "\\'")
 	escapedLabel = strings.ReplaceAll(escapedLabel, ":", "\\:")
+
+	// 根据format参数确定输出格式
+	var outputFileFormat string
+	var qualityOption string
+	switch strings.ToLower(format) {
+	case "png":
+		outputFileFormat = "png"
+		qualityOption = "-q:v" // PNG是无损格式，使用质量参数控制压缩
+	default: // 默认为JPEG格式
+		outputFileFormat = "mjpeg"
+		qualityOption = "-q:v"
+	}
 
 	cmd := exec.Command(
 		"ffmpeg",
@@ -129,8 +150,8 @@ func DrawDetectionBBox(imgBytes []byte, bbox BBox, label string, confidence floa
 		"-i", "pipe:0",
 		"-vf", fmt.Sprintf("drawbox=x=%f*iw:y=%f*ih:w=%f*iw:h=%f*ih:color=red:thickness=2",
 			bbox.X, bbox.Y, bbox.W, bbox.H),
-		"-q:v", "2", // JPEG质量
-		"-f", "mjpeg",
+		qualityOption, "2", // JPEG质量或PNG压缩级别
+		"-f", outputFileFormat,
 		"pipe:1",
 	)
 

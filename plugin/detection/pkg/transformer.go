@@ -224,7 +224,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 处理视频帧
 	var buf bytes.Buffer
-	if err := SnapFrameWithFFmpeg(annexb, &buf); err != nil {
+	if err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapshotFormat); err != nil {
 		return fmt.Errorf("process with ffmpeg error: %w", err)
 	}
 
@@ -258,7 +258,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 					// 依次处理每个检测框
 					for _, detection := range result.Data.Detections {
-						imgBytes, err = DrawDetectionBBox(imgBytes, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
+						imgBytes, err = DrawDetectionBBox(imgBytes, t.config.SnapshotFormat, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
 						if err != nil {
 							t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 							continue
