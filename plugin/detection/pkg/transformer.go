@@ -260,15 +260,38 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				// 修复后的代码
 				if result.hasDetections() {
 					// 将框画在图片上, result 的归一化参数 bbox
-					imgBytes := buf.Bytes()
 					// 依次处理每个检测框
+					if buf.Len() == 0 {
+						t.job.Plugin.Error("original image data is empty")
+						return
+					}
+
 					for _, detection := range result.Data.Detections {
-						imgBytes, err = DrawDetectionBBox(imgBytes, t.config.SnapshotFormat, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
+						// 将当前buf的数据复制到临时buffer
+						tempData := buf.Bytes()
+						processedBytes, err := DrawDetectionBBox(tempData, t.config.SnapshotFormat, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
 						if err != nil {
 							t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 							continue
 						}
+
+						if len(processedBytes) == 0 {
+							t.job.Plugin.Error("processed image data is empty after drawing bbox")
+							continue
+						}
+
+						// 清空原buf并写入处理后的数据
+						buf.Reset()
+						buf.Write(processedBytes)
 					}
+
+					// 确保最终图像数据不为空
+					if buf.Len() == 0 {
+						t.job.Plugin.Error("final image data is empty")
+						return
+					}
+					// 最终使用buf.Bytes()获取处理后的图像数据
+					imgBytes := buf.Bytes()
 
 					var accessUrl string
 					// 保存带标注的图像到OSS
@@ -288,7 +311,6 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 							t.job.Plugin.Error("write file error", "error", err.Error())
 							return
 						}
-						t.job.Plugin.Debug("tempFile loc", file.Name())
 						// close 会自动 sync 本地 temp 文件到 oss
 						err = file.Close()
 						if err != nil {
@@ -313,4 +335,38 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 	}
 
 	return nil
+}
+
+// updateConfig 更新算法配置
+func (t *SnapTask) updateConfig(steamPath string, config *SnapConfig) {
+	t.config = *config
+	// 关闭当前任务, 启动新的任务
+	t.job.Dispose()
+	// 根据 SnapMode 重新构造对应的任务类型
+	var newTask task.ITask
+	switch config.SnapMode {
+	case int(SnapModeTimeInterval):
+		newTask = &TimeSnapTask{
+			SnapTask: SnapTask{
+				config:    *config,
+				job:       t.job,
+				ossPlugin: t.ossPlugin,
+			},
+		}
+	case int(SnapModeIFrameInterval):
+		newTask = &IFrameSnapTask{
+			SnapTask: SnapTask{
+				config:    *config,
+				job:       t.job,
+				ossPlugin: t.ossPlugin,
+			},
+		}
+	case int(SnapModeManual):
+		// 手动模式暂不支持动态更新任务
+		return
+	}
+
+	if newTask != nil {
+		t.job.AddTask(newTask)
+	}
 }

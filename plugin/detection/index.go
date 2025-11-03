@@ -33,7 +33,7 @@ type (
 		Bucket          string        `desc:"S3存储桶名称"`
 		PathPrefix      string        `desc:"文件路径前缀"`
 		ForcePathStyle  bool          `desc:"强制路径样式（MinIO需要）"`
-		UseSSL          bool          `desc:"是否使用SSL" default:"true"`
+		UseSSL          bool          `desc:"是否使用SSL" default:"false"`
 		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
 	}
 
