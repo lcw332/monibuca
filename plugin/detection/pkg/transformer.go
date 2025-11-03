@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	task "github.com/langhuihui/gotask"
@@ -232,116 +233,123 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
 	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
+		var wg sync.WaitGroup
 		for index, algorithmID := range t.config.AlgorithmId {
-			go func(id uint8) {
+			wg.Add(1)
+			go func(id uint8, idx int) {
+				defer wg.Done()
+
 				detectClient := NewDetectionClient(
 					t.config.AlgorithmAPI.Url,
 					t.config.AlgorithmAPI.Method,
 					t.config.AlgorithmAPI.ApiKey,
 				)
-				result, err := detectClient.Detect(DetectionRequest{
+
+				imageData := buf.Bytes()
+				if len(imageData) == 0 {
+					t.job.Plugin.Error("original image data is empty")
+					return
+				}
+
+				req := DetectionRequest{
 					AlgorithmID: id,
-					Image:       SnapFrameToBase64WithFFmpeg(buf.Bytes()),
+					Image:       SnapFrameToBase64WithFFmpeg(imageData),
 					ConfThreshold: func() float32 {
-						if index < len(t.config.ConfThreshold) {
-							return t.config.ConfThreshold[index]
+						if idx < len(t.config.ConfThreshold) {
+							return t.config.ConfThreshold[idx]
 						}
 						return 0.6
 					}(),
-				})
+				}
+
+				result, err := detectClient.Detect(req)
 				if err != nil {
 					t.job.Plugin.Error("detect error", "error", err.Error())
 					return
 				}
-				if result.IsSuccess() == false {
-					t.job.Plugin.Error("algorithm api request failed")
+				if !result.IsSuccess() {
+					t.job.Plugin.Error("algorithm api request failed or no detections found")
 					return
 				}
 
-				// 修复后的代码
-				if result.hasDetections() {
+				if !result.hasDetections() {
+					return
+				}
 
-					// 将框画在图片上, result 的归一化参数 bbox
-					if buf.Len() == 0 {
-						t.job.Plugin.Error("original image data is empty")
-						return
-					}
-					originalImgData := make([]byte, buf.Len())
-					copy(originalImgData, buf.Bytes())
-					// 创建新的buffer用于处理当前算法的结果
-					var processingBuf bytes.Buffer
-					processingBuf.Write(originalImgData)
-
-					for _, detection := range result.Data.Detections {
-						// 将当前buf的数据复制到临时buffer
-						tempData := buf.Bytes()
-						processedBytes, err := DrawDetectionBBox(tempData, t.config.SnapshotFormat, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
-						if err != nil {
-							t.job.Plugin.Error("draw bounding box error", "error", err.Error())
-							continue
-						}
-
-						if len(processedBytes) == 0 {
-							t.job.Plugin.Error("processed image data is empty after drawing bbox")
-							continue
-						}
-
-						// 清空原buf并写入处理后的数据
-						processingBuf.Reset()
-						processingBuf.Write(processedBytes)
-					}
-
-					// 确保最终图像数据不为空
-					if processingBuf.Len() == 0 {
-						t.job.Plugin.Error("final image data is empty")
-						return
-					}
-					// 最终使用buf.Bytes()获取处理后的图像数据
-					imgBytes := processingBuf.Bytes()
-					var accessUrl string
-					// 保存带标注的图像到OSS
-					if t.ossPlugin != nil {
-						ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s", strings.ReplaceAll(t.job.StreamPath, "/", "_"),
-							algorithmID,
-							now.Format("20060102150405.000"),
-							t.config.SnapshotFormat)
-
-						file, err := t.ossPlugin.CreateFile(context.Background(), ossFilename)
-						if err != nil {
-							t.job.Plugin.Error("create file error", err)
-							return
-						}
-						_, err = file.Write(imgBytes)
-						if err != nil {
-							t.job.Plugin.Error("write file error", "error", err.Error())
-							return
-						}
-						_, err = file.Seek(0, io.SeekStart)
-						if err != nil {
-							t.job.Plugin.Error("seek file error", "error", err.Error())
-							return
-						}
-						// close 会自动 sync 本地 temp 文件到 oss
-						err = file.Close()
-						if err != nil {
-							t.job.Plugin.Error("close file error", "error", err.Error())
-						}
-						accessUrl, _ = t.ossPlugin.GetURL(context.Background(), ossFilename)
-					}
-
-					callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
-					callbackEntity.Args.AccessUrl = accessUrl
-
-					if t.config.AlgorithmAPI.CallbackURL != "" {
-						jsonData, _ := json.Marshal(callbackEntity)
-						_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
-						if err != nil {
-							t.job.Plugin.Error("callback error", "error", err.Error())
-						}
+				// 绘制边界框
+				processedImage := imageData
+				for _, detection := range result.Data.Detections {
+					bbox := FloatsToBBox(detection.BBox)
+					processedImage, err = DrawDetectionBBox(processedImage, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence)
+					if err != nil {
+						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
+						continue
 					}
 				}
-			}(algorithmID)
+
+				if len(processedImage) == 0 {
+					t.job.Plugin.Error("final image data is empty after drawing boxes")
+					return
+				}
+
+				var accessUrl string
+				if t.ossPlugin != nil {
+					ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
+						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
+						id,
+						now.Format("20060102150405.000"),
+						t.config.SnapshotFormat)
+
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+
+					file, err := t.ossPlugin.CreateFile(ctx, ossFilename)
+					if err != nil {
+						t.job.Plugin.Error("create file error", "error", err.Error())
+						return
+					}
+					defer file.Close()
+
+					_, err = file.Write(processedImage)
+					if err != nil {
+						t.job.Plugin.Error("write file error", "error", err.Error())
+						return
+					}
+
+					_, err = file.Seek(0, io.SeekStart)
+					if err != nil {
+						t.job.Plugin.Error("seek file error", "error", err.Error())
+						return
+					}
+
+					err = file.Sync()
+					if err != nil {
+						t.job.Plugin.Error("sync file error", "error", err.Error())
+						return
+					}
+
+					accessUrl, _ = t.ossPlugin.GetURL(ctx, ossFilename)
+				}
+
+				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+				callbackEntity.Args.AccessUrl = accessUrl
+
+				if t.config.AlgorithmAPI.CallbackURL != "" {
+					jsonData, _ := json.Marshal(callbackEntity)
+					resp, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
+					if err != nil {
+						t.job.Plugin.Error("callback error", "error", err.Error())
+						return
+					}
+					defer resp.Body.Close()
+
+					if resp.StatusCode >= 300 {
+						t.job.Plugin.Warn("callback response status not ok", "status", resp.Status)
+					}
+				}
+			}(algorithmID, index)
 		}
+		wg.Wait()
 	}
 
 	return nil
