@@ -28,7 +28,7 @@ const (
 type (
 	SnapConfig struct {
 		SnapshotFormat string        `json:"snapshotFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
-		SnapMode       SnapMode      `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+		SnapMode       int           `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
 		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `json:"savePath" desc:"截图保存路径"`
@@ -124,8 +124,9 @@ func (t *Transformer) Start() (err error) {
 		}
 
 		// TODO: 水印配置
+
 		switch snapConfig.SnapMode {
-		case SnapModeTimeInterval:
+		case int(SnapModeTimeInterval):
 			// 时间间隔模式截图逻辑
 			timeTask := &TimeSnapTask{
 				SnapTask: SnapTask{
@@ -135,7 +136,7 @@ func (t *Transformer) Start() (err error) {
 				},
 			}
 			task = timeTask
-		case SnapModeIFrameInterval:
+		case int(SnapModeIFrameInterval):
 			// 关键帧间隔模式截图逻辑
 			iframeTask := &IFrameSnapTask{
 				SnapTask: SnapTask{
@@ -145,7 +146,7 @@ func (t *Transformer) Start() (err error) {
 				},
 			}
 			task = iframeTask
-		case SnapModeManual:
+		case int(SnapModeManual):
 			// 手动触发模式截图逻辑
 		}
 		if task != nil {
