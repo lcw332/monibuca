@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -259,12 +260,17 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 				// 修复后的代码
 				if result.hasDetections() {
+
 					// 将框画在图片上, result 的归一化参数 bbox
-					// 依次处理每个检测框
 					if buf.Len() == 0 {
 						t.job.Plugin.Error("original image data is empty")
 						return
 					}
+					originalImgData := make([]byte, buf.Len())
+					copy(originalImgData, buf.Bytes())
+					// 创建新的buffer用于处理当前算法的结果
+					var processingBuf bytes.Buffer
+					processingBuf.Write(originalImgData)
 
 					for _, detection := range result.Data.Detections {
 						// 将当前buf的数据复制到临时buffer
@@ -281,18 +287,17 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						}
 
 						// 清空原buf并写入处理后的数据
-						buf.Reset()
-						buf.Write(processedBytes)
+						processingBuf.Reset()
+						processingBuf.Write(processedBytes)
 					}
 
 					// 确保最终图像数据不为空
-					if buf.Len() == 0 {
+					if processingBuf.Len() == 0 {
 						t.job.Plugin.Error("final image data is empty")
 						return
 					}
 					// 最终使用buf.Bytes()获取处理后的图像数据
-					imgBytes := buf.Bytes()
-
+					imgBytes := processingBuf.Bytes()
 					var accessUrl string
 					// 保存带标注的图像到OSS
 					if t.ossPlugin != nil {
@@ -309,6 +314,11 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						_, err = file.Write(imgBytes)
 						if err != nil {
 							t.job.Plugin.Error("write file error", "error", err.Error())
+							return
+						}
+						_, err = file.Seek(0, io.SeekStart)
+						if err != nil {
+							t.job.Plugin.Error("seek file error", "error", err.Error())
 							return
 						}
 						// close 会自动 sync 本地 temp 文件到 oss
