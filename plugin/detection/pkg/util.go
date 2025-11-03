@@ -144,12 +144,17 @@ func DrawDetectionBBox(imgBytes []byte, format string, bbox BBox, label string, 
 		qualityOption = "-q:v"
 	}
 
+	// TODO: 添加标签和置信度显示
+	//labelText := fmt.Sprintf("%s %.2f", escapedLabel, confidence)
+
 	cmd := exec.Command(
 		"ffmpeg",
 		"-hide_banner",
 		"-i", "pipe:0",
 		"-vf", fmt.Sprintf("drawbox=x=%f*iw:y=%f*ih:w=%f*iw:h=%f*ih:color=red:thickness=2",
 			bbox.X, bbox.Y, bbox.W, bbox.H),
+		//"-vf", fmt.Sprintf("drawbox=x=%f*iw:y=%f*ih:w=%f*iw:h=%f*ih:color=red:thickness=2,drawtext=fontfile=/System/Library/Fonts/Arial.ttf:text='%s':x=%f*iw:y=%f*ih:fontsize=24:fontcolor=red",
+		//	bbox.X, bbox.Y, bbox.W, bbox.H, labelText, bbox.X, bbox.Y),
 		qualityOption, "2", // JPEG质量或PNG压缩级别
 		"-f", outputFileFormat,
 		"pipe:1",

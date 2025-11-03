@@ -33,6 +33,7 @@ type (
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `json:"savePath" desc:"截图保存路径"`
 		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
+		ConfThreshold  []float32     `default:"0.5" desc:"置信度配置，与算法ID一一对应"`
 		AlgorithmAPI   AlgorithmAPI  `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
 		SnapCompress   SnapCompress  `json:"snapCompress" default:"{}" desc:"图片压缩配置"`
 		Watermark      Watermark     `json:"watermark" default:"{}" desc:"水印配置"`
@@ -230,7 +231,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
 	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
-		for _, algorithmID := range t.config.AlgorithmId {
+		for index, algorithmID := range t.config.AlgorithmId {
 			go func(id uint8) {
 				detectClient := NewDetectionClient(
 					t.config.AlgorithmAPI.Url,
@@ -238,9 +239,14 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					t.config.AlgorithmAPI.ApiKey,
 				)
 				result, err := detectClient.Detect(DetectionRequest{
-					AlgorithmID:   id,
-					Image:         SnapFrameToBase64WithFFmpeg(buf.Bytes()),
-					ConfThreshold: 0.5,
+					AlgorithmID: id,
+					Image:       SnapFrameToBase64WithFFmpeg(buf.Bytes()),
+					ConfThreshold: func() float32 {
+						if index < len(t.config.ConfThreshold) {
+							return t.config.ConfThreshold[index]
+						}
+						return 0.6
+					}(),
 				})
 				if err != nil {
 					t.job.Plugin.Error("detect error", "error", err.Error())
@@ -255,7 +261,6 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				if result.hasDetections() {
 					// 将框画在图片上, result 的归一化参数 bbox
 					imgBytes := buf.Bytes()
-
 					// 依次处理每个检测框
 					for _, detection := range result.Data.Detections {
 						imgBytes, err = DrawDetectionBBox(imgBytes, t.config.SnapshotFormat, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
@@ -281,9 +286,10 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						_, err = file.Write(imgBytes)
 						if err != nil {
 							t.job.Plugin.Error("write file error", "error", err.Error())
-							file.Close()
 							return
 						}
+						t.job.Plugin.Debug("tempFile loc", file.Name())
+						// close 会自动 sync 本地 temp 文件到 oss
 						err = file.Close()
 						if err != nil {
 							t.job.Plugin.Error("close file error", "error", err.Error())

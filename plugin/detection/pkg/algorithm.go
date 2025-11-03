@@ -40,7 +40,7 @@ var AlgorithmMap = AlgorithmId{
 type DetectionRequest struct {
 	AlgorithmID   uint8   `json:"algorithm_id"`
 	Image         string  `json:"image"`
-	ConfThreshold float64 `json:"conf_threshold,omitempty"`
+	ConfThreshold float32 `json:"conf_threshold,omitempty"`
 }
 
 // DetectionResult 定义检测结果结构
