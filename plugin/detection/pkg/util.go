@@ -4,12 +4,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
 	"io"
 	"os/exec"
+	"strings"
 
 	"m7s.live/v5"
 	"m7s.live/v5/pkg"
@@ -120,66 +117,72 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer) error {
 	return cmd.Wait()
 }
 
-// DrawBoundingBox 在图像上绘制检测框和标签
-func DrawBoundingBox(imgBytes []byte, bbox BBox, label string, confidence float64) ([]byte, error) {
-	// 解码图像
-	img, _, err := image.Decode(bytes.NewReader(imgBytes))
+// DrawDetectionBBox 在图像上绘制检测框和标签
+func DrawDetectionBBox(imgBytes []byte, bbox BBox, label string, confidence float64) ([]byte, error) {
+	// 转义文本中的特殊字符
+	escapedLabel := strings.ReplaceAll(label, "'", "\\'")
+	escapedLabel = strings.ReplaceAll(escapedLabel, ":", "\\:")
+
+	cmd := exec.Command(
+		"ffmpeg",
+		"-hide_banner",
+		"-i", "pipe:0",
+		"-vf", fmt.Sprintf("drawbox=x=%f*iw:y=%f*ih:w=%f*iw:h=%f*ih:color=red:thickness=2",
+			bbox.X, bbox.Y, bbox.W, bbox.H),
+		"-q:v", "2", // JPEG质量
+		"-f", "mjpeg",
+		"pipe:1",
+	)
+
+	// 获取输入和输出pipe
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("decode image failed: %w", err)
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
 	}
 
-	// 创建画布
-	bounds := img.Bounds()
-	width, height := bounds.Dx(), bounds.Dy()
+	// 启动ffmpeg进程
+	if err = cmd.Start(); err != nil {
+		return nil, err
+	}
 
-	// 转换归一化坐标为像素坐标
-	x := int(bbox.X * float64(width))
-	y := int(bbox.Y * float64(height))
-	w := int(bbox.W * float64(width))
-	h := int(bbox.H * float64(height))
+	// 将图像数据写入到ffmpeg的stdin
+	if _, err = stdin.Write(imgBytes); err != nil {
+		stdin.Close()
+		return nil, err
+	}
+	stdin.Close()
 
-	// 创建新图像（RGBA）
-	newImg := image.NewRGBA(bounds)
-	draw.Draw(newImg, bounds, img, image.Point{}, draw.Src)
-
-	// 设置颜色和字体
-	red := color.RGBA{255, 0, 0, 255}
-	white := color.RGBA{255, 255, 255, 255}
-	//green := color.RGBA{0, 255, 0, 255}
-
-	// 绘制矩形框
-	drawRectangle(newImg, x, y, x+w, y+h, red)
-
-	// 绘制标签文字（使用默认字体）
-	labelText := fmt.Sprintf("%s %.2f", label, confidence)
-	drawText(newImg, x, y-10, labelText, white)
-
-	// 编码为 PNG 字节
+	// 从ffmpeg的stdout读取处理后的图像数据
 	var buf bytes.Buffer
-	err = jpeg.Encode(&buf, newImg, &jpeg.Options{
-		Quality: 80,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode image failed: %w", err)
+	var errBuf bytes.Buffer
+
+	// 并行读取stdout和stderr
+	done := make(chan error, 2)
+	go func() {
+		_, err := io.Copy(&buf, stdout)
+		done <- err
+	}()
+	go func() {
+		_, err := io.Copy(&errBuf, stderr)
+		done <- err
+	}()
+
+	// 等待复制完成
+	<-done
+	<-done
+
+	// 等待ffmpeg进程结束
+	if err = cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("ffmpeg error: %v, stderr: %s", err, errBuf.String())
 	}
 
 	return buf.Bytes(), nil
-}
-
-func drawRectangle(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
-	for i := x1; i < x2; i++ {
-		img.Set(i, y1, c)
-		img.Set(i, y2-1, c)
-	}
-	for j := y1; j < y2; j++ {
-		img.Set(x1, j, c)
-		img.Set(x2-1, j, c)
-	}
-}
-
-func drawText(img *image.RGBA, x, y int, text string, c color.Color) {
-	// 简化：仅支持单行文本，无字体支持
-	// 实际项目中建议使用 `golang.org/x/image/font` 支持真字体
-	// 此处仅示意
-	// 可替换为更复杂的字体渲染逻辑
 }

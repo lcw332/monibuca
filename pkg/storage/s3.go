@@ -1,5 +1,3 @@
-//go:build s3
-
 package storage
 
 import (

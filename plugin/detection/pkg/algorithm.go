@@ -45,13 +45,10 @@ type DetectionRequest struct {
 
 // DetectionResult 定义检测结果结构
 type DetectionResult struct {
-	ClassID     int       `json:"class_id"`
-	ClassName   string    `json:"class_name"`
-	Confidence  float64   `json:"confidence"`
-	BBox        []float64 `json:"bbox"`
-	Mask        string    `json:"mask,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Severity    string    `json:"severity,omitempty"`
+	ClassID    int       `json:"class_id"`
+	ClassName  string    `json:"class_name"`
+	Confidence float64   `json:"confidence"`
+	BBox       []float64 `json:"bbox"`
 }
 
 // DetectionResponse 定义响应结构体

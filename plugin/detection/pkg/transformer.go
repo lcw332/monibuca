@@ -258,13 +258,14 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 					// 依次处理每个检测框
 					for _, detection := range result.Data.Detections {
-						imgBytes, err = DrawBoundingBox(imgBytes, FloatsToBBox(detection.BBox), "test", detection.Confidence)
+						imgBytes, err = DrawDetectionBBox(imgBytes, FloatsToBBox(detection.BBox), detection.ClassName, detection.Confidence)
 						if err != nil {
 							t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 							continue
 						}
 					}
 
+					var accessUrl string
 					// 保存带标注的图像到OSS
 					if t.ossPlugin != nil {
 						ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s", strings.ReplaceAll(t.job.StreamPath, "/", "_"),
@@ -287,9 +288,11 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						if err != nil {
 							t.job.Plugin.Error("close file error", "error", err.Error())
 						}
+						accessUrl, _ = t.ossPlugin.GetURL(context.Background(), ossFilename)
 					}
 
 					callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+					callbackEntity.Args.AccessUrl = accessUrl
 
 					if t.config.AlgorithmAPI.CallbackURL != "" {
 						jsonData, _ := json.Marshal(callbackEntity)
