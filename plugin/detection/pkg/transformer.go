@@ -2,6 +2,7 @@ package detection
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -100,6 +101,14 @@ func NewTransform() m7s.ITransformer {
 func (t *Transformer) Start() (err error) {
 	// 为每个输出配置创建一个截图任务
 	// 创建一个公共的 OssPlugin
+	ossConfig := t.TransformJob.Plugin.Config.Get("oss")
+	var ossPlugin storage.Storage
+	if ossConfig != nil {
+		ossPlugin, err = storage.CreateStorage("s3", ossConfig.File)
+		if err != nil {
+			return err
+		}
+	}
 
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
@@ -120,8 +129,9 @@ func (t *Transformer) Start() (err error) {
 			// 时间间隔模式截图逻辑
 			timeTask := &TimeSnapTask{
 				SnapTask: SnapTask{
-					config: snapConfig,
-					job:    &t.TransformJob,
+					config:    snapConfig,
+					job:       &t.TransformJob,
+					ossPlugin: ossPlugin,
 				},
 			}
 			task = timeTask
@@ -129,8 +139,9 @@ func (t *Transformer) Start() (err error) {
 			// 关键帧间隔模式截图逻辑
 			iframeTask := &IFrameSnapTask{
 				SnapTask: SnapTask{
-					config: snapConfig,
-					job:    &t.TransformJob,
+					config:    snapConfig,
+					job:       &t.TransformJob,
+					ossPlugin: ossPlugin,
 				},
 			}
 			task = iframeTask
@@ -209,14 +220,6 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 	now := time.Now()
 	filename := fmt.Sprintf("%s_%s.%s", t.job.StreamPath, now.Format("20060102150405.000"), t.config.SnapshotFormat)
 	filename = strings.ReplaceAll(filename, "/", "_")
-	//savePath := filepath.Join(t.config.SavePath, filename)
-	ossConfig := t.job.Plugin.Config.Get("Oss")
-	if ossConfig != nil && ossConfig.File == true {
-		t.ossPlugin, err = storage.CreateStorage("s3", ossConfig)
-		if err != nil {
-			return err
-		}
-	}
 
 	// 处理视频帧
 	var buf bytes.Buffer
@@ -247,9 +250,46 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					return
 				}
 
+				// 修复后的代码
 				if result.hasDetections() {
+					// 将框画在图片上, result 的归一化参数 bbox
+					imgBytes := buf.Bytes()
+
+					// 依次处理每个检测框
+					for _, detection := range result.Data.Detections {
+						imgBytes, err = DrawBoundingBox(imgBytes, FloatsToBBox(detection.BBox), "test", detection.Confidence)
+						if err != nil {
+							t.job.Plugin.Error("draw bounding box error", "error", err.Error())
+							continue
+						}
+					}
+
+					// 保存带标注的图像到OSS
+					if t.ossPlugin != nil {
+						ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s", strings.ReplaceAll(t.job.StreamPath, "/", "_"),
+							algorithmID,
+							now.Format("20060102150405.000"),
+							t.config.SnapshotFormat)
+
+						file, err := t.ossPlugin.CreateFile(context.Background(), ossFilename)
+						if err != nil {
+							t.job.Plugin.Error("create file error", err)
+							return
+						}
+						_, err = file.Write(imgBytes)
+						if err != nil {
+							t.job.Plugin.Error("write file error", "error", err.Error())
+							file.Close()
+							return
+						}
+						err = file.Close()
+						if err != nil {
+							t.job.Plugin.Error("close file error", "error", err.Error())
+						}
+					}
+
 					callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
-					//// Todo: 将检测成功的结果保存到 对象存储中去
+
 					if t.config.AlgorithmAPI.CallbackURL != "" {
 						jsonData, _ := json.Marshal(callbackEntity)
 						_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
