@@ -2,7 +2,6 @@ package detection
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,49 +26,50 @@ const (
 
 type (
 	SnapConfig struct {
-		SnapshotFormat string        `desc:"截图文件格式(jpg/png)"`
-		SnapMode       SnapMode      `default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
-		TimeInterval   time.Duration `default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
-		IFrameInterval int           `default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
-		SavePath       string        `desc:"截图保存路径"`
-		AlgorithmAPI   AlgorithmAPI  `default:"{}" desc:"算法API配置"`
-		SnapCompress   SnapCompress  `default:"{}" desc:"图片压缩配置"`
-		Watermark      Watermark     `default:"{}" desc:"水印配置"`
-		MaxSnapshots   int           `default:"100" desc:"最大保存截图数量"`
+		SnapshotFormat string        `json:"snapshotFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
+		SnapMode       SnapMode      `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
+		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+		SavePath       string        `json:"savePath" desc:"截图保存路径"`
+		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
+		AlgorithmAPI   AlgorithmAPI  `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
+		SnapCompress   SnapCompress  `json:"snapCompress" default:"{}" desc:"图片压缩配置"`
+		Watermark      Watermark     `json:"watermark" default:"{}" desc:"水印配置"`
+		MaxSnapshots   int           `json:"maxSnapshots" default:"100" desc:"最大保存截图数量"`
 	}
 
 	AlgorithmAPI struct {
-		Enable        bool              `default:"false" desc:"是否启用算法分析"`
-		Url           string            `default:"" desc:"算法服务地址"`
-		Method        string            `default:"POST" desc:"算法服务请求方式"`
-		Headers       map[string]string `default:"{}" desc:"自定义请求头"`
-		Timeout       time.Duration     `default:"30s" desc:"请求超时时间"`
-		ApiKey        string            `default:"" desc:"认证密钥"`
-		RetryCount    int               `default:"3" desc:"失败重试次数"`
-		RetryInterval time.Duration     `default:"5s" desc:"重试间隔"`
-		AsyncMode     bool              `default:"true" desc:"是否异步调用"`
-		CallbackURL   string            `default:"" desc:"回调地址"`
+		Enable        bool              `json:"enable" default:"false" desc:"是否启用算法分析"`
+		Url           string            `json:"url" default:"" desc:"算法服务地址"`
+		Method        string            `json:"method" default:"POST" desc:"算法服务请求方式"`
+		Headers       map[string]string `json:"headers" default:"{}" desc:"自定义请求头"`
+		Timeout       time.Duration     `json:"timeout" default:"30s" desc:"请求超时时间"`
+		ApiKey        string            `json:"apiKey" default:"" desc:"认证密钥"`
+		RetryCount    int               `json:"retryCount" default:"3" desc:"失败重试次数"`
+		RetryInterval time.Duration     `json:"retryInterval" default:"5s" desc:"重试间隔"`
+		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
+		CallbackURL   string            `json:"callbackURL" default:"" desc:"回调地址"`
 	}
 
 	SnapCompress struct {
-		Enable       bool    `default:"false" desc:"是否开启压缩"`
-		Quality      float64 `default:"1" desc:"图片压缩质量"`
-		MaxSize      int     `default:"2097152" desc:"图片文件大小, 单位字节"`
-		Mode         string  `default:"none" desc:"图片裁剪模式: none,letterbox、cover、contain等"`
-		TargetWidth  int     `default:"0" desc:"目标宽度(0表示不调整)"`
-		TargetHeight int     `default:"0" desc:"目标高度(0表示不调整)"`
+		Enable       bool    `json:"enable" default:"false" desc:"是否开启压缩"`
+		Quality      float64 `json:"quality" default:"1" desc:"图片压缩质量"`
+		MaxSize      int     `json:"maxSize" default:"2097152" desc:"图片文件大小, 单位字节"`
+		Mode         string  `json:"mode" default:"none" desc:"图片裁剪模式: none,letterbox、cover、contain等"`
+		TargetWidth  int     `json:"targetWidth" default:"0" desc:"目标宽度(0表示不调整)"`
+		TargetHeight int     `json:"targetHeight" default:"0" desc:"目标高度(0表示不调整)"`
 	}
 
 	Watermark struct {
-		Enable      bool    `default:"false" desc:"是否开启水印"`
-		Text        string  `default:"" desc:"水印文字内容"`
-		FontPath    string  `default:"" desc:"水印字体文件路径"`
-		FontColor   string  `default:"rgba(255,165,0,1)" desc:"水印字体颜色，支持rgba格式"`
-		FontSize    float64 `default:"36" desc:"水印字体大小"`
-		FontSpacing float64 `default:"2" desc:"水印字体间距"`
-		OffsetX     int     `default:"0" desc:"水印位置X"`
-		OffsetY     int     `default:"0" desc:"水印位置Y"`
-		Opacity     float64 `default:"1.0" desc:"水印透明度(0-1)"`
+		Enable      bool    `json:"enable" default:"false" desc:"是否开启水印"`
+		Text        string  `json:"text" default:"" desc:"水印文字内容"`
+		FontPath    string  `json:"fontPath" default:"" desc:"水印字体文件路径"`
+		FontColor   string  `json:"fontColor" default:"rgba(255,165,0,1)" desc:"水印字体颜色，支持rgba格式"`
+		FontSize    float64 `json:"fontSize" default:"36" desc:"水印字体大小"`
+		FontSpacing float64 `json:"fontSpacing" default:"2" desc:"水印字体间距"`
+		OffsetX     int     `json:"offsetX" default:"0" desc:"水印位置X"`
+		OffsetY     int     `json:"offsetY" default:"0" desc:"水印位置Y"`
+		Opacity     float64 `json:"opacity" default:"1.0" desc:"水印透明度(0-1)"`
 	}
 )
 
@@ -105,15 +105,15 @@ func (t *Transformer) Start() (err error) {
 		var task task.ITask
 		var snapConfig SnapConfig
 
-		outputConf := output.Conf
-		if outputConf != nil {
-			switch v := outputConf.(type) {
+		if output.Conf != nil {
+			switch v := output.Conf.(type) {
 			case SnapConfig:
 				snapConfig = v
 			case map[string]any:
 				config.Parse(&snapConfig, v)
 			}
 		}
+
 		// TODO: 水印配置
 		switch snapConfig.SnapMode {
 		case SnapModeTimeInterval:
@@ -226,41 +226,39 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
 	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
-		// TODO: 查看配置了哪些算法
-		//var algorithmIDs []int
-		detectClient := NewDetectionClient(
-			t.config.AlgorithmAPI.Url,
-			t.config.AlgorithmAPI.Method,
-			t.config.AlgorithmAPI.ApiKey,
-		)
-		result, err := detectClient.Detect(DetectionRequest{
-			AlgorithmID:   1,
-			Image:         SnapFrameToBase64WithFFmpeg(buf.Bytes()),
-			ConfThreshold: 0.5,
-		})
-		if err != nil {
-			return err
-		}
-		if result.IsSuccess() == false {
-			return fmt.Errorf("请求算法接口异常")
-		}
-		// Todo: 将检测成功的结果保存到 对象存储中去
-		file, err := t.ossPlugin.CreateFile(context.Background(), filename)
-		file.Write(buf.Bytes())
-		file.Close()
-		accessUrl, err := t.ossPlugin.GetURL(context.Background(), filename)
-		if err != nil {
-			return err
-		}
-		callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
-		callbackEntity.Args.AccessUrl = accessUrl
+		for _, algorithmID := range t.config.AlgorithmId {
+			go func(id uint8) {
+				detectClient := NewDetectionClient(
+					t.config.AlgorithmAPI.Url,
+					t.config.AlgorithmAPI.Method,
+					t.config.AlgorithmAPI.ApiKey,
+				)
+				result, err := detectClient.Detect(DetectionRequest{
+					AlgorithmID:   id,
+					Image:         SnapFrameToBase64WithFFmpeg(buf.Bytes()),
+					ConfThreshold: 0.5,
+				})
+				if err != nil {
+					t.job.Plugin.Error("detect error", "error", err.Error())
+					return
+				}
+				if result.IsSuccess() == false {
+					t.job.Plugin.Error("algorithm api request failed")
+					return
+				}
 
-		if t.config.AlgorithmAPI.CallbackURL != "" {
-			jsonData, _ := json.Marshal(callbackEntity)
-			_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
-			if err != nil {
-				return fmt.Errorf("callback error")
-			}
+				if result.hasDetections() {
+					callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+					//// Todo: 将检测成功的结果保存到 对象存储中去
+					if t.config.AlgorithmAPI.CallbackURL != "" {
+						jsonData, _ := json.Marshal(callbackEntity)
+						_, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
+						if err != nil {
+							t.job.Plugin.Error("callback error", "error", err.Error())
+						}
+					}
+				}
+			}(algorithmID)
 		}
 	}
 

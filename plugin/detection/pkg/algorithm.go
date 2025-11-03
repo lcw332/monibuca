@@ -38,7 +38,7 @@ var AlgorithmMap = AlgorithmId{
 
 // DetectionRequest 定义请求结构体
 type DetectionRequest struct {
-	AlgorithmID   int     `json:"algorithm_id"`
+	AlgorithmID   uint8   `json:"algorithm_id"`
 	Image         string  `json:"image"`
 	ConfThreshold float64 `json:"conf_threshold,omitempty"`
 }
@@ -137,7 +137,7 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 	// 设置请求头
 	httpReq.Header.Set("Content-Type", "application/json")
 	if c.APIKey != "" {
-		httpReq.Header.Set("X-API-Key", c.APIKey)
+		httpReq.Header.Set("x-api-key", c.APIKey)
 	}
 
 	// 添加自定义请求头
@@ -214,6 +214,11 @@ func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionR
 // IsSuccess 判断响应是否成功
 func (resp *DetectionResponse) IsSuccess() bool {
 	return resp.Code == 200
+}
+
+// hasDetections 判断响应中是否有检测结果
+func (resp *DetectionResponse) hasDetections() bool {
+	return len(resp.Data.Detections) > 0
 }
 
 // ToCallback converts a DetectionResponse to a CallbackDetection

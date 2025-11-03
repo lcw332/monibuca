@@ -19,10 +19,9 @@ type (
 	// DetectionPlugin 图像插件
 	DetectionPlugin struct {
 		m7s.Plugin
-		Algorithms   string    `default:"1~24" desc:"全局算法配置"`
-		Threshold    float64   `default:"0.5" desc:"全局阈值"`
-		Oss          Oss       `default:"{}" desc:"对象存储公共配置"`
-		AlgorithmMap Algorithm `default:"{}" desc:"算法映射配置"`
+		Algorithms string  `default:"1~24" desc:"全局算法配置"`
+		Threshold  float64 `default:"0.5" desc:"全局阈值"`
+		Oss        Oss     `default:"{}" desc:"对象存储公共配置"`
 	}
 
 	Oss struct {

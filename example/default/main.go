@@ -28,7 +28,7 @@ import (
 )
 
 func main() {
-	conf := flag.String("c", "config.yaml", "config file")
+	conf := flag.String("c", "/Users/lcw/GolandProjects/monibuca/example/default/config.yaml", "config file")
 	flag.Parse()
 	// ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(time.Second*100))
 	m7s.Run(context.Background(), *conf)
