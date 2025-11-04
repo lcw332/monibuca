@@ -34,6 +34,7 @@ type (
 		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `json:"savePath" desc:"截图保存路径"`
+		FontPath       string        `json:"fontPath" default:"" desc:"检测框字体文件路径"`
 		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
 		ConfThreshold  []float32     `default:"0.5" desc:"置信度配置，与算法ID一一对应"`
 		AlgorithmAPI   AlgorithmAPI  `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
@@ -181,6 +182,8 @@ func (t *IFrameSnapTask) Go() (err error) {
 	err = m7s.PlayBlock(t.subscriber, (func(audio *pkg.AVFrame) error)(nil), func(video *format.AnnexB) error {
 		iframeCount++
 		if iframeCount%t.config.IFrameInterval == 0 {
+			// 原始分辨率
+			t.Logger.Debug("video info", video.GetInfo())
 			if err := t.saveSnap([]*format.AnnexB{video}, SnapModeIFrameInterval); err != nil {
 				t.Error("save snapshot failed", "error", err.Error())
 			}
@@ -227,7 +230,8 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 	// 处理视频帧
 	var buf bytes.Buffer
-	if err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapshotFormat); err != nil {
+	imgInfo, err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapshotFormat)
+	if err != nil {
 		return fmt.Errorf("process with ffmpeg error: %w", err)
 	}
 
@@ -236,7 +240,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		var wg sync.WaitGroup
 		for index, algorithmID := range t.config.AlgorithmId {
 			wg.Add(1)
-			go func(id uint8, idx int) {
+			go func(id *uint8, idx *int, imgInfo *ImgInfo) {
 				defer wg.Done()
 
 				detectClient := NewDetectionClient(
@@ -252,11 +256,11 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				}
 
 				req := DetectionRequest{
-					AlgorithmID: id,
+					AlgorithmID: *id,
 					Image:       SnapFrameToBase64WithFFmpeg(imageData),
 					ConfThreshold: func() float32 {
-						if idx < len(t.config.ConfThreshold) {
-							return t.config.ConfThreshold[idx]
+						if *idx < len(t.config.ConfThreshold) {
+							return t.config.ConfThreshold[*idx]
 						}
 						return 0.6
 					}(),
@@ -280,7 +284,8 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				processedImage := imageData
 				for _, detection := range result.Data.Detections {
 					bbox := FloatsToBBox(detection.BBox)
-					processedImage, err = DrawDetectionBBox(processedImage, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence)
+					//
+					processedImage, err = DrawDetectionBBox(processedImage, imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.FontPath)
 					if err != nil {
 						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 						continue
@@ -296,7 +301,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				if t.ossPlugin != nil {
 					ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
 						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
-						id,
+						*id,
 						now.Format("20060102150405.000"),
 						t.config.SnapshotFormat)
 
@@ -347,7 +352,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						t.job.Plugin.Warn("callback response status not ok", "status", resp.Status)
 					}
 				}
-			}(algorithmID, index)
+			}(&algorithmID, &index, &imgInfo)
 		}
 		wg.Wait()
 	}
