@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -235,12 +236,21 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		return fmt.Errorf("process with ffmpeg error: %w", err)
 	}
 
+	// 提前编码图片用于并发传输
+	imageData := buf.Bytes()
+	if len(imageData) == 0 {
+		return errors.New("original image data is empty")
+	}
+
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
 	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
+		base64ImageData := SnapFrameToBase64WithFFmpeg(imageData)
 		var wg sync.WaitGroup
+		client := &http.Client{Timeout: 10 * time.Second} // 设置全局HTTP客户端带超时
+
 		for index, algorithmID := range t.config.AlgorithmId {
 			wg.Add(1)
-			go func(id *uint8, idx *int, imgInfo *ImgInfo) {
+			go func(id uint8, idx int, imgInfo ImgInfo) {
 				defer wg.Done()
 
 				detectClient := NewDetectionClient(
@@ -249,18 +259,12 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					t.config.AlgorithmAPI.ApiKey,
 				)
 
-				imageData := buf.Bytes()
-				if len(imageData) == 0 {
-					t.job.Plugin.Error("original image data is empty")
-					return
-				}
-
 				req := DetectionRequest{
-					AlgorithmID: *id,
-					Image:       SnapFrameToBase64WithFFmpeg(imageData),
+					AlgorithmID: id,
+					Image:       base64ImageData,
 					ConfThreshold: func() float32 {
-						if *idx < len(t.config.ConfThreshold) {
-							return t.config.ConfThreshold[*idx]
+						if idx < len(t.config.ConfThreshold) {
+							return t.config.ConfThreshold[idx]
 						}
 						return 0.6
 					}(),
@@ -284,8 +288,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				processedImage := imageData
 				for _, detection := range result.Data.Detections {
 					bbox := FloatsToBBox(detection.BBox)
-					//
-					processedImage, err = DrawDetectionBBox(processedImage, imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.FontPath)
+					processedImage, err = DrawDetectionBBox(processedImage, &imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.FontPath)
 					if err != nil {
 						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 						continue
@@ -301,7 +304,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				if t.ossPlugin != nil {
 					ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
 						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
-						*id,
+						id,
 						now.Format("20060102150405.000"),
 						t.config.SnapshotFormat)
 
@@ -340,19 +343,25 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				callbackEntity.Args.AccessUrl = accessUrl
 
 				if t.config.AlgorithmAPI.CallbackURL != "" {
-					jsonData, _ := json.Marshal(callbackEntity)
-					resp, err := http.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
-					if err != nil {
-						t.job.Plugin.Error("callback error", "error", err.Error())
+					jsonData, marshalErr := json.Marshal(callbackEntity)
+					if marshalErr != nil {
+						t.job.Plugin.Warn("marshal callback entity error", "error", marshalErr.Error())
+						return
+					}
+
+					resp, postErr := client.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
+					if postErr != nil {
+						t.job.Plugin.Error("callback error", "error", postErr.Error())
 						return
 					}
 					defer resp.Body.Close()
 
+					body, _ := io.ReadAll(resp.Body)
 					if resp.StatusCode >= 300 {
-						t.job.Plugin.Warn("callback response status not ok", "status", resp.Status)
+						t.job.Plugin.Warn("callback response status not ok", "status", resp.Status, "body", string(body))
 					}
 				}
-			}(&algorithmID, &index, &imgInfo)
+			}(algorithmID, index, imgInfo)
 		}
 		wg.Wait()
 	}
