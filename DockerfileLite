@@ -4,7 +4,8 @@ FROM docker.1ms.run/library/alpine:latest
 WORKDIR /monibuca
 
 # Install ffmpeg and required tools
-RUN apk add --no-cache ffmpeg ca-certificates
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --no-cache ffmpeg ca-certificates
 
 # Copy the pre-compiled binary from the build context
 # The GitHub Actions workflow prepares 'monibuca_linux' in the context root
