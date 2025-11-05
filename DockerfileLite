@@ -9,8 +9,8 @@ RUN apk add --no-cache ffmpeg ca-certificates
 # Copy the pre-compiled binary from the build context
 # The GitHub Actions workflow prepares 'monibuca_linux' in the context root
 
-COPY example/default/monibuca_amd64 ./monibuca_amd64
-COPY example/default/monibuca_arm64 ./monibuca_arm64
+COPY ./monibuca_amd64 ./monibuca_amd64
+COPY ./monibuca_amd64 ./monibuca_arm64
 
 COPY example/default/admin.zip ./admin.zip
 
