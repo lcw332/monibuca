@@ -19,6 +19,10 @@ BUILD_DOCKER=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --platform=*)
+            PLATFORMS="${1#*=}"
+            shift
+            ;;
         --platform)
             if [ -n "$2" ]; then
                 PLATFORMS="$2"
