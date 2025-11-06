@@ -195,8 +195,8 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 	// 计算基于图像实际尺寸的像素坐标
 	x := bbox.X * float64(imgInfo.Width)
 	y := bbox.Y * float64(imgInfo.Height)
-	w := bbox.W * float64(imgInfo.Width)
-	h := bbox.H * float64(imgInfo.Height)
+	w := (bbox.W - bbox.X) * float64(imgInfo.Width)
+	h := (bbox.H - bbox.Y) * float64(imgInfo.Height)
 
 	// 检查系统字体可用性
 	hasFontSupport := checkFontSupport() && fontPath != ""
