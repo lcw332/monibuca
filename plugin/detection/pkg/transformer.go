@@ -30,7 +30,7 @@ const (
 
 type (
 	SnapConfig struct {
-		SnapshotFormat string        `json:"snapshotFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
+		SnapImgFormat  string        `json:"snapImgFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
 		SnapMode       int           `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
 		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
@@ -244,7 +244,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 	now := time.Now()
 	// 处理视频帧
 	var buf bytes.Buffer
-	imgInfo, err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapshotFormat)
+	imgInfo, err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapImgFormat)
 	if err != nil {
 		return fmt.Errorf("process with ffmpeg error: %w", err)
 	}
@@ -302,7 +302,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				for _, detection := range result.Data.Detections {
 					bbox := FloatsToBBox(detection.BBox)
 					processedImage, err = DrawDetectionBBox(processedImage,
-						&imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
+						&imgInfo, t.config.SnapImgFormat, bbox, detection.ClassName, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
 						t.config.Bbox.FontColor)
 					if err != nil {
 						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
@@ -321,7 +321,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
 						id,
 						now.Format("20060102150405.000"),
-						t.config.SnapshotFormat)
+						t.config.SnapImgFormat)
 
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
