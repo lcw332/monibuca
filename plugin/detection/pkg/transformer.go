@@ -38,9 +38,7 @@ type (
 		FontPath       string        `json:"fontPath" default:"" desc:"检测框字体文件路径"`
 		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
 		ConfThreshold  []float32     `default:"0.5" desc:"置信度配置，与算法ID一一对应"`
-		AlgorithmAPI   AlgorithmAPI  `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
-		SnapCompress   SnapCompress  `json:"snapCompress" default:"{}" desc:"图片压缩配置"`
-		Watermark      Watermark     `json:"watermark" default:"{}" desc:"水印配置"`
+		AlgorithmAPI   *AlgorithmAPI `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
 		MaxSnapshots   int           `json:"maxSnapshots" default:"100" desc:"最大保存截图数量"`
 	}
 
@@ -55,27 +53,6 @@ type (
 		RetryInterval time.Duration     `json:"retryInterval" default:"5s" desc:"重试间隔"`
 		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
 		CallbackURL   string            `json:"callbackURL" default:"" desc:"回调地址"`
-	}
-
-	SnapCompress struct {
-		Enable       bool    `json:"enable" default:"false" desc:"是否开启压缩"`
-		Quality      float64 `json:"quality" default:"1" desc:"图片压缩质量"`
-		MaxSize      int     `json:"maxSize" default:"2097152" desc:"图片文件大小, 单位字节"`
-		Mode         string  `json:"mode" default:"none" desc:"图片裁剪模式: none,letterbox、cover、contain等"`
-		TargetWidth  int     `json:"targetWidth" default:"0" desc:"目标宽度(0表示不调整)"`
-		TargetHeight int     `json:"targetHeight" default:"0" desc:"目标高度(0表示不调整)"`
-	}
-
-	Watermark struct {
-		Enable      bool    `json:"enable" default:"false" desc:"是否开启水印"`
-		Text        string  `json:"text" default:"" desc:"水印文字内容"`
-		FontPath    string  `json:"fontPath" default:"" desc:"水印字体文件路径"`
-		FontColor   string  `json:"fontColor" default:"rgba(255,165,0,1)" desc:"水印字体颜色，支持rgba格式"`
-		FontSize    float64 `json:"fontSize" default:"36" desc:"水印字体大小"`
-		FontSpacing float64 `json:"fontSpacing" default:"2" desc:"水印字体间距"`
-		OffsetX     int     `json:"offsetX" default:"0" desc:"水印位置X"`
-		OffsetY     int     `json:"offsetY" default:"0" desc:"水印位置Y"`
-		Opacity     float64 `json:"opacity" default:"1.0" desc:"水印透明度(0-1)"`
 	}
 )
 
@@ -104,9 +81,9 @@ func NewTransform() m7s.ITransformer {
 
 // Start #TaskStarter 启动一个定时任务
 func (t *Transformer) Start() (err error) {
-	// 为每个输出配置创建一个截图任务
-	// 创建一个公共的 OssPlugin
-	ossConfig := t.TransformJob.Plugin.Config.Get("oss")
+	plugin := t.TransformJob.Plugin
+
+	ossConfig := plugin.Config.Get("oss")
 	var ossPlugin storage.Storage
 	if ossConfig != nil {
 		ossPlugin, err = storage.CreateStorage("s3", ossConfig.File)
@@ -115,6 +92,18 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	apiConfig := plugin.Config.Get("algorithmApi")
+	var algApi *AlgorithmAPI
+	if apiConfig != nil {
+		algApi = &AlgorithmAPI{}
+		switch v := apiConfig.File.(type) {
+		case *AlgorithmAPI:
+			algApi = v
+		case map[string]any:
+			config.Parse(algApi, v)
+		}
+	}
+	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
 		var snapConfig SnapConfig
@@ -128,7 +117,10 @@ func (t *Transformer) Start() (err error) {
 			}
 		}
 
-		// TODO: 水印配置
+		// 如果 snapConfig 的 algorithmApi没有配置则使用全局的 api 配置
+		if snapConfig.AlgorithmAPI == nil && apiConfig != nil {
+			snapConfig.AlgorithmAPI = algApi
+		}
 
 		switch snapConfig.SnapMode {
 		case int(SnapModeTimeInterval):
@@ -226,9 +218,6 @@ func (t *TimeSnapTask) Tick(any) {
 func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
 	// 生成文件名
 	now := time.Now()
-	filename := fmt.Sprintf("%s_%s.%s", t.job.StreamPath, now.Format("20060102150405.000"), t.config.SnapshotFormat)
-	filename = strings.ReplaceAll(filename, "/", "_")
-
 	// 处理视频帧
 	var buf bytes.Buffer
 	imgInfo, err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapshotFormat)

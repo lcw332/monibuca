@@ -208,7 +208,7 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 		escapedLabel = strings.ReplaceAll(escapedLabel, ":", "\\:")
 		labelText := fmt.Sprintf("%s %.2f", escapedLabel, confidence)
 
-		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=24:fontcolor=red",
+		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=12:fontcolor=red",
 			x, y, w, h, fontPath, labelText, x, y-30)
 	} else {
 		// 仅绘制边框，不添加文本

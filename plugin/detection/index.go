@@ -19,9 +19,15 @@ type (
 	// DetectionPlugin 图像插件
 	DetectionPlugin struct {
 		m7s.Plugin
-		Algorithms string  `default:"1~24" desc:"全局算法配置"`
-		Threshold  float64 `default:"0.5" desc:"全局阈值"`
-		Oss        Oss     `default:"{}" desc:"对象存储公共配置"`
+		SnapImgFormat  string        `json:"snapImgFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
+		SnapMode       int           `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
+		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+		AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
+		ConfThreshold  []float32     `default:"[]" desc:"全局置信度配置，与算法ID一一对应"`
+		// 对象
+		AlgorithmAPI AlgorithmAPI `json:"algorithmApi" default:"{}" desc:"算法API配置"`
+		Oss          Oss          `default:"{}" desc:"对象存储公共配置"`
 	}
 
 	Oss struct {
@@ -37,12 +43,17 @@ type (
 		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
 	}
 
-	Algorithm struct {
-		DefaultTimeout    time.Duration `default:"30s" desc:"默认算法超时时间"`
-		DefaultRetryCount int           `default:"3" desc:"默认重试次数"`
-		MaxImageSize      int           `default:"2097152" desc:"最大图片大小(字节)"`
-		EnableBatch       bool          `default:"false" desc:"是否启用批量处理"`
-		BatchSize         int           `default:"5" desc:"批量处理大小"`
+	AlgorithmAPI struct {
+		Enable        bool              `json:"enable" default:"false" desc:"是否启用算法分析"`
+		Url           string            `json:"url" default:"" desc:"算法服务地址"`
+		Method        string            `json:"method" default:"POST" desc:"算法服务请求方式"`
+		Headers       map[string]string `json:"headers" default:"{}" desc:"自定义请求头"`
+		Timeout       time.Duration     `json:"timeout" default:"30s" desc:"请求超时时间"`
+		ApiKey        string            `json:"apiKey" default:"" desc:"认证密钥"`
+		RetryCount    int               `json:"retryCount" default:"3" desc:"失败重试次数"`
+		RetryInterval time.Duration     `json:"retryInterval" default:"5s" desc:"重试间隔"`
+		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
+		CallbackURL   string            `json:"callbackURL" default:"" desc:"回调地址"`
 	}
 )
 

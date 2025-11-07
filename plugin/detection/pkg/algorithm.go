@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -45,10 +46,11 @@ type DetectionRequest struct {
 
 // DetectionResult 定义检测结果结构
 type DetectionResult struct {
-	ClassID    int       `json:"class_id"`
-	ClassName  string    `json:"class_name"`
-	Confidence float64   `json:"confidence"`
-	BBox       []float64 `json:"bbox"`
+	ClassID     int       `json:"class_id"`
+	ClassName   string    `json:"class_name"`
+	ClassNameCn string    `json:"class_name_cn"`
+	Confidence  float64   `json:"confidence"`
+	BBox        []float64 `json:"bbox"`
 }
 
 // DetectionResponse 定义响应结构体
@@ -194,7 +196,7 @@ func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionR
 	defer resp.Body.Close()
 
 	// 读取响应体
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read batch response body: %v", err)
 	}
