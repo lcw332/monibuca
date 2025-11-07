@@ -36,9 +36,9 @@ func sendError(rw http.ResponseWriter, code int, message string) {
 
 func (p *DetectionPlugin) RegisterHandler() map[string]http.HandlerFunc {
 	return map[string]http.HandlerFunc{
-		"/list":                    p.listConfig,
-		"/launch":                  p.launchDetection,
-		"/dispose/{streamPath...}": p.disposeDetection,
+		"/list":    p.listConfig,
+		"/launch":  p.launchDetection,
+		"/dispose": p.disposeDetection,
 	}
 }
 
@@ -153,20 +153,37 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 
 // disposeDetection 停止图像检测
 func (p *DetectionPlugin) disposeDetection(rw http.ResponseWriter, r *http.Request) {
-	streamPath := r.URL.Query().Get("streamPath")
+	if r.Method != http.MethodDelete {
+		sendError(rw, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		StreamPath string `json:"streamPath"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(rw, http.StatusBadRequest, "Invalid JSON format")
+		return
+	}
+
+	streamPath := req.StreamPath
 	if streamPath == "" {
 		sendError(rw, http.StatusBadRequest, "streamPath is required")
 		return
 	}
+
 	_, err := p.Server.GetPublisher(streamPath)
 	if err != nil {
 		sendError(rw, http.StatusNotFound, "stream not found")
 		return
 	}
+
 	if tm, ok := p.Server.Transforms.Get(streamPath); ok && tm != nil {
 		tm.TransformJob.Stop(task.ErrTaskComplete)
 		p.Logger.Debug("remove transform")
 	}
+
 	sendSuccess(rw, nil)
 }
 

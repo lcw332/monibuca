@@ -103,6 +103,7 @@ func (t *Transformer) Start() (err error) {
 			config.Parse(algApi, v)
 		}
 	}
+
 	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
