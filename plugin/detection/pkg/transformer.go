@@ -39,9 +39,15 @@ type (
 		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
 		ConfThreshold  []float32     `default:"0.5" desc:"置信度配置，与算法ID一一对应"`
 		AlgorithmAPI   *AlgorithmAPI `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
-		MaxSnapshots   int           `json:"maxSnapshots" default:"100" desc:"最大保存截图数量"`
+		Bbox           *Bbox         `json:"bbox" default:"{}" desc:"检测框配置"`
 	}
 
+	Bbox struct {
+		SnapOriginal bool   `json:"snapOriginal" default:"true" desc:"是否保存原始图片"`
+		FontPath     string `json:"fontPath" default:"" desc:"水印字体文件路径"`
+		FontColor    string `json:"fontColor" default:"red" desc:"截图文字颜色，支持rgba格式"`
+		FontSize     uint8  `json:"fontSize" default:"12" desc:"截图字体大小"`
+	}
 	AlgorithmAPI struct {
 		Enable        bool              `json:"enable" default:"false" desc:"是否启用算法分析"`
 		Url           string            `json:"url" default:"" desc:"算法服务地址"`
@@ -93,14 +99,26 @@ func (t *Transformer) Start() (err error) {
 	}
 
 	apiConfig := plugin.Config.Get("algorithmApi")
-	var algApi *AlgorithmAPI
+	var globalAlgApi *AlgorithmAPI
 	if apiConfig != nil {
-		algApi = &AlgorithmAPI{}
+		globalAlgApi = &AlgorithmAPI{}
 		switch v := apiConfig.File.(type) {
 		case *AlgorithmAPI:
-			algApi = v
+			globalAlgApi = v
 		case map[string]any:
-			config.Parse(algApi, v)
+			config.Parse(globalAlgApi, v)
+		}
+	}
+
+	bboxConfig := plugin.Config.Get("bbox")
+	var globalBbox *Bbox
+	if bboxConfig != nil {
+		globalBbox = &Bbox{}
+		switch v := bboxConfig.File.(type) {
+		case *Bbox:
+			globalBbox = v
+		case map[string]any:
+			config.Parse(globalBbox, v)
 		}
 	}
 
@@ -120,7 +138,12 @@ func (t *Transformer) Start() (err error) {
 
 		// 如果 snapConfig 的 algorithmApi没有配置则使用全局的 api 配置
 		if snapConfig.AlgorithmAPI == nil && apiConfig != nil {
-			snapConfig.AlgorithmAPI = algApi
+			snapConfig.AlgorithmAPI = globalAlgApi
+		}
+
+		// 如果 snapConfig 的 bbox 没有配置则使用全局的 bbox 配置
+		if snapConfig.Bbox == nil && globalBbox != nil {
+			snapConfig.Bbox = globalBbox
 		}
 
 		switch snapConfig.SnapMode {
@@ -278,7 +301,9 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				processedImage := imageData
 				for _, detection := range result.Data.Detections {
 					bbox := FloatsToBBox(detection.BBox)
-					processedImage, err = DrawDetectionBBox(processedImage, &imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.FontPath)
+					processedImage, err = DrawDetectionBBox(processedImage,
+						&imgInfo, t.config.SnapshotFormat, bbox, detection.ClassName, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
+						t.config.Bbox.FontColor)
 					if err != nil {
 						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
 						continue

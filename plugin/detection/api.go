@@ -189,5 +189,7 @@ func (p *DetectionPlugin) disposeDetection(rw http.ResponseWriter, r *http.Reque
 
 // listConfig 列出所有算法配置
 func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
-
+	configs := make([]Configuration, 0)
+	// TODO: 实现获取配置列表逻辑
+	sendSuccess(rw, configs)
 }

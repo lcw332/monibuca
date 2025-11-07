@@ -182,7 +182,7 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 }
 
 // DrawDetectionBBox 在图像上绘制检测框和标签
-func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BBox, label string, confidence float64, fontPath string) ([]byte, error) {
+func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BBox, label string, confidence float64, fontPath string, fontSize uint8, fontColor string) ([]byte, error) {
 
 	var outputFileFormat string
 	switch strings.ToLower(format) {
@@ -208,8 +208,8 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 		escapedLabel = strings.ReplaceAll(escapedLabel, ":", "\\:")
 		labelText := fmt.Sprintf("%s %.2f", escapedLabel, confidence)
 
-		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=12:fontcolor=red",
-			x, y, w, h, fontPath, labelText, x, y-30)
+		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=%d:fontcolor=%s",
+			x, y, w, h, fontPath, labelText, x, y-30, fontSize, fontColor)
 	} else {
 		// 仅绘制边框，不添加文本
 		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2", x, y, w, h)

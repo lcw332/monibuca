@@ -27,9 +27,15 @@ type (
 		ConfThreshold  []float32     `default:"[]" desc:"全局置信度配置，与算法ID一一对应"`
 		// 对象
 		AlgorithmAPI AlgorithmAPI `json:"algorithmApi" default:"{}" desc:"算法API配置"`
-		Oss          Oss          `default:"{}" desc:"对象存储公共配置"`
+		Oss          Oss          `json:"oss" default:"{}" desc:"对象存储公共配置"`
+		Bbox         Bbox         `json:"bbox" default:"" desc:"检测框配置"`
 	}
-
+	Bbox struct {
+		SnapOriginal bool   `json:"snapOriginal" default:"true" desc:"是否保存原始图片"`
+		FontPath     string `json:"fontPath" default:"" desc:"水印字体文件路径"`
+		FontColor    string `json:"fontColor" default:"red" desc:"截图文字颜色，支持rgba格式"`
+		FontSize     uint8  `json:"fontSize" default:"12" desc:"截图字体大小"`
+	}
 	Oss struct {
 		Enable          bool          `default:"false" desc:"是否启用Oss配置" `
 		Endpoint        string        `desc:"S3服务端点"`
