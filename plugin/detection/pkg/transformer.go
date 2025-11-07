@@ -122,6 +122,16 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	snapImgFormat := plugin.Config.Get("snapImgFormat")
+	var globalSnapImgFormat string
+	if snapImgFormat != nil {
+		globalSnapImgFormat = ""
+		switch v := snapImgFormat.File.(type) {
+		case string:
+			globalSnapImgFormat = v
+		}
+	}
+
 	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
@@ -144,6 +154,10 @@ func (t *Transformer) Start() (err error) {
 		// 如果 snapConfig 的 bbox 没有配置则使用全局的 bbox 配置
 		if snapConfig.Bbox == nil && globalBbox != nil {
 			snapConfig.Bbox = globalBbox
+		}
+
+		if snapConfig.SnapImgFormat == "" && globalSnapImgFormat != "" {
+			snapConfig.SnapImgFormat = globalSnapImgFormat
 		}
 
 		switch snapConfig.SnapMode {
