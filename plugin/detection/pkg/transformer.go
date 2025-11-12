@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -280,16 +281,16 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		var wg sync.WaitGroup
 		client := &http.Client{Timeout: 10 * time.Second} // 设置全局HTTP客户端带超时
 
+		detectClient := NewDetectionClient(
+			t.config.AlgorithmAPI.Url,
+			t.config.AlgorithmAPI.Method,
+			t.config.AlgorithmAPI.ApiKey,
+		)
+
 		for index, algorithmID := range t.config.AlgorithmId {
 			wg.Add(1)
 			go func(id uint8, idx int, imgInfo ImgInfo) {
 				defer wg.Done()
-
-				detectClient := NewDetectionClient(
-					t.config.AlgorithmAPI.Url,
-					t.config.AlgorithmAPI.Method,
-					t.config.AlgorithmAPI.ApiKey,
-				)
 
 				req := DetectionRequest{
 					AlgorithmID: id,
@@ -335,6 +336,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				}
 
 				var accessUrl string
+				var objKey string
 				if t.ossPlugin != nil {
 					ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
 						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
@@ -370,11 +372,17 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 						return
 					}
 
-					accessUrl, _ = t.ossPlugin.GetURL(ctx, ossFilename)
+					accessUrl, err = t.ossPlugin.GetURL(ctx, ossFilename)
+					if err != nil {
+						t.job.Plugin.Error("get url error", "error", err.Error())
+						return
+					}
+					objKey = getObjectKey(accessUrl)
 				}
 
 				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
 				callbackEntity.Args.AccessUrl = accessUrl
+				callbackEntity.Args.ObjectKey = objKey
 
 				if t.config.AlgorithmAPI.CallbackURL != "" {
 					jsonData, marshalErr := json.Marshal(callbackEntity)
@@ -403,36 +411,14 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 	return nil
 }
 
-// updateConfig 更新算法配置
-func (t *SnapTask) updateConfig(steamPath string, config *SnapConfig) {
-	t.config = *config
-	// 关闭当前任务, 启动新的任务
-	t.job.Dispose()
-	// 根据 SnapMode 重新构造对应的任务类型
-	var newTask task.ITask
-	switch config.SnapMode {
-	case int(SnapModeTimeInterval):
-		newTask = &TimeSnapTask{
-			SnapTask: SnapTask{
-				config:    *config,
-				job:       t.job,
-				ossPlugin: t.ossPlugin,
-			},
-		}
-	case int(SnapModeIFrameInterval):
-		newTask = &IFrameSnapTask{
-			SnapTask: SnapTask{
-				config:    *config,
-				job:       t.job,
-				ossPlugin: t.ossPlugin,
-			},
-		}
-	case int(SnapModeManual):
-		// 手动模式暂不支持动态更新任务
-		return
+func getObjectKey(accessUrl string) string {
+	// 解析URL并提取路径部分作为object key
+	parsedURL, err := url.Parse(accessUrl)
+	if err != nil {
+		return ""
 	}
 
-	if newTask != nil {
-		t.job.AddTask(newTask)
-	}
+	// 移除路径开头的斜杠（如果存在）
+	path := strings.TrimPrefix(parsedURL.Path, "/")
+	return path
 }
