@@ -253,12 +253,6 @@ func (p *DetectionPlugin) disposeDetection(rw http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	_, err := p.Server.GetPublisher(streamPath)
-	if err != nil {
-		sendError(rw, http.StatusNotFound, "stream not found")
-		return
-	}
-
 	if tm, ok := p.Server.Transforms.Get(streamPath); ok && tm != nil {
 		tm.TransformJob.Stop(task.ErrTaskComplete)
 		p.Logger.Debug("remove transform")
