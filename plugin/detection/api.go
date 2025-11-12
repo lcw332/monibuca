@@ -2,6 +2,7 @@ package plugin_detection
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -48,9 +49,9 @@ type UpdateDetectRequest struct {
 }
 
 type Configuration struct {
-	SnapMode       int       `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
-	TimerInterval  string    `json:"timeInterval" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
-	IFrameInterval int       `json:"iframeInterval" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+	SnapMode       []int     `json:"snapMode" default:"[0]" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
+	TimerInterval  []string  `json:"timeInterval" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
+	IFrameInterval []int     `json:"iframeInterval" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 	AlgorithmId    []uint8   `json:"algorithmId" default:"[]" desc:"算法ID"`
 	Threshold      []float32 `json:"threshold" default:"[]" desc:"置信度配置，与算法ID一一对应"`
 }
@@ -63,7 +64,7 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 	}
 
 	var req UpdateDetectRequest
-	var timerInterval time.Duration
+	var timerIntervals []time.Duration
 
 	// 从请求中解析流路径参数
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -79,23 +80,65 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 	}
 
 	configuration := req.Configuration
-	// 参数校验
-	if configuration.SnapMode < 0 || configuration.SnapMode > 2 {
-		sendError(rw, http.StatusBadRequest, "snapMode must be between 0 and 2")
-		return
+
+	// 如果snapMode未提供，则默认为[0]
+	if len(configuration.SnapMode) == 0 {
+		configuration.SnapMode = []int{0}
 	}
 
-	if configuration.SnapMode == 0 {
-		duration, err := time.ParseDuration(configuration.TimerInterval)
-		if err != nil || duration <= 0 {
-			sendError(rw, http.StatusBadRequest, "invalid timeInterval format or value, must be greater than 0")
+	// 确保数组长度一致
+	maxLen := len(configuration.SnapMode)
+	if len(configuration.TimerInterval) > maxLen {
+		maxLen = len(configuration.TimerInterval)
+	}
+	if len(configuration.IFrameInterval) > maxLen {
+		maxLen = len(configuration.IFrameInterval)
+	}
+
+	// 扩展数组至相同长度
+	for len(configuration.SnapMode) < maxLen {
+		configuration.SnapMode = append(configuration.SnapMode, configuration.SnapMode[len(configuration.SnapMode)-1])
+	}
+	for len(configuration.TimerInterval) < maxLen {
+		configuration.TimerInterval = append(configuration.TimerInterval, "")
+	}
+	for len(configuration.IFrameInterval) < maxLen {
+		configuration.IFrameInterval = append(configuration.IFrameInterval, configuration.IFrameInterval[len(configuration.IFrameInterval)-1])
+	}
+
+	// 初始化timerIntervals数组
+	timerIntervals = make([]time.Duration, maxLen)
+
+	// 参数校验
+	for i, mode := range configuration.SnapMode {
+		if mode < 0 || mode > 2 {
+			sendError(rw, http.StatusBadRequest, fmt.Sprintf("snapMode[%d] must be between 0 and 2", i))
 			return
 		}
-		timerInterval = duration
-	}
-	if configuration.SnapMode == 1 && configuration.IFrameInterval <= 0 {
-		sendError(rw, http.StatusBadRequest, "iframeInterval must be greater than 0 when snapMode is 1")
-		return
+
+		if mode == 0 {
+			if configuration.TimerInterval[i] == "" {
+				// 如果未提供timeInterval，使用默认值1s
+				configuration.TimerInterval[i] = "1s"
+			}
+
+			duration, err := time.ParseDuration(configuration.TimerInterval[i])
+			if err != nil || duration <= 0 {
+				sendError(rw, http.StatusBadRequest, fmt.Sprintf("invalid timeInterval[%d] format or value, must be greater than 0", i))
+				return
+			}
+			timerIntervals[i] = duration
+		}
+
+		if mode == 1 && configuration.IFrameInterval[i] <= 0 {
+			// 如果未提供IFrameInterval，使用默认值1
+			if configuration.IFrameInterval[i] == 0 {
+				configuration.IFrameInterval[i] = 1
+			} else {
+				sendError(rw, http.StatusBadRequest, fmt.Sprintf("iframeInterval[%d] must be greater than 0 when snapMode[%d] is 1", i, i))
+				return
+			}
+		}
 	}
 
 	if len(configuration.AlgorithmId) != len(configuration.Threshold) {
@@ -124,22 +167,59 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 		p.Logger.Debug("remove transform")
 	}
 
+	// 创建输出配置数组
+	var outputs []config.TransformOutput
+	for i := 0; i < maxLen; i++ {
+		// 构造当前输出配置的算法ID和阈值数组
+		var algorithmIds []uint8
+		var thresholds []float32
+
+		// 如果AlgorithmId和Threshold数组长度大于i，则取对应索引的值
+		if len(configuration.AlgorithmId) > i {
+			algorithmIds = []uint8{configuration.AlgorithmId[i]}
+			if len(configuration.Threshold) > i {
+				thresholds = []float32{configuration.Threshold[i]}
+			} else {
+				thresholds = []float32{0.5} // 默认阈值
+			}
+		} else if len(configuration.AlgorithmId) > 0 {
+			// 如果索引超出范围但数组不为空，则使用第一个元素
+			algorithmIds = []uint8{configuration.AlgorithmId[0]}
+			if len(configuration.Threshold) > 0 {
+				thresholds = []float32{configuration.Threshold[0]}
+			} else {
+				thresholds = []float32{0.5} // 默认阈值
+			}
+		} else {
+			// 如果没有提供算法配置，使用默认值
+			algorithmIds = []uint8{1}
+			thresholds = []float32{0.5}
+		}
+
+		conf := detection.SnapConfig{
+			SnapMode:       configuration.SnapMode[i],
+			IFrameInterval: configuration.IFrameInterval[i],
+			AlgorithmId:    algorithmIds,
+			ConfThreshold:  thresholds,
+		}
+
+		if configuration.SnapMode[i] == 0 && i < len(timerIntervals) {
+			conf.TimeInterval = timerIntervals[i]
+		}
+
+		output := config.TransformOutput{
+			Target:     streamPath,
+			StreamPath: streamPath,
+			Conf:       conf,
+		}
+
+		outputs = append(outputs, output)
+	}
+
 	// 创建新的 Transformer 实例，并初始化
 	trans = detection.NewTransform().(*detection.Transformer)
 	trans.TransformJob.Init(trans, &p.Plugin, publisher, config.Transform{
-		Output: []config.TransformOutput{
-			{
-				Target:     streamPath,
-				StreamPath: streamPath,
-				Conf: detection.SnapConfig{
-					SnapMode:       configuration.SnapMode,
-					TimeInterval:   timerInterval,
-					IFrameInterval: configuration.IFrameInterval,
-					AlgorithmId:    configuration.AlgorithmId,
-					ConfThreshold:  configuration.Threshold,
-				},
-			},
-		},
+		Output: outputs,
 	})
 
 	err = trans.WaitStarted()
