@@ -240,6 +240,11 @@ func (t *TimeSnapTask) GetTickInterval() time.Duration {
 
 // Tick #TaskTicker 定时截图任务执行逻辑
 func (t *TimeSnapTask) Tick(any) {
+	// 如果没有publisher，直接返回
+	if nil == t.job.OriginPublisher {
+		return
+	}
+
 	// 获取视频帧
 	annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
 	if err != nil {
