@@ -321,8 +321,14 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 				processedImage := imageData
 				for _, detection := range result.Data.Detections {
 					bbox := FloatsToBBox(detection.BBox)
+					className := "unknown"
+					if detection.ClassNameCn != "" {
+						className = detection.ClassNameCn
+					} else if detection.ClassName != "" {
+						className = detection.ClassName
+					}
 					processedImage, err = DrawDetectionBBox(processedImage,
-						&imgInfo, t.config.SnapImgFormat, bbox, detection.ClassName, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
+						&imgInfo, t.config.SnapImgFormat, bbox, className, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
 						t.config.Bbox.FontColor)
 					if err != nil {
 						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
