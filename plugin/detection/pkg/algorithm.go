@@ -79,8 +79,8 @@ type CallbackDetection struct {
 	Event      string `json:"event"`
 	StreamPath string `json:"streamPath"`
 	Args       struct {
-		AccessUrl     string            `json:"access_url" desc:"对象存储访问链接"`
-		ObjectKey     string            `json:"object_key" desc:"对象存储 Key"`
+		AccessUrl     string            `json:"access_url,omitempty" desc:"对象存储访问链接"`
+		ObjectKey     string            `json:"object_key,omitempty" desc:"对象存储 Key"`
 		AlgorithmID   int               `json:"algorithm_id"`
 		AlgorithmName string            `json:"algorithm_name"`
 		Detections    []DetectionResult `json:"detections"`
