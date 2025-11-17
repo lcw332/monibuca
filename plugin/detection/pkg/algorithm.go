@@ -2,12 +2,18 @@ package detection
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"m7s.live/v5/plugin/detection/pb"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // AlgorithmMap 定义算法映射关系
@@ -106,22 +112,50 @@ type DetectionClient struct {
 	Method     string
 	APIKey     string
 	HTTPClient *http.Client
+	// gRPC相关字段
+	GRPCClient pb.DetectionServiceClient
+	GRPConn    *grpc.ClientConn
+	IsGRPC     bool
 }
 
 // NewDetectionClient 创建新的检测客户端
 func NewDetectionClient(URL, Method, apiKey string) *DetectionClient {
-	return &DetectionClient{
+	client := &DetectionClient{
 		URL:    URL,
 		Method: Method,
 		APIKey: apiKey,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		IsGRPC: false,
 	}
+
+	// 如果URL以grpc://开头，则初始化gRPC客户端
+	if len(URL) > 7 && URL[:7] == "grpc://" {
+		client.IsGRPC = true
+		conn, err := grpc.NewClient(URL[7:], grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			// 如果gRPC连接失败，回退到HTTP模式
+			client.IsGRPC = false
+			return client
+		}
+		client.GRPConn = conn
+		client.GRPCClient = pb.NewDetectionServiceClient(conn)
+	}
+
+	return client
 }
 
 // Detect 发送检测请求
 func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, error) {
+	if c.IsGRPC {
+		return c.detectGRPC(req)
+	}
+	return c.detectHTTP(req)
+}
+
+// detectHTTP 通过HTTP发送检测请求
+func (c *DetectionClient) detectHTTP(req DetectionRequest) (*DetectionResponse, error) {
 	// 序列化请求体
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -165,8 +199,67 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 	return &detectionResp, nil
 }
 
+// detectGRPC 通过gRPC发送检测请求
+func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, error) {
+	grpcReq := &pb.DetectRequest{
+		AlgorithmId:   int32(req.AlgorithmID),
+		Image:         req.Image,
+		ConfThreshold: req.ConfThreshold,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send gRPC request: %v", err)
+	}
+
+	// 转换响应格式
+	detections := make([]DetectionResult, len(grpcResp.Data.Detections))
+	for i, d := range grpcResp.Data.Detections {
+		bbox := make([]float64, len(d.Bbox))
+		for j, b := range d.Bbox {
+			bbox[j] = float64(b)
+		}
+		detections[i] = DetectionResult{
+			ClassID:     int(d.ClassId),
+			ClassName:   d.ClassName,
+			ClassNameCn: d.ClassNameCn,
+			Confidence:  float64(d.Confidence),
+			BBox:        bbox,
+		}
+	}
+
+	detectionResp := &DetectionResponse{
+		Code:    int(grpcResp.Code),
+		Message: grpcResp.Message,
+		Data: struct {
+			AlgorithmID   int               `json:"algorithm_id"`
+			AlgorithmName string            `json:"algorithm_name"`
+			Detections    []DetectionResult `json:"detections"`
+			TotalCount    int               `json:"total_count"`
+			DetectTime    float64           `json:"detect_time"`
+		}{
+			AlgorithmID:   int(grpcResp.Data.AlgorithmId),
+			AlgorithmName: grpcResp.Data.AlgorithmName,
+			Detections:    detections,
+			TotalCount:    int(grpcResp.Data.TotalCount),
+			DetectTime:    float64(grpcResp.Data.DetectTime),
+		},
+	}
+
+	return detectionResp, nil
+}
+
 // BatchDetect 发送批量检测请求
 func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
+	// gRPC模式下暂不支持批量检测，回退到HTTP实现
+	return c.batchDetectHTTP(reqs)
+}
+
+// batchDetectHTTP 发送HTTP批量检测请求
+func (c *DetectionClient) batchDetectHTTP(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
 	batchReq := BatchDetectionRequest{
 		Requests: reqs,
 	}
@@ -209,6 +302,14 @@ func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionR
 	}
 
 	return &batchResp, nil
+}
+
+// Close 关闭客户端连接
+func (c *DetectionClient) Close() error {
+	if c.IsGRPC && c.GRPConn != nil {
+		return c.GRPConn.Close()
+	}
+	return nil
 }
 
 // IsSuccess 判断响应是否成功

@@ -61,6 +61,18 @@ type (
 		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
 		CallbackURL   string            `json:"callbackURL" default:"" desc:"回调地址"`
 	}
+	Oss struct {
+		Enable          bool          `default:"false" desc:"是否启用Oss配置" `
+		Endpoint        string        `desc:"S3服务端点"`
+		Region          string        `desc:"AWS区域" default:"us-east-1"`
+		AccessKeyID     string        `desc:"S3访问密钥ID"`
+		SecretAccessKey string        `desc:"S3秘密访问密钥"`
+		Bucket          string        `desc:"S3存储桶名称"`
+		PathPrefix      string        `desc:"文件路径前缀"`
+		ForcePathStyle  bool          `desc:"强制路径样式（MinIO需要）"`
+		UseSSL          bool          `desc:"是否使用SSL" default:"false"`
+		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
+	}
 )
 
 type Transformer struct {
@@ -69,9 +81,10 @@ type Transformer struct {
 }
 
 type SnapTask struct {
-	job       *m7s.TransformJob
-	ossPlugin storage.Storage
-	config    SnapConfig
+	job        *m7s.TransformJob
+	ossPlugin  storage.Storage
+	config     SnapConfig
+	mqttClient *MQTTClient
 }
 
 type AlgTask struct {
@@ -133,6 +146,19 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	// 初始化MQTT客户端
+	mqttConfig := plugin.Config.Get("mqtt")
+	var globalMQTTConfig *MQTTConfig
+	if mqttConfig != nil {
+		globalMQTTConfig = &MQTTConfig{}
+		switch v := mqttConfig.File.(type) {
+		case *MQTTConfig:
+			globalMQTTConfig = v
+		case map[string]any:
+			config.Parse(globalMQTTConfig, v)
+		}
+	}
+
 	// 为每个输出配置创建一个截图任务
 	for _, output := range t.TransformJob.Config.Output {
 		var task task.ITask
@@ -161,14 +187,21 @@ func (t *Transformer) Start() (err error) {
 			snapConfig.SnapImgFormat = globalSnapImgFormat
 		}
 
+		// 创建MQTT客户端
+		var mqttClient *MQTTClient
+		if globalMQTTConfig != nil && globalMQTTConfig.Enable {
+			mqttClient = NewMQTTClient(globalMQTTConfig, plugin.Logger)
+		}
+
 		switch snapConfig.SnapMode {
 		case int(SnapModeTimeInterval):
 			// 时间间隔模式截图逻辑
 			timeTask := &TimeSnapTask{
 				SnapTask: SnapTask{
-					config:    snapConfig,
-					job:       &t.TransformJob,
-					ossPlugin: ossPlugin,
+					config:     snapConfig,
+					job:        &t.TransformJob,
+					ossPlugin:  ossPlugin,
+					mqttClient: mqttClient,
 				},
 			}
 			task = timeTask
@@ -176,9 +209,10 @@ func (t *Transformer) Start() (err error) {
 			// 关键帧间隔模式截图逻辑
 			iframeTask := &IFrameSnapTask{
 				SnapTask: SnapTask{
-					config:    snapConfig,
-					job:       &t.TransformJob,
-					ossPlugin: ossPlugin,
+					config:     snapConfig,
+					job:        &t.TransformJob,
+					ossPlugin:  ossPlugin,
+					mqttClient: mqttClient,
 				},
 			}
 			task = iframeTask
@@ -341,6 +375,19 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					return
 				}
 
+				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+
+				// 通过MQTT推送检测结果
+				if t.mqttClient != nil && t.mqttClient.IsConnected() {
+					for i, topic := range t.mqttClient.config.Pub {
+						// 发布消息
+						err := t.mqttClient.PublishWithIndex(topic, i, t.job.StreamPath, callbackEntity)
+						if err != nil {
+							t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
+						}
+					}
+				}
+
 				var accessUrl string
 				var objKey string
 				if t.ossPlugin != nil {
@@ -386,7 +433,6 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					objKey = getObjectKey(accessUrl)
 				}
 
-				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
 				callbackEntity.Args.AccessUrl = accessUrl
 				callbackEntity.Args.ObjectKey = objKey
 
