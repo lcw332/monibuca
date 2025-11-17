@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	task "github.com/langhuihui/gotask"
 	"m7s.live/v5"
 	"m7s.live/v5/pkg"
@@ -294,6 +295,7 @@ func (t *TimeSnapTask) Tick(any) {
 
 // saveSnap 保存截图，核心实现逻辑
 func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
+	publishId := uuid.New()
 	// 生成文件名
 	now := time.Now()
 	// 处理视频帧
@@ -375,7 +377,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 					return
 				}
 
-				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, 0)
+				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
 
 				// 通过MQTT推送检测结果
 				if t.mqttClient != nil && t.mqttClient.IsConnected() {

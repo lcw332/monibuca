@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"m7s.live/v5/plugin/detection/pb"
 
 	"google.golang.org/grpc"
@@ -86,11 +87,11 @@ type CallbackDetection struct {
 		TotalCount    int               `json:"total_count"`
 		DetectTime    float64           `json:"detect_time"`
 	} `json:"args"`
-	PublishId  uint32 `json:"publishId"`
-	RemoteAddr string `json:"remoteAddr"`
-	Type       string `json:"type"`
-	PluginName string `json:"pluginName"`
-	Timestamp  int    `json:"timestamp"`
+	PublishId  uuid.UUID `json:"publishId"`
+	RemoteAddr string    `json:"remoteAddr"`
+	Type       string    `json:"type"`
+	PluginName string    `json:"pluginName"`
+	Timestamp  int       `json:"timestamp"`
 }
 
 // BatchDetectionRequest 批量检测请求
@@ -323,7 +324,7 @@ func (resp *DetectionResponse) hasDetections() bool {
 }
 
 // ToCallback converts a DetectionResponse to a CallbackDetection
-func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName string, publishId uint32) *CallbackDetection {
+func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName string, publishId uuid.UUID) *CallbackDetection {
 	callback := &CallbackDetection{
 		Event:      "detection",
 		StreamPath: streamPath,
