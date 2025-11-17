@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+//import "global.proto";
+package detection;
+option go_package="m7s.live/v5/plugin/detection/pb";
+
+// Request for object detection
+message DetectRequest {
+  int32 algorithm_id = 1;
+  string image = 2;
+  float conf_threshold = 3;
+}
+
+// Response for object detection
+message DetectResponse {
+  int32 code = 1;
+  string message = 2;
+  DetectionData data = 3;
+}
+
+// Detection data structure containing results
+message DetectionData {
+  int32 algorithm_id = 1;
+  string algorithm_name = 2;
+  repeated Detection detections = 3;
+  int32 total_count = 4;
+  float detect_time = 5;
+}
+
+// Single detection result
+message Detection {
+  int32 class_id = 1;
+  string class_name = 2;
+  string class_name_cn = 3;
+  float confidence = 4;
+  repeated float bbox = 5;
+}
+
+// Health check request (empty)
+message HealthRequest {}
+
+// Health check response with system information
+message HealthResponse {
+  string status = 1;
+  string device = 2;
+  string yolov5_repo = 3;
+  int32 models_cached = 4;
+  string image_backend = 5;
+  string gpu_name = 6;
+  float gpu_memory_allocated_mb = 7;
+  float gpu_memory_reserved_mb = 8;
+}
+
+// Version request (empty)
+message VersionRequest {}
+
+// Version response with environment details
+message VersionResponse {
+  string version = 1;
+  string mode = 2;
+  string pytorch_version = 3;
+  string opencv_version = 4;
+  string device = 5;
+  bool cuda_available = 6;
+  float default_conf_threshold = 7;
+  repeated int32 algo_supported = 8;
+}
+
+// Detection service definition
+service DetectionService {
+  rpc Detect(DetectRequest) returns (DetectResponse);
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+  rpc GetVersion(VersionRequest) returns (VersionResponse);
+}
