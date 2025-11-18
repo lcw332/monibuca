@@ -215,7 +215,10 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 	md := metadata.Pairs(
 		"x-api-key", c.APIKey,
 	)
-	grpc.SetHeader(ctx, md)
+	err := grpc.SetHeader(ctx, md)
+	if err != nil {
+		return nil, err
+	}
 	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send gRPC request: %v", err)
