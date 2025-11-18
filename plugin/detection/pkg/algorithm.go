@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 	"m7s.live/v5/plugin/detection/pb"
 
 	"google.golang.org/grpc"
@@ -211,7 +212,10 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	ctx = context.WithValue(ctx, "x-api-key", c.APIKey)
+	md := metadata.Pairs(
+		"x-api-key", c.APIKey,
+	)
+	grpc.SetHeader(ctx, md)
 	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send gRPC request: %v", err)
