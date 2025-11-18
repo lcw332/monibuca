@@ -193,7 +193,7 @@ func (m *MQTTClient) Publish(topic string, qos int, payload interface{}) error {
 }
 
 // PublishWithIndex 发布消息，支持索引替换
-func (m *MQTTClient) PublishWithIndex(topicTemplate string, index int, streamPath string, payload interface{}) error {
+func (m *MQTTClient) PublishWithIndex(topicTemplate string, index uint8, streamPath string, payload interface{}) error {
 	if !m.IsConnected() {
 		return fmt.Errorf("MQTT not connected")
 	}

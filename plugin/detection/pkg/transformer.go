@@ -381,9 +381,9 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 
 				// 通过MQTT推送检测结果
 				if t.mqttClient != nil && t.mqttClient.IsConnected() {
-					for i, topic := range t.mqttClient.config.Pub {
+					for _, topic := range t.mqttClient.config.Pub {
 						// 发布消息
-						err := t.mqttClient.PublishWithIndex(topic, i, t.job.StreamPath, callbackEntity)
+						err := t.mqttClient.PublishWithIndex(topic, id, t.job.StreamPath, callbackEntity)
 						if err != nil {
 							t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
 						}
