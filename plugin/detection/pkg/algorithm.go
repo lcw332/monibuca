@@ -211,6 +211,7 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	ctx = context.WithValue(ctx, "x-api-key", c.APIKey)
 	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send gRPC request: %v", err)
