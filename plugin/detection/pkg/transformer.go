@@ -373,16 +373,16 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 	// 并行执行所有算法检测
 	for index, algorithmID := range t.config.AlgorithmId {
 		wg.Add(1)
-		go func(id uint8, idx int) {
+		go func(algId uint8, idx int) {
 			defer wg.Done()
 
 			result := &algorithmResult{
-				algId: id,
+				algId: algId,
 				index: idx,
 			}
 
 			req := DetectionRequest{
-				AlgorithmID: id,
+				AlgorithmID: algId,
 				Image:       base64ImageData,
 				ConfThreshold: func() float32 {
 					if idx < len(t.config.ConfThreshold) {
