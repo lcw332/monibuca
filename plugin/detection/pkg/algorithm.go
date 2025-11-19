@@ -338,7 +338,7 @@ func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName str
 		RemoteAddr: remoteAddr,
 		Type:       "detection",
 		PluginName: pluginName,
-		Timestamp:  int(time.Now().Unix()),
+		Timestamp:  int(time.Now().UnixMilli()),
 	}
 
 	callback.Args.AlgorithmID = resp.Data.AlgorithmID
