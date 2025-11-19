@@ -205,7 +205,15 @@ func (m *MQTTClient) PublishWithIndex(topicTemplate string, index int, algId uin
 	// 替换主题模板中的变量
 	topic := topicTemplate
 	topic = strings.ReplaceAll(topic, "${streamPath}", strings.ReplaceAll(streamPath, "/", "_"))
-	topic = strings.ReplaceAll(topic, "+", fmt.Sprintf("%d", algId))
+
+	// 只有当主题中包含 "+" 占位符时才替换算法ID
+	if strings.Contains(topic, "+") {
+		topic = strings.ReplaceAll(topic, "+", fmt.Sprintf("%d", algId))
+	}
+	//else {
+	//	// 如果没有占位符，为了区分不同算法的结果，可以在主题后添加算法ID
+	//	topic = fmt.Sprintf("%s/%d", topic, algId)
+	//}
 
 	return m.Publish(topic, m.config.Qos[index], payload)
 }
