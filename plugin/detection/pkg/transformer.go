@@ -38,10 +38,11 @@ type (
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		SavePath       string        `json:"savePath" desc:"截图保存路径"`
 		FontPath       string        `json:"fontPath" default:"" desc:"检测框字体文件路径"`
-		AlgorithmId    []uint8       `default:"1:26" desc:"算法ID"`
-		ConfThreshold  []float32     `default:"0.5" desc:"置信度配置，与算法ID一一对应"`
+		AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
+		ConfThreshold  []float32     `default:"[]" desc:"置信度配置，与算法ID一一对应"`
 		AlgorithmAPI   *AlgorithmAPI `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
 		Bbox           *Bbox         `json:"bbox" default:"{}" desc:"检测框配置"`
+		MQTT           *MQTTConfig   `json:"mqtt" default:"{}" desc:"MQTT配置"`
 	}
 
 	Bbox struct {
@@ -99,7 +100,7 @@ type SnapTask struct {
 	job        *m7s.TransformJob
 	ossPlugin  storage.Storage
 	config     SnapConfig
-	mqttClient *MQTTClient
+	mqttClient MQTTClient
 }
 
 type AlgTask struct {
@@ -202,10 +203,15 @@ func (t *Transformer) Start() (err error) {
 			snapConfig.SnapImgFormat = globalSnapImgFormat
 		}
 
+		// 如果 snapConfig 的 mqtt 没有配置则使用全局的 mqtt 配置
+		if snapConfig.MQTT == nil && globalMQTTConfig != nil {
+			snapConfig.MQTT = globalMQTTConfig
+		}
+
 		// 创建MQTT客户端
-		var mqttClient *MQTTClient
+		var mqttClient MQTTClient
 		if globalMQTTConfig != nil && globalMQTTConfig.Enable {
-			mqttClient = NewMQTTClient(globalMQTTConfig, plugin.Logger)
+			mqttClient, _ = NewMQTTClient(globalMQTTConfig, plugin.Logger)
 		}
 
 		switch snapConfig.SnapMode {
@@ -482,7 +488,6 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
 		// 发送MQTT消息
 		t.sendMQTTMessage(result, callbackEntity)
-
 		// 上传到OSS（如果需要）
 		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, imgInfo, now, uploadedFiles)
 		if err != nil {
@@ -568,7 +573,8 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 		return
 	}
 
-	for i, topic := range t.mqttClient.config.Pub {
+	// 遍历配置中的发布主题并发送消息
+	for i, topic := range t.config.MQTT.Pub {
 		err := t.mqttClient.PublishWithIndex(topic, i, result.algId, t.job.StreamPath, callbackEntity)
 		if err != nil {
 			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())

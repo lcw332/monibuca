@@ -24,8 +24,17 @@ type MQTTConfig struct {
 	KeepAlive int      `json:"keepAlive" default:"60" desc:"心跳间隔(秒)"`
 }
 
-// MQTTClient MQTT客户端封装
-type MQTTClient struct {
+// MQTTClient Interface
+type MQTTClient interface {
+	IsConnected() bool
+	Publish(topic string, qos int, payload interface{}) error
+	PublishWithIndex(topicTemplate string, index int, algId uint8, streamPath string, payload interface{}) error
+	Close()
+	GetClient() mqtt.Client
+}
+
+// mqttClientImpl MQTT客户端封装
+type mqttClientImpl struct {
 	config    *MQTTConfig
 	client    mqtt.Client
 	logger    *slog.Logger
@@ -33,23 +42,40 @@ type MQTTClient struct {
 	connected bool
 }
 
-// NewMQTTClient 创建MQTT客户端
-func NewMQTTClient(config *MQTTConfig, logger *slog.Logger) *MQTTClient {
+var (
+	// 存储每个配置对应的MQTT客户端实例
+	clientInstances = sync.Map{}
+)
+
+// NewMQTTClient 创建MQTT客户端，一个配置仅允许存在一个 client
+func NewMQTTClient(config *MQTTConfig, logger *slog.Logger) (MQTTClient, error) {
 	if config == nil || !config.Enable {
-		return nil
+		return nil, fmt.Errorf("MQTT not enabled")
 	}
 
-	client := &MQTTClient{
+	// 使用配置的Endpoint作为唯一标识符来确保一个配置只有一个客户端实例
+	configKey := fmt.Sprintf("%s-%s", config.Endpoint, config.ClientID)
+
+	// 尝试从缓存中获取现有客户端
+	if instance, ok := clientInstances.Load(configKey); ok {
+		return instance.(MQTTClient), nil
+	}
+
+	client := &mqttClientImpl{
 		config: config,
 		logger: logger,
 	}
 
 	client.connect()
-	return client
+
+	// 将新创建的客户端存储到缓存中
+	clientInstances.Store(configKey, client)
+
+	return client, nil
 }
 
 // connect 建立MQTT连接
-func (m *MQTTClient) connect() {
+func (m *mqttClientImpl) connect() {
 	if m.config.Endpoint == "" {
 		m.logger.Error("MQTT endpoint is empty")
 		return
@@ -61,7 +87,7 @@ func (m *MQTTClient) connect() {
 	// 设置客户端ID，如果为空则生成一个
 	clientID := m.config.ClientID
 	if clientID == "" {
-		clientID = fmt.Sprintf("detection_client_%d", time.Now().Unix())
+		clientID = fmt.Sprintf("monibuca_detection_client_%d", time.Now().Unix())
 	}
 	opts.SetClientID(clientID)
 
@@ -100,7 +126,7 @@ func (m *MQTTClient) connect() {
 }
 
 // onConnect 连接回调
-func (m *MQTTClient) onConnect(client mqtt.Client) {
+func (m *mqttClientImpl) onConnect(client mqtt.Client) {
 	m.mutex.Lock()
 	m.connected = true
 	m.mutex.Unlock()
@@ -108,7 +134,7 @@ func (m *MQTTClient) onConnect(client mqtt.Client) {
 }
 
 // onConnectionLost 连接丢失回调
-func (m *MQTTClient) onConnectionLost(client mqtt.Client, err error) {
+func (m *mqttClientImpl) onConnectionLost(client mqtt.Client, err error) {
 	m.mutex.Lock()
 	m.connected = false
 	m.mutex.Unlock()
@@ -116,25 +142,21 @@ func (m *MQTTClient) onConnectionLost(client mqtt.Client, err error) {
 }
 
 // onMessage 消息接收回调
-func (m *MQTTClient) onMessage(client mqtt.Client, msg mqtt.Message) {
+func (m *mqttClientImpl) onMessage(client mqtt.Client, msg mqtt.Message) {
 	m.logger.Debug("MQTT message received", "topic", msg.Topic(), "payload", string(msg.Payload()))
 }
 
 // IsConnected 检查是否连接
-func (m *MQTTClient) IsConnected() bool {
+func (m *mqttClientImpl) IsConnected() bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	return m.connected && m.client != nil && m.client.IsConnected()
 }
 
 // Publish 发布消息，支持指定QoS等级
-func (m *MQTTClient) Publish(topic string, qos int, payload interface{}) error {
+func (m *mqttClientImpl) Publish(topic string, qos int, payload interface{}) error {
 	if !m.IsConnected() {
-		m.logger.Warn("MQTT not connected, attempting to reconnect")
-		m.connect() // 尝试重新连接
-		if !m.IsConnected() {
-			return fmt.Errorf("MQTT not connected")
-		}
+		return fmt.Errorf("MQTT not connected")
 	}
 
 	// 根据配置格式化消息
@@ -197,7 +219,7 @@ func (m *MQTTClient) Publish(topic string, qos int, payload interface{}) error {
 }
 
 // PublishWithIndex 发布消息，支持索引替换
-func (m *MQTTClient) PublishWithIndex(topicTemplate string, index int, algId uint8, streamPath string, payload interface{}) error {
+func (m *mqttClientImpl) PublishWithIndex(topicTemplate string, index int, algId uint8, streamPath string, payload interface{}) error {
 	if !m.IsConnected() {
 		return fmt.Errorf("MQTT not connected")
 	}
@@ -219,12 +241,12 @@ func (m *MQTTClient) PublishWithIndex(topicTemplate string, index int, algId uin
 }
 
 // GetClient 获取原生MQTT客户端
-func (m *MQTTClient) GetClient() mqtt.Client {
+func (m *mqttClientImpl) GetClient() mqtt.Client {
 	return m.client
 }
 
 // Close 关闭MQTT连接
-func (m *MQTTClient) Close() {
+func (m *mqttClientImpl) Close() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
