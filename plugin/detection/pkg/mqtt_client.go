@@ -76,7 +76,7 @@ func (m *MQTTClient) connect() {
 	if m.config.KeepAlive > 0 {
 		keepAlive = m.config.KeepAlive
 	}
-
+	opts.SetCleanSession(true)
 	opts.SetKeepAlive(time.Duration(keepAlive) * time.Second)
 	opts.SetDefaultPublishHandler(m.onMessage)
 	// retry
