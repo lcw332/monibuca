@@ -487,7 +487,8 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 	for _, result := range validResults {
 		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
 		// 发送MQTT消息
-		t.sendMQTTMessage(result, callbackEntity)
+		t.sendMQTTMessage(result, callbackEntity, t.mqttClient, t.config.MQTT)
+
 		// 上传到OSS（如果需要）
 		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, imgInfo, now, uploadedFiles)
 		if err != nil {
@@ -547,6 +548,11 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo,
 		return "", "", err
 	}
 
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", "", err
+	}
+
 	err = file.Sync()
 	if err != nil {
 		return "", "", err
@@ -568,14 +574,14 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo,
 }
 
 // sendMQTTMessage 发送MQTT消息
-func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *CallbackDetection) {
-	if t.mqttClient == nil || !t.mqttClient.IsConnected() {
+func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *CallbackDetection, mqttClient MQTTClient, mqttConfig *MQTTConfig) {
+	if mqttClient == nil || !mqttClient.IsConnected() {
 		return
 	}
 
 	// 遍历配置中的发布主题并发送消息
-	for i, topic := range t.config.MQTT.Pub {
-		err := t.mqttClient.PublishWithIndex(topic, i, result.algId, t.job.StreamPath, callbackEntity)
+	for i, topic := range mqttConfig.Pub {
+		err := mqttClient.PublishWithIndex(topic, i, result.algId, t.job.StreamPath, callbackEntity)
 		if err != nil {
 			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
 		}
