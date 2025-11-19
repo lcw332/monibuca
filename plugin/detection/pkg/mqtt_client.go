@@ -21,7 +21,7 @@ type MQTTConfig struct {
 	Format    string   `json:"format" default:"json" desc:"消息格式(json/pb)"`
 	Username  string   `json:"username" desc:"用户名"`
 	Password  string   `json:"password" desc:"密码"`
-	KeepAlive int      `json:"keepAlive" default:"30" desc:"心跳间隔(秒)"`
+	KeepAlive int      `json:"keepAlive" default:"60" desc:"心跳间隔(秒)"`
 }
 
 // MQTTClient MQTT客户端封装
@@ -72,7 +72,7 @@ func (m *MQTTClient) connect() {
 		opts.SetPassword(m.config.Password)
 	}
 
-	keepAlive := 30
+	keepAlive := 60
 	if m.config.KeepAlive > 0 {
 		keepAlive = m.config.KeepAlive
 	}
@@ -83,7 +83,7 @@ func (m *MQTTClient) connect() {
 	opts.SetAutoReconnect(true)
 	opts.SetConnectRetry(true)
 	opts.SetConnectRetryInterval(5 * time.Second)
-	opts.SetWriteTimeout(1 * time.Second)
+	opts.SetWriteTimeout(5 * time.Second)
 	opts.SetPingTimeout(10 * time.Second)
 
 	opts.OnConnect = m.onConnect
@@ -130,7 +130,11 @@ func (m *MQTTClient) IsConnected() bool {
 // Publish 发布消息，支持指定QoS等级
 func (m *MQTTClient) Publish(topic string, qos int, payload interface{}) error {
 	if !m.IsConnected() {
-		return fmt.Errorf("MQTT not connected")
+		m.logger.Warn("MQTT not connected, attempting to reconnect")
+		m.connect() // 尝试重新连接
+		if !m.IsConnected() {
+			return fmt.Errorf("MQTT not connected")
+		}
 	}
 
 	// 根据配置格式化消息

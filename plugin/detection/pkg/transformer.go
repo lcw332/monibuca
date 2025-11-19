@@ -74,6 +74,15 @@ type (
 		UseSSL          bool          `desc:"是否使用SSL" default:"false"`
 		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
 	}
+
+	// algorithmResult 用于存储算法检测结果
+	algorithmResult struct {
+		id             uint8
+		index          int
+		result         *DetectionResponse
+		processedImage []byte
+		err            error
+	}
 )
 
 type Transformer struct {
@@ -295,174 +304,296 @@ func (t *TimeSnapTask) Tick(any) {
 
 // saveSnap 保存截图，核心实现逻辑
 func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
-	publishId := uuid.New()
 	// 生成文件名
 	now := time.Now()
+
 	// 处理视频帧
+	imageData, imgInfo, err := t.processVideoFrame(annexb)
+	if err != nil {
+		return err
+	}
+
+	// 请求yolo算法接口，获取检测结果，然后hook到指定url
+	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
+		return t.processAlgorithmDetection(imageData, imgInfo, now)
+	}
+
+	return nil
+}
+
+// processVideoFrame 处理视频帧并生成图像数据
+func (t *SnapTask) processVideoFrame(annexb []*format.AnnexB) ([]byte, ImgInfo, error) {
 	var buf bytes.Buffer
 	imgInfo, err := SnapFrameWithFFmpeg(annexb, &buf, t.config.SnapImgFormat)
 	if err != nil {
-		return fmt.Errorf("process with ffmpeg error: %w", err)
+		return nil, ImgInfo{}, fmt.Errorf("process with ffmpeg error: %w", err)
 	}
 
 	// 提前编码图片用于并发传输
 	imageData := buf.Bytes()
 	if len(imageData) == 0 {
-		return errors.New("original image data is empty")
+		return nil, ImgInfo{}, errors.New("original image data is empty")
 	}
 
-	// 请求yolo算法接口，获取检测结果，然后hook到指定url
-	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
-		base64ImageData := SnapFrameToBase64WithFFmpeg(imageData)
-		var wg sync.WaitGroup
-		client := &http.Client{Timeout: 10 * time.Second} // 设置全局HTTP客户端带超时
+	return imageData, imgInfo, nil
+}
 
-		detectClient := NewDetectionClient(
-			t.config.AlgorithmAPI.Url,
-			t.config.AlgorithmAPI.Method,
-			t.config.AlgorithmAPI.ApiKey,
-		)
+// processAlgorithmDetection 处理算法检测逻辑
+func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, now time.Time) error {
+	base64ImageData := SnapFrameToBase64WithFFmpeg(imageData)
 
-		for index, algorithmID := range t.config.AlgorithmId {
-			wg.Add(1)
-			go func(id uint8, idx int, imgInfo ImgInfo) {
-				defer wg.Done()
+	detectClient := NewDetectionClient(
+		t.config.AlgorithmAPI.Url,
+		t.config.AlgorithmAPI.Method,
+		t.config.AlgorithmAPI.ApiKey,
+	)
 
-				req := DetectionRequest{
-					AlgorithmID: id,
-					Image:       base64ImageData,
-					ConfThreshold: func() float32 {
-						if idx < len(t.config.ConfThreshold) {
-							return t.config.ConfThreshold[idx]
-						}
-						return 0.6
-					}(),
-				}
+	// 执行并行算法检测
+	validResults := t.executeParallelDetection(detectClient, imageData, base64ImageData, imgInfo)
 
-				result, err := detectClient.Detect(req)
-				if err != nil {
-					t.job.Plugin.Error("detect error", "error", err.Error())
-					return
-				}
-				if !result.IsSuccess() {
-					t.job.Plugin.Error("algorithm api request failed or no detections found")
-					return
-				}
+	// 如果没有有效的检测结果，直接返回
+	if len(validResults) == 0 {
+		return nil
+	}
 
-				if !result.hasDetections() {
-					return
-				}
+	// 处理检测结果（上传到OSS、发送MQTT消息和HTTP回调）
+	return t.handleDetectionResults(validResults, now)
+}
 
-				// 绘制边界框
-				processedImage := imageData
-				for _, detection := range result.Data.Detections {
-					bbox := FloatsToBBox(detection.BBox)
-					className := "unknown"
-					if detection.ClassNameCn != "" {
-						className = detection.ClassNameCn
-					} else if detection.ClassName != "" {
-						className = detection.ClassName
+// executeParallelDetection 并行执行算法检测
+func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, imageData []byte, base64ImageData string, imgInfo ImgInfo) []*algorithmResult {
+	var wg sync.WaitGroup
+	results := make(chan *algorithmResult, len(t.config.AlgorithmId))
+
+	// 并行执行所有算法检测
+	for index, algorithmID := range t.config.AlgorithmId {
+		wg.Add(1)
+		go func(id uint8, idx int) {
+			defer wg.Done()
+
+			result := &algorithmResult{
+				id:    id,
+				index: idx,
+			}
+
+			req := DetectionRequest{
+				AlgorithmID: id,
+				Image:       base64ImageData,
+				ConfThreshold: func() float32 {
+					if idx < len(t.config.ConfThreshold) {
+						return t.config.ConfThreshold[idx]
 					}
-					processedImage, err = DrawDetectionBBox(processedImage,
-						&imgInfo, t.config.SnapImgFormat, bbox, className, detection.Confidence, t.config.Bbox.FontPath, t.config.Bbox.FontSize,
-						t.config.Bbox.FontColor)
-					if err != nil {
-						t.job.Plugin.Error("draw bounding box error", "error", err.Error())
-						continue
-					}
-				}
+					return 0.6
+				}(),
+			}
 
-				if len(processedImage) == 0 {
-					t.job.Plugin.Error("final image data is empty after drawing boxes")
-					return
-				}
+			detectResult, err := detectClient.Detect(req)
+			if err != nil {
+				t.job.Plugin.Error("detect error", "error", err.Error())
+				result.err = err
+				results <- result
+				return
+			}
 
-				callbackEntity := result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
+			if !detectResult.IsSuccess() {
+				t.job.Plugin.Error("algorithm api request failed or no detections found")
+				result.err = errors.New("algorithm api request failed or no detections found")
+				results <- result
+				return
+			}
 
-				// 通过MQTT推送检测结果
-				if t.mqttClient != nil && t.mqttClient.IsConnected() {
-					for i, topic := range t.mqttClient.config.Pub {
-						// 发布消息
-						err := t.mqttClient.PublishWithIndex(topic, i, id, t.job.StreamPath, callbackEntity)
-						if err != nil {
-							t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
-						}
-					}
-				}
+			if !detectResult.hasDetections() {
+				results <- result
+				return
+			}
 
-				var accessUrl string
-				var objKey string
-				if t.ossPlugin != nil {
-					ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
-						strings.ReplaceAll(t.job.StreamPath, "/", "_"),
-						id,
-						now.Format("20060102150405.000"),
-						t.config.SnapImgFormat)
+			result.result = detectResult
 
-					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					defer cancel()
+			// 绘制边界框
+			processedImage, err := t.drawBoundingBoxes(detectResult, imageData, imgInfo)
+			if err != nil {
+				result.err = err
+				results <- result
+				return
+			}
 
-					file, err := t.ossPlugin.CreateFile(ctx, ossFilename)
-					if err != nil {
-						t.job.Plugin.Error("create file error", "error", err.Error())
-						return
-					}
-					defer file.Close()
+			result.processedImage = processedImage
+			results <- result
+		}(algorithmID, index)
+	}
 
-					_, err = file.Write(processedImage)
-					if err != nil {
-						t.job.Plugin.Error("write file error", "error", err.Error())
-						return
-					}
+	// 等待所有检测完成
+	wg.Wait()
+	close(results)
 
-					_, err = file.Seek(0, io.SeekStart)
-					if err != nil {
-						t.job.Plugin.Error("seek file error", "error", err.Error())
-						return
-					}
-
-					err = file.Sync()
-					if err != nil {
-						t.job.Plugin.Error("sync file error", "error", err.Error())
-						return
-					}
-
-					accessUrl, err = t.ossPlugin.GetURL(ctx, ossFilename)
-					if err != nil {
-						t.job.Plugin.Error("get url error", "error", err.Error())
-						return
-					}
-					objKey = getObjectKey(accessUrl)
-				}
-
-				callbackEntity.Args.AccessUrl = accessUrl
-				callbackEntity.Args.ObjectKey = objKey
-
-				if t.config.AlgorithmAPI.CallbackURL != "" {
-					jsonData, marshalErr := json.Marshal(callbackEntity)
-					if marshalErr != nil {
-						t.job.Plugin.Warn("marshal callback entity error", "error", marshalErr.Error())
-						return
-					}
-
-					resp, postErr := client.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
-					if postErr != nil {
-						t.job.Plugin.Error("callback error", "error", postErr.Error())
-						return
-					}
-					defer resp.Body.Close()
-
-					body, _ := io.ReadAll(resp.Body)
-					if resp.StatusCode >= 300 {
-						t.job.Plugin.Warn("callback response status not ok", "status", resp.Status, "body", string(body))
-					}
-				}
-			}(algorithmID, index, imgInfo)
+	// 收集所有有效结果
+	var validResults []*algorithmResult
+	for result := range results {
+		if result.err == nil && result.result != nil {
+			validResults = append(validResults, result)
 		}
-		wg.Wait()
+	}
+
+	return validResults
+}
+
+// drawBoundingBoxes 在图像上绘制检测框
+func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData []byte, imgInfo ImgInfo) ([]byte, error) {
+	processedImage := imageData
+	var err error
+
+	for _, detection := range detectResult.Data.Detections {
+		bbox := FloatsToBBox(detection.BBox)
+		className := "unknown"
+		if detection.ClassNameCn != "" {
+			className = detection.ClassNameCn
+		} else if detection.ClassName != "" {
+			className = detection.ClassName
+		}
+
+		processedImage, err = DrawDetectionBBox(processedImage,
+			&imgInfo, t.config.SnapImgFormat, bbox, className, detection.Confidence,
+			t.config.Bbox.FontPath, t.config.Bbox.FontSize, t.config.Bbox.FontColor)
+		if err != nil {
+			t.job.Plugin.Error("draw bounding box error", "error", err.Error())
+			return nil, err
+		}
+	}
+
+	if len(processedImage) == 0 {
+		t.job.Plugin.Error("final image data is empty after drawing boxes")
+		return nil, errors.New("final image data is empty after drawing boxes")
+	}
+
+	return processedImage, nil
+}
+
+// handleDetectionResults 处理检测结果（包括上传OSS、发送MQTT消息和HTTP回调）
+func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now time.Time) error {
+	// 创建OSS文件映射，避免重复上传相同图像
+	uploadedFiles := make(map[string]struct {
+		accessUrl string
+		objKey    string
+	})
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	publishId := uuid.New()
+
+	// 处理每个检测结果
+	for _, result := range validResults {
+		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
+
+		// 上传到OSS（如果需要）
+		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, now, uploadedFiles)
+		if err != nil {
+			t.job.Plugin.Error("upload to OSS failed", "error", err.Error())
+			continue
+		}
+
+		callbackEntity.Args.AccessUrl = accessUrl
+		callbackEntity.Args.ObjectKey = objKey
+
+		// 发送MQTT消息
+		t.sendMQTTMessage(result, callbackEntity)
+
+		// 发送HTTP回调
+		t.sendHTTPCallback(client, callbackEntity)
 	}
 
 	return nil
+}
+
+// uploadToOSSIfNeeded 如需要则上传到OSS
+func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, uploadedFiles map[string]struct {
+	accessUrl string
+	objKey    string
+}) (string, string, error) {
+	if t.ossPlugin == nil {
+		return "", "", nil
+	}
+
+	// 检查是否已经上传过相同图像
+	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.id)
+	if uploaded, exists := uploadedFiles[key]; exists {
+		return uploaded.accessUrl, uploaded.objKey, nil
+	}
+
+	ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
+		strings.ReplaceAll(t.job.StreamPath, "/", "_"),
+		result.id,
+		now.Format("20060102150405.000"),
+		t.config.SnapImgFormat)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	file, err := t.ossPlugin.CreateFile(ctx, ossFilename)
+	if err != nil {
+		return "", "", err
+	}
+	defer file.Close()
+
+	_, err = file.Write(result.processedImage)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = file.Sync()
+	if err != nil {
+		return "", "", err
+	}
+
+	accessUrl, err := t.ossPlugin.GetURL(ctx, ossFilename)
+	if err != nil {
+		return "", "", err
+	}
+
+	objKey := getObjectKey(accessUrl)
+	uploadedFiles[key] = struct {
+		accessUrl string
+		objKey    string
+	}{accessUrl, objKey}
+
+	return accessUrl, objKey, nil
+}
+
+// sendMQTTMessage 发送MQTT消息
+func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *CallbackDetection) {
+	if t.mqttClient == nil || !t.mqttClient.IsConnected() {
+		return
+	}
+
+	for i, topic := range t.mqttClient.config.Pub {
+		err := t.mqttClient.PublishWithIndex(topic, i, result.id, t.job.StreamPath, callbackEntity)
+		if err != nil {
+			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
+		}
+	}
+}
+
+// sendHTTPCallback 发送HTTP回调
+func (t *SnapTask) sendHTTPCallback(client *http.Client, callbackEntity *CallbackDetection) {
+	if t.config.AlgorithmAPI.CallbackURL == "" {
+		return
+	}
+
+	jsonData, marshalErr := json.Marshal(callbackEntity)
+	if marshalErr != nil {
+		t.job.Plugin.Warn("marshal callback entity error", "error", marshalErr.Error())
+		return
+	}
+
+	resp, postErr := client.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
+	if postErr != nil {
+		t.job.Plugin.Error("callback error", "error", postErr.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.job.Plugin.Warn("callback response status not ok", "status", resp.Status, "body", string(body))
+	}
 }
 
 func getObjectKey(accessUrl string) string {
