@@ -77,11 +77,16 @@ type (
 
 	// algorithmResult 用于存储算法检测结果
 	algorithmResult struct {
-		id             uint8
-		index          int
-		result         *DetectionResponse
+		// 算法 ID
+		algId uint8
+		// 索引
+		index int
+		// 检测结果
+		result *DetectionResponse
+		// 处理后的图片
 		processedImage []byte
-		err            error
+		// 错误
+		err error
 	}
 )
 
@@ -372,7 +377,7 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			defer wg.Done()
 
 			result := &algorithmResult{
-				id:    id,
+				algId: id,
 				index: idx,
 			}
 
@@ -482,6 +487,8 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now t
 	// 处理每个检测结果
 	for _, result := range validResults {
 		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
+		// 发送MQTT消息
+		t.sendMQTTMessage(result, callbackEntity)
 
 		// 上传到OSS（如果需要）
 		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, now, uploadedFiles)
@@ -492,9 +499,6 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now t
 
 		callbackEntity.Args.AccessUrl = accessUrl
 		callbackEntity.Args.ObjectKey = objKey
-
-		// 发送MQTT消息
-		t.sendMQTTMessage(result, callbackEntity)
 
 		// 发送HTTP回调
 		t.sendHTTPCallback(client, callbackEntity)
@@ -513,14 +517,14 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, u
 	}
 
 	// 检查是否已经上传过相同图像
-	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.id)
+	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.algId)
 	if uploaded, exists := uploadedFiles[key]; exists {
 		return uploaded.accessUrl, uploaded.objKey, nil
 	}
 
 	ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
 		strings.ReplaceAll(t.job.StreamPath, "/", "_"),
-		result.id,
+		result.algId,
 		now.Format("20060102150405.000"),
 		t.config.SnapImgFormat)
 
@@ -564,7 +568,7 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 	}
 
 	for i, topic := range t.mqttClient.config.Pub {
-		err := t.mqttClient.PublishWithIndex(topic, i, result.id, t.job.StreamPath, callbackEntity)
+		err := t.mqttClient.PublishWithIndex(topic, i, result.algId, t.job.StreamPath, callbackEntity)
 		if err != nil {
 			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
 		}

@@ -2,7 +2,7 @@ package detection
 
 // DetectionConfig 检测配置表（单表实现）
 type DetectionConfig struct {
-	ID            uint   `gorm:"primaryKey" json:"id"`
+	ID            uint   `gorm:"primaryKey" json:"algId"`
 	Name          string `gorm:"not null; uniqueIndex" json:"name"`  // 配置名称
 	StreamURL     string `gorm:"not null" json:"stream_url"`         // 流地址
 	AlgorithmConf string `gorm:"not null" json:"algorithm_conf"`     // 算法ID列表，用逗号分隔存储多个ID
