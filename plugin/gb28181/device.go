@@ -49,10 +49,12 @@ func (d *DeviceKeepaliveTickTask) Tick(any) {
 		keepaliveSeconds = d.device.KeepaliveInterval
 	}
 	if timeDiff := time.Since(d.device.KeepaliveTime); timeDiff > time.Duration(d.device.KeepaliveCount*keepaliveSeconds)*time.Second {
+		d.device.Debug("keeplive time out", "timediff", timeDiff, "currettime", time.Now(), "d.device.KeepaliveTime", d.device.KeepaliveTime, "timeout time", time.Duration(d.device.KeepaliveCount*keepaliveSeconds)*time.Second)
 		d.device.Online = false
 		d.device.Status = DeviceOfflineStatus
 		// 设置所有通道状态为off
 		d.device.channels.Range(func(channel *Channel) bool {
+			d.device.Debug("keeplive time out", "timediff", timeDiff, "offline channeid", channel.ChannelId)
 			channel.Status = "OFF"
 			return true
 		})
@@ -114,6 +116,7 @@ type Device struct {
 	CatalogSubscribeTask  *CatalogSubscribeTask  `gorm:"-:all"`
 	PositionSubscribeTask *PositionSubscribeTask `gorm:"-:all"`
 	AlarmSubscribeTask    *AlarmSubscribeTask    `gorm:"-:all"`
+	Cataloging            bool                   `gorm:"-:all" default:"false"`
 }
 
 func (d *Device) TableName() string {
@@ -201,6 +204,7 @@ type catalogHandlerTask struct {
 func (c *catalogHandlerTask) Run() (err error) {
 	// 处理目录信息
 	d := c.d
+	d.Cataloging = true
 	msg := c.msg
 	catalogReq, exists := d.catalogReqs.Get(msg.SN)
 	if !exists {
@@ -233,8 +237,11 @@ func (c *catalogHandlerTask) Run() (err error) {
 		if c.CustomChannelId == "" {
 			c.CustomChannelId = c.ChannelId
 		}
+		if c.CustomName == "" {
+			c.CustomName = c.Name
+		}
 		// 使用 Save 进行 upsert 操作
-		d.Debug("ready to addOrUpdateChannel", "channel.ID is", c.ID, "channel.Status is", c.Status)
+		d.Debug("ready to addOrUpdateChannel", "channel.ID is", c.ID, "channel.Status is", c.Status, "channel.Name", c.Name, "channel.Owner", c.Owner, "channel.Address", c.Address)
 		d.addOrUpdateChannel(c)
 		catalogReq.TotalCount++
 	}
@@ -247,6 +254,7 @@ func (c *catalogHandlerTask) Run() (err error) {
 	if catalogReq.IsComplete() {
 		catalogReq.Resolve()
 		d.catalogReqs.RemoveByKey(msg.SN)
+		d.Cataloging = false
 	}
 	return
 }
@@ -330,17 +338,7 @@ func (d *Device) onMessage(req *sip.Request, tx sip.ServerTransaction, msg *gb28
 				}
 				request.AppendHeader(&toHeader)
 
-				// 添加Via头部
-				viaHeader := sip.ViaHeader{
-					ProtocolName:    "SIP",
-					ProtocolVersion: "2.0",
-					Transport:       platform.PlatformModel.Transport,
-					Host:            platform.PlatformModel.DeviceIP,
-					Port:            platform.PlatformModel.DevicePort,
-					Params:          sip.NewParams(),
-				}
-				viaHeader.Params.Add("branch", sip.GenerateBranchN(16)).Add("rport", "")
-				request.AppendHeader(&viaHeader)
+				// 不手动添加Via头部，让Client自动创建并由TransportLayer填充正确的IP
 
 				// 设置Content-Type
 				contentTypeHeader := sip.ContentTypeHeader("Application/MANSCDP+xml")
@@ -445,9 +443,23 @@ func (d *Device) onMessage(req *sip.Request, tx sip.ServerTransaction, msg *gb28
 
 func (d *Device) send(req *sip.Request) (*sip.Response, error) {
 	d.SN++
-	d.Trace("send", "req", req.String())
+
+	// 检查Via头部和Transport
+	via := req.Via()
+	transportBefore := req.Transport()
+	d.Info("send请求前", "device.Transport", d.Transport, "req.Transport()", transportBefore, "via.Transport", func() string {
+		if via != nil {
+			return via.Transport
+		}
+		return "nil"
+	}())
+
 	req.SetTransport(d.Transport)
-	return d.client.Do(context.Background(), req)
+	transportAfter := req.Transport()
+	d.Info("send请求SetTransport后", "req.Transport()", transportAfter)
+
+	d.Trace("send", "req", req.String())
+	return d.client.Do(d, req)
 }
 
 func (d *Device) Go() (err error) {
@@ -523,17 +535,20 @@ func (d *Device) CreateRequest(Method sip.RequestMethod, Recipient any) *sip.Req
 		Address: sip.Uri{User: d.DeviceId, Host: d.HostAddress},
 	}
 	req.AppendHeader(&toHeader)
-	//viaHeader := sip.ViaHeader{
-	//	ProtocolName:    "SIP",
-	//	ProtocolVersion: "2.0",
-	//	Transport:       "UDP",
-	//	Host:            d.SipIp,
-	//	Port:            d.LocalPort,
-	//	Params:          sip.HeaderParams(sip.NewParams()),
-	//}
-	//viaHeader.Params.Add("branch", sip.GenerateBranchN(10)).Add("rport", "")
-	//req.AppendHeader(&viaHeader)
 	req.AppendHeader(&d.contactHDR)
+
+	// 添加Via头部，使用设备的Transport协议
+	// Via头部必须用PrependHeader放在最前面，这样Client才能正确识别Transport
+	viaHeader := sip.ViaHeader{
+		ProtocolName:    "SIP",
+		ProtocolVersion: "2.0",
+		Transport:       d.Transport, // 使用设备注册时的Transport
+		Host:            d.SipIp,
+		Port:            d.LocalPort,
+		Params:          sip.HeaderParams(sip.NewParams()),
+	}
+	viaHeader.Params.Add("branch", sip.GenerateBranchN(16))
+	req.PrependHeader(&viaHeader)
 	return req
 }
 
@@ -754,14 +769,14 @@ func (d *Device) onNotify(req *sip.Request, tx sip.ServerTransaction, msg *gb281
 	if strings.Contains(string(notifyBody), "<Notify>") {
 		// 处理 Notify 通知
 		notify := &gb28181.AlarmNotify{}
-		if err := gb28181.DecodeXML(notify, notifyBody); err != nil {
+		if err := gb28181.DecodeXML(notify, notifyBody, d.Charset); err != nil {
 			return fmt.Errorf("decode notify xml error: %v", err)
 		}
 
 		if notify.CmdType == "MobilePosition" {
 			// 处理 MobilePosition 通知
 			posNotify := &gb28181.MobilePositionNotify{}
-			if err := gb28181.DecodeXML(posNotify, notifyBody); err != nil {
+			if err := gb28181.DecodeXML(posNotify, notifyBody, d.Charset); err != nil {
 				return fmt.Errorf("decode mobile position notify xml error: %v", err)
 			}
 
@@ -870,7 +885,7 @@ func (d *Device) onNotify(req *sip.Request, tx sip.ServerTransaction, msg *gb281
 	if strings.Contains(string(notifyBody), "<Response>") {
 		// 重新解析为 Response 消消息
 		response := &gb28181.Message{}
-		if err := gb28181.DecodeXML(response, notifyBody); err != nil {
+		if err := gb28181.DecodeXML(response, notifyBody, d.Charset); err != nil {
 			return fmt.Errorf("decode response xml error: %v", err)
 		}
 
