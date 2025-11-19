@@ -83,8 +83,8 @@ type (
 		index int
 		// 检测结果
 		result *DetectionResponse
-		// 处理后的图片
-		processedImage []byte
+		// 原图数据
+		rawImgData []byte
 		// 错误
 		err error
 	}
@@ -362,7 +362,7 @@ func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, 
 	}
 
 	// 处理检测结果（上传到OSS、发送MQTT消息和HTTP回调）
-	return t.handleDetectionResults(validResults, now)
+	return t.handleDetectionResults(validResults, imgInfo, now)
 }
 
 // executeParallelDetection 并行执行算法检测
@@ -414,15 +414,7 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 
 			result.result = detectResult
 
-			// 绘制边界框
-			processedImage, err := t.drawBoundingBoxes(detectResult, imageData, imgInfo)
-			if err != nil {
-				result.err = err
-				results <- result
-				return
-			}
-
-			result.processedImage = processedImage
+			result.rawImgData = imageData
 			results <- result
 		}(algorithmID, index)
 	}
@@ -474,11 +466,12 @@ func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData 
 }
 
 // handleDetectionResults 处理检测结果（包括上传OSS、发送MQTT消息和HTTP回调）
-func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now time.Time) error {
+func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, now time.Time) error {
 	// 创建OSS文件映射，避免重复上传相同图像
 	uploadedFiles := make(map[string]struct {
-		accessUrl string
-		objKey    string
+		accessUrl      string
+		objKey         string
+		processedImage []byte
 	})
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -491,7 +484,7 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now t
 		t.sendMQTTMessage(result, callbackEntity)
 
 		// 上传到OSS（如果需要）
-		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, now, uploadedFiles)
+		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, imgInfo, now, uploadedFiles)
 		if err != nil {
 			t.job.Plugin.Error("upload to OSS failed", "error", err.Error())
 			continue
@@ -508,9 +501,10 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, now t
 }
 
 // uploadToOSSIfNeeded 如需要则上传到OSS
-func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, uploadedFiles map[string]struct {
-	accessUrl string
-	objKey    string
+func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo, now time.Time, uploadedFiles map[string]struct {
+	accessUrl      string
+	objKey         string
+	processedImage []byte
 }) (string, string, error) {
 	if t.ossPlugin == nil {
 		return "", "", nil
@@ -520,6 +514,12 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, u
 	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.algId)
 	if uploaded, exists := uploadedFiles[key]; exists {
 		return uploaded.accessUrl, uploaded.objKey, nil
+	}
+
+	// 绘制边界框（移到这里执行，避免重复绘制）
+	processedImage, err := t.drawBoundingBoxes(result.result, result.rawImgData, imgInfo)
+	if err != nil {
+		return "", "", err
 	}
 
 	ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
@@ -537,7 +537,7 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, u
 	}
 	defer file.Close()
 
-	_, err = file.Write(result.processedImage)
+	_, err = file.Write(processedImage)
 	if err != nil {
 		return "", "", err
 	}
@@ -554,9 +554,10 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, now time.Time, u
 
 	objKey := getObjectKey(accessUrl)
 	uploadedFiles[key] = struct {
-		accessUrl string
-		objKey    string
-	}{accessUrl, objKey}
+		accessUrl      string
+		objKey         string
+		processedImage []byte
+	}{accessUrl, objKey, processedImage}
 
 	return accessUrl, objKey, nil
 }
