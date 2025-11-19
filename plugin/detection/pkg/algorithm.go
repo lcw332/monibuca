@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"google.golang.org/grpc/metadata"
 	"m7s.live/v5/plugin/detection/pb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // AlgorithmMap 定义算法映射关系
@@ -212,12 +212,10 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	md := metadata.Pairs(
-		"x-api-key", c.APIKey,
-	)
-	err := grpc.SetHeader(ctx, md)
-	if err != nil {
-		return nil, err
+	// 添加API Key到gRPC请求的metadata中
+	if c.APIKey != "" {
+		md := metadata.Pairs("x-api-key", c.APIKey)
+		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
 	if err != nil {
