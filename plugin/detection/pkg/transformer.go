@@ -573,8 +573,6 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 		if err != nil {
 			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
 		}
-		// 添加短暂延迟，避免消息发送过快导致丢失
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 
