@@ -222,6 +222,10 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 		Output: outputs,
 	})
 
+	publisher.OnDispose(func() {
+		trans.TransformJob.Stop(task.ErrTaskComplete)
+	})
+
 	err = trans.WaitStarted()
 	if err != nil {
 		sendError(rw, http.StatusInternalServerError, err.Error())
