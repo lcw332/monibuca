@@ -24,8 +24,4 @@ example/default/*
 !example/default/test.mp4
 shutdown.sh
 !example/test/test.db
-shutdown.bat
-
-# 编译后的 bin 文件
-/monibuca_amd64
-/monibuca_arm64
+shutdown.bat3rd/ffmpeg6
