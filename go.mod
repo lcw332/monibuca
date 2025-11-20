@@ -1,6 +1,6 @@
 module m7s.live/v5
 
-go 1.24
+go 1.24.0
 
 toolchain go1.24.10
 
@@ -14,6 +14,7 @@ require (
 	github.com/cloudwego/goref v0.0.0-20240724113447-685d2a9523c8
 	github.com/deepch/vdk v0.0.27
 	github.com/disintegration/imaging v1.6.2
+	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/emiago/sipgo v1.0.0-alpha
 	github.com/go-delve/delve v1.23.0
 	github.com/gobwas/ws v1.3.2
@@ -47,7 +48,7 @@ require (
 	github.com/valyala/fasthttp v1.61.0
 	github.com/yapingcat/gomedia v0.0.0-20240601043430-920523f8e5c7
 	golang.org/x/image v0.22.0
-	golang.org/x/text v0.28.0
+	golang.org/x/text v0.29.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -133,7 +134,7 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
 )
@@ -143,15 +144,15 @@ require (
 	github.com/bluenviron/mediacommon v1.11.1-0.20240525122142-20163863aa75
 	github.com/chromedp/chromedp v0.9.5
 	github.com/datarhei/gosrt v0.7.0
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/ianlancetaylor/demangle v0.0.0-20240912202439-0a2b6291aafd
 	github.com/langhuihui/gomem v0.0.0-20251001011839-023923cf7683
 	github.com/phsym/console-slog v0.3.1
 	github.com/prometheus/client_golang v1.20.4
 	github.com/quangngotan95/go-m3u8 v0.1.0
-	golang.org/x/crypto v0.41.0
+	golang.org/x/crypto v0.42.0
 	golang.org/x/exp v0.0.0-20240716175740-e3f259677ff7
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
