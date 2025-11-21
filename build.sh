@@ -76,12 +76,12 @@ if [ "$BUILD_DOCKER" = true ]; then
         case $platform in
             amd64)
                 echo "正在构建 AMD64 Docker 镜像... 🐳"
-                docker build -f ./DockerfileLite --build-arg BUILD_TAGS="$BUILD_TAGS" -t jddt/monibuca:v5-slim .
+                docker build -f ./DockerfileLite --build-arg BUILD_TAGS="$BUILD_TAGS" --platform linux/amd64 -t jddt/monibuca:v5-slim .
                 echo "AMD64 Docker 镜像构建完成 ✅"
                 ;;
             arm64)
                 echo "正在构建 ARM64 Docker 镜像... 🐳"
-                docker build -f ./DockerfileLite --build-arg BUILD_TAGS="$BUILD_TAGS" -t jddt/monibuca:v5-arm-slim . --platform linux/arm64
+                docker build -f ./DockerfileLite --build-arg BUILD_TAGS="$BUILD_TAGS" --platform linux/arm64 -t jddt/monibuca:v5-arm-slim .
                 echo "ARM64 Docker 镜像构建完成 ✅"
                 ;;
         esac
