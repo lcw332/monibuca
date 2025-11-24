@@ -17,15 +17,16 @@ import (
 type MP4Plugin struct {
 	pb.UnimplementedApiServer
 	m7s.Plugin
-	BeforeDuration            time.Duration `default:"30s" desc:"事件录像提前时长，不配置则默认30s"`
-	AfterDuration             time.Duration `default:"30s" desc:"事件录像结束时长，不配置则默认30s"`
-	RecordFileExpireDays      int           `desc:"录像自动删除的天数,0或未设置表示不自动删除"`
-	DiskMaxPercent            float64       `default:"90" desc:"硬盘使用百分之上限值，超上限后触发报警，并停止当前所有磁盘写入动作。"`
-	AutoOverWriteDiskPercent  float64       `default:"0" desc:"自动覆盖功能磁盘占用上限值，超过上限时连续录像自动删除日有录像，事件录像自动删除非重要事件录像，删除规则为删除距离当日最久日期的连续录像或非重要事件录像。"`
-	MigrationThresholdPercent float64       `default:"60" desc:"开始迁移到次级存储的磁盘使用率阈值，当主存储达到此阈值时自动将文件迁移到次级存储"`
-	AutoRecovery              bool          `default:"false" desc:"是否自动恢复"`
-	ExceptionPostUrl          string        `desc:"第三方异常上报地址"`
-	EventRecordFilePath       string        `desc:"事件录像存放地址"`
+	BeforeDuration            time.Duration  `default:"30s" desc:"事件录像提前时长，不配置则默认30s"`
+	AfterDuration             time.Duration  `default:"30s" desc:"事件录像结束时长，不配置则默认30s"`
+	RecordFileExpireDays      int            `desc:"录像自动删除的天数,0或未设置表示不自动删除"`
+	DiskMaxPercent            float64        `default:"90" desc:"硬盘使用百分之上限值，超上限后触发报警，并停止当前所有磁盘写入动作。"`
+	AutoOverWriteDiskPercent  float64        `default:"0" desc:"自动覆盖功能磁盘占用上限值，超过上限时连续录像自动删除日有录像，事件录像自动删除非重要事件录像，删除规则为删除距离当日最久日期的连续录像或非重要事件录像。"`
+	MigrationThresholdPercent float64        `default:"60" desc:"开始迁移到次级存储的磁盘使用率阈值，当主存储达到此阈值时自动将文件迁移到次级存储"`
+	AutoRecovery              bool           `default:"false" desc:"是否自动恢复"`
+	ExceptionPostUrl          string         `desc:"第三方异常上报地址"`
+	EventRecordFilePath       string         `desc:"事件录像存放地址"`
+	Storage                   map[string]any `desc:"录像文件存储配置"`
 }
 
 const defaultConfig m7s.DefaultYaml = `publish:
