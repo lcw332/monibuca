@@ -13,6 +13,16 @@ else
     echo "使用默认 tags: $BUILD_TAGS"
 fi
 
+# 检查是否指定了 go cmd 路径
+if [ "$1" = "-cmd" ] && [ -n "$2" ]; then
+    GO_CMD_PATH="$2"
+    echo "使用自定义 Go 命令路径: $GO_CMD_PATH"
+    shift 2
+else
+    GO_CMD_PATH="go"
+    echo "使用默认 Go 命令路径"
+fi
+
 # 解析平台参数
 PLATFORMS=""
 BUILD_DOCKER=false
@@ -54,12 +64,12 @@ for platform in "${PLATFORM_ARRAY[@]}"; do
     case $platform in
         amd64)
             echo "正在构建 AMD64 版本... 💻"
-            GOOS=linux GOARCH=amd64 go build -tags "$BUILD_TAGS" -o ./monibuca_amd64 ./example/default/main.go
+            GOOS=linux GOARCH=amd64 $GO_CMD_PATH build -tags "$BUILD_TAGS" -o ./monibuca_amd64 ./example/default/main.go
             echo "AMD64 版本构建完成 ✅"
             ;;
         arm64)
             echo "正在构建 ARM64 版本... 📱"
-            GOOS=linux GOARCH=arm64 go build -tags "$BUILD_TAGS" -o ./monibuca_arm64 ./example/default/main.go
+            GOOS=linux GOARCH=arm64 $GO_CMD_PATH build -tags "$BUILD_TAGS" -o ./monibuca_arm64 ./example/default/main.go
             echo "ARM64 版本构建完成 ✅"
             ;;
         *)
