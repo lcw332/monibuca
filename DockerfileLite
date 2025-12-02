@@ -1,5 +1,5 @@
 # Running Stage 
-FROM --platform=$TARGETPLATFORM docker.1ms.run/library/alpine:latest
+FROM docker.1ms.run/library/alpine:latest
 
 WORKDIR /monibuca
 
