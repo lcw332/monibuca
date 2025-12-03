@@ -11,10 +11,48 @@ import (
 	detection "m7s.live/v5/plugin/detection/pkg"
 )
 
+// 算法ID到名称的映射常量
+var algorithmNames = map[uint8]string{
+	1:  "松线虫害识别",
+	2:  "河道淤积识别",
+	3:  "漂浮物识别",
+	4:  "游泳涉水识别",
+	5:  "车牌识别",
+	6:  "交通拥堵识别",
+	7:  "路面破损识别",
+	8:  "路面污染",
+	9:  "人群聚集识别",
+	10: "非法垂钓识别",
+	11: "施工识别",
+	12: "秸秆焚烧",
+	13: "变化检测",
+	14: "占道经营识别",
+	15: "垃圾堆放识别",
+	16: "裸土未覆盖识别",
+	17: "建控区违建识别",
+	18: "烟火识别",
+	19: "光伏板缺陷检测",
+	20: "园区夜间入侵检测",
+	21: "园区外立面病害识别",
+	22: "罂粟识别",
+	23: "作物倒伏检测",
+	24: "林业侵占",
+}
+
 type APIResponse struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
+}
+
+// 新增用于列表接口的专用响应结构体
+type ListAPIResponse struct {
+	Code     int         `json:"code"`
+	Message  string      `json:"message"`
+	Total    int         `json:"total"`
+	PageNum  int         `json:"pageNum"`
+	PageSize int         `json:"pageSize"`
+	Data     interface{} `json:"data"`
 }
 
 func sendResponse(rw http.ResponseWriter, code int, message string, data interface{}) {
@@ -22,6 +60,20 @@ func sendResponse(rw http.ResponseWriter, code int, message string, data interfa
 		Code:    code,
 		Message: message,
 		Data:    data,
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(response)
+}
+
+// 新增列表专用响应方法
+func sendListResponse(rw http.ResponseWriter, code int, message string, total, pageNum, pageSize int, data interface{}) {
+	response := ListAPIResponse{
+		Code:     code,
+		Message:  message,
+		Total:    total,
+		PageNum:  pageNum,
+		PageSize: pageSize,
+		Data:     data,
 	}
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(response)
@@ -41,6 +93,38 @@ func (p *DetectionPlugin) RegisterHandler() map[string]http.HandlerFunc {
 		"/launch":  p.launchDetection,
 		"/dispose": p.disposeDetection,
 	}
+}
+
+type ListDetectRequest struct {
+	StreamPath  string  `json:"streamPath" desc:"流地址"`
+	AlgorithmId []uint8 `json:"algorithmId" default:"[]" desc:"算法ID"`
+	Page        int     `json:"page" default:"1" desc:"页码"`
+	PageSize    int     `json:"pageSize" default:"10" desc:"每页数量"`
+}
+
+type ListDetectPageResponse struct {
+	Total    int               `json:"total"`
+	List     []*ListDetectItem `json:"list" default:"[]"`
+	Page     int               `json:"page" desc:"页码"`
+	PageSize int               `json:"pageSize" desc:"页面大小"`
+}
+
+type ListDetectItem struct {
+	AlgorithmId    uint8   `json:"algorithmId" desc:"算法 ID"`
+	AlgorithmName  string  `json:"algorithmName" desc:"算法名称"`
+	StreamPath     string  `json:"streamPath" desc:"流地址"`
+	Threshold      float32 `json:"threshold" desc:"置信度"`
+	SnapMode       int     `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔"`
+	TimerInterval  string  `json:"timeInterval,omitempty" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
+	IFrameInterval int     `json:"iframeInterval,omitempty" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+}
+
+// getAlgorithmName 根据算法ID获取算法名称
+func (p *DetectionPlugin) getAlgorithmName(algorithmId uint8) string {
+	if name, ok := algorithmNames[algorithmId]; ok {
+		return name
+	}
+	return fmt.Sprintf("算法%d", algorithmId)
 }
 
 type UpdateDetectRequest struct {
@@ -267,7 +351,130 @@ func (p *DetectionPlugin) disposeDetection(rw http.ResponseWriter, r *http.Reque
 
 // listConfig 列出所有算法配置
 func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
-	configs := make([]Configuration, 0)
-	// TODO: 实现获取配置列表逻辑
-	sendSuccess(rw, configs)
+
+	if r.Method != http.MethodPost {
+		sendError(rw, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ListDetectRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(rw, http.StatusBadRequest, "Invalid JSON format")
+		return
+	}
+
+	// 设置默认值
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
+
+	// 获取所有检测配置项
+	transforms := p.Server.Transforms.Items
+	total := len(transforms)
+
+	// 计算分页起始和结束位置
+	startIndex := (req.Page - 1) * req.PageSize
+	endIndex := startIndex + req.PageSize
+
+	// 边界检查
+	if startIndex >= total {
+		startIndex = total
+	}
+	if endIndex > total {
+		endIndex = total
+	}
+
+	// 应用分页
+	pagedTransforms := transforms[startIndex:endIndex]
+
+	// 构造返回列表
+	var ret []*ListDetectItem
+	for _, transform := range pagedTransforms {
+		// 从TransformJob中获取详细配置信息
+		if transform.TransformJob != nil && transform.TransformJob.Config.Output != nil {
+			for _, output := range transform.TransformJob.Config.Output {
+				if output.Conf != nil {
+					// 解析SnapConfig配置
+					snapConfig := detection.SnapConfig{}
+					switch v := output.Conf.(type) {
+					case detection.SnapConfig:
+						snapConfig = v
+					case map[string]any:
+						config.Parse(&snapConfig, v)
+					}
+
+					// 创建配置项，每个算法ID对应一个配置项
+					for i, algorithmId := range snapConfig.AlgorithmId {
+						item := &ListDetectItem{
+							AlgorithmId:   algorithmId,
+							AlgorithmName: p.getAlgorithmName(algorithmId),
+							StreamPath:    transform.StreamPath,
+							Threshold: func() float32 {
+								if i < len(snapConfig.ConfThreshold) {
+									return snapConfig.ConfThreshold[i]
+								}
+								return 0.5 // 默认阈值
+							}(),
+							SnapMode:       snapConfig.SnapMode,
+							TimerInterval:  snapConfig.TimeInterval.String(),
+							IFrameInterval: snapConfig.IFrameInterval,
+						}
+						ret = append(ret, item)
+					}
+				}
+			}
+		} else {
+			// 如果没有详细配置，只返回基础信息
+			item := &ListDetectItem{
+				StreamPath: transform.StreamPath,
+			}
+			ret = append(ret, item)
+		}
+	}
+
+	// 如果指定了算法ID过滤条件
+	if len(req.AlgorithmId) > 0 {
+		var filtered []*ListDetectItem
+		algorithmIdMap := make(map[uint8]bool)
+		for _, id := range req.AlgorithmId {
+			algorithmIdMap[id] = true
+		}
+
+		for _, item := range ret {
+			if algorithmIdMap[item.AlgorithmId] {
+				filtered = append(filtered, item)
+			}
+		}
+		ret = filtered
+		total = len(ret)
+	}
+
+	// 应用分页到过滤后的结果
+	if len(req.AlgorithmId) > 0 && total > 0 {
+		startIndex := (req.Page - 1) * req.PageSize
+		endIndex := startIndex + req.PageSize
+
+		if startIndex >= total {
+			startIndex = total
+		}
+		if endIndex > total {
+			endIndex = total
+		}
+
+		if startIndex < len(ret) {
+			ret = ret[startIndex:endIndex]
+		} else {
+			ret = []*ListDetectItem{}
+		}
+	}
+
+	// 确保返回空数组而不是 null
+	if ret == nil {
+		ret = make([]*ListDetectItem, 0)
+	}
+
+	sendListResponse(rw, 0, "", total, req.Page, req.PageSize, ret)
 }
