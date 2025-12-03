@@ -123,9 +123,10 @@ func (t *Transformer) Start() (err error) {
 
 	ossConfig := plugin.Config.Get("oss")
 	var ossPlugin storage.Storage
-	if ossConfig != nil {
+	if ossConfig != nil && ossConfig.File != nil {
 		ossPlugin, err = storage.CreateStorage("s3", ossConfig.File)
 		if err != nil {
+			plugin.Error("create s3 storage failed", "error", err.Error())
 			return err
 		}
 	}
