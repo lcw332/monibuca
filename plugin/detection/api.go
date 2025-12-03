@@ -101,14 +101,6 @@ type ListDetectRequest struct {
 	Page        int     `json:"page" default:"1" desc:"页码"`
 	PageSize    int     `json:"pageSize" default:"10" desc:"每页数量"`
 }
-
-type ListDetectPageResponse struct {
-	Total    int               `json:"total"`
-	List     []*ListDetectItem `json:"list" default:"[]"`
-	Page     int               `json:"page" desc:"页码"`
-	PageSize int               `json:"pageSize" desc:"页面大小"`
-}
-
 type ListDetectItem struct {
 	AlgorithmId    uint8   `json:"algorithmId" desc:"算法 ID"`
 	AlgorithmName  string  `json:"algorithmName" desc:"算法名称"`
