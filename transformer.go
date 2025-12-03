@@ -87,7 +87,7 @@ func (p *TransformJob) Init(transformer ITransformer, plugin *Plugin, pub *Publi
 		"conf":       conf,
 	})
 	transformer.SetRetry(-1, time.Second*2)
-	if sender, webhook := plugin.getHookSender(config.HookOnTransformStart); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnTransformStart); sender != nil {
 		transformer.OnStart(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnTransformStart),
@@ -97,7 +97,7 @@ func (p *TransformJob) Init(transformer ITransformer, plugin *Plugin, pub *Publi
 			sender(webhook, alarmInfo)
 		})
 	}
-	if sender, webhook := plugin.getHookSender(config.HookOnTransformEnd); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnTransformEnd); sender != nil {
 		transformer.OnDispose(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnTransformEnd),

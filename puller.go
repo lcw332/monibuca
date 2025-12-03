@@ -137,7 +137,7 @@ func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf c
 	})
 	puller.SetRetry(conf.MaxRetry, conf.RetryInterval)
 
-	if sender, webhook := plugin.getHookSender(config.HookOnPullStart); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnPullStart); sender != nil {
 		puller.OnStart(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnPullStart),
@@ -148,7 +148,7 @@ func (p *PullJob) Init(puller IPuller, plugin *Plugin, streamPath string, conf c
 		})
 	}
 
-	if sender, webhook := plugin.getHookSender(config.HookOnPullEnd); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnPullEnd); sender != nil {
 		puller.OnDispose(func() {
 			p.Fail(puller.StopReason().Error())
 			alarmInfo := AlarmInfo{

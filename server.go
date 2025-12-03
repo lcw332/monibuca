@@ -443,7 +443,7 @@ func (s *Server) Start() (err error) {
 			s.initPushProxiesWithoutDB()
 		}
 	})
-	if sender, webhook := s.getHookSender(config.HookOnSystemStart); sender != nil {
+	if sender, webhook := s.GetHookSender(config.HookOnSystemStart); sender != nil {
 		alarmInfo := AlarmInfo{
 			AlarmName: string(config.HookOnSystemStart),
 			AlarmType: config.AlarmStartupRunning,

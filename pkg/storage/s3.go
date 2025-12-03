@@ -111,6 +111,43 @@ func (s *S3Storage) CreateFile(ctx context.Context, path string) (File, error) {
 	}, nil
 }
 
+func (s *S3Storage) OpenFile(ctx context.Context, path string) (File, error) {
+	objectKey := s.getObjectKey(path)
+
+	// 下载文件到临时文件
+	tempFile, err := os.CreateTemp("", "s3-download-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tempFile.Close()
+			os.Remove(tempFile.Name())
+		}
+	}()
+
+	_, err = s.downloader.DownloadWithContext(ctx, tempFile, &s3.GetObjectInput{
+		Bucket: aws.String(s.config.Bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+
+	// 重置文件指针到开始
+	if _, err = tempFile.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to seek temp file: %w", err)
+	}
+
+	return &S3File{
+		storage:   s,
+		objectKey: objectKey,
+		ctx:       ctx,
+		tempFile:  tempFile,
+		filePath:  tempFile.Name(),
+	}, nil
+}
+
 func (s *S3Storage) Delete(ctx context.Context, path string) error {
 	objectKey := s.getObjectKey(path)
 

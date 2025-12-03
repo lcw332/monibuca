@@ -39,7 +39,7 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 		"maxRetry":   conf.MaxRetry,
 	})
 	pusher.SetRetry(conf.MaxRetry, conf.RetryInterval)
-	if sender, webhook := plugin.getHookSender(config.HookOnPushStart); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnPushStart); sender != nil {
 		pusher.OnStart(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnPushStart),
@@ -51,7 +51,7 @@ func (p *PushJob) Init(pusher IPusher, plugin *Plugin, streamPath string, conf c
 		})
 	}
 
-	if sender, webhook := plugin.getHookSender(config.HookOnPushEnd); sender != nil {
+	if sender, webhook := plugin.GetHookSender(config.HookOnPushEnd); sender != nil {
 		pusher.OnDispose(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnPushEnd),

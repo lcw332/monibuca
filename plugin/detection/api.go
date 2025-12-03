@@ -3,10 +3,13 @@ package plugin_detection
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"time"
 
 	task "github.com/langhuihui/gotask"
+	"m7s.live/v5"
 	"m7s.live/v5/pkg/config"
 	detection "m7s.live/v5/plugin/detection/pkg"
 )
@@ -117,6 +120,32 @@ func (p *DetectionPlugin) getAlgorithmName(algorithmId uint8) string {
 		return name
 	}
 	return fmt.Sprintf("算法%d", algorithmId)
+}
+
+// getHostname 获取主机名
+func getHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return hostname
+}
+
+// getLocalIP 获取本地IP地址
+func getLocalIP() string {
+	ipAddr := "unknown"
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					ipAddr = ipnet.IP.String()
+					break
+				}
+			}
+		}
+	}
+	return ipAddr
 }
 
 type UpdateDetectRequest struct {
@@ -300,6 +329,13 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 
 	publisher.OnDispose(func() {
 		trans.TransformJob.Stop(task.ErrTaskComplete)
+		// 触发 onDetectionClose webhook 用于 disposeDetection
+		closeData := m7s.AlarmInfo{
+			AlarmDesc: "manual_dispose",
+		}
+		if sender, webhook := p.GetHookSender(detection.HookOnDetectionClose); sender != nil {
+			sender(webhook, closeData)
+		}
 	})
 
 	err = trans.WaitStarted()

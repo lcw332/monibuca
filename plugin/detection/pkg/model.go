@@ -1,5 +1,9 @@
 package detection
 
+import (
+	config "m7s.live/v5/pkg/config"
+)
+
 // DetectionConfig 检测配置表（单表实现）
 type DetectionConfig struct {
 	ID            uint   `gorm:"primaryKey" json:"algId"`
@@ -15,7 +19,22 @@ type DetectionConfig struct {
 	AlertWebhook  string `json:"alert_webhook"`                      // 告警回调地址
 }
 
+// WebhookConfig Webhook配置
+type WebhookConfig struct {
+	OnDetectionInit   *config.Webhook `json:"onDetectionInit" desc:"检测初始化时触发的webhook"`
+	OnDetectionResult *config.Webhook `json:"onDetectionResult" desc:"检测结果产生时触发的webhook"`
+	OnDetectionError  *config.Webhook `json:"onDetectionError" desc:"检测出错时触发的webhook"`
+	OnDetectionClose  *config.Webhook `json:"onDetectionClose" desc:"检测关闭时触发的webhook"`
+}
+
 // TableName 指定表名
 func (DetectionConfig) TableName() string {
 	return "detection_configs"
 }
+
+const (
+	HookOnDetectionInit   config.HookType = "on_detection_init"
+	HookOnDetectionResult config.HookType = "on_detection_result"
+	HookOnDetectionError  config.HookType = "on_detection_error"
+	HookOnDetectionClose  config.HookType = "on_detection_close"
+)

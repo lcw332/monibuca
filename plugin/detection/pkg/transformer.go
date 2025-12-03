@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -242,6 +244,17 @@ func (t *Transformer) Start() (err error) {
 		}
 		if task != nil {
 			t.AddTask(task)
+
+			// 触发 onDetectionInit webhook
+			if snapTask, ok := task.(interface {
+				SendDetectionWebhook(string, uint8, interface{}, error)
+			}); ok {
+				snapTask.SendDetectionWebhook("onDetectionInit", 0, map[string]interface{}{
+					"snapMode":     snapConfig.SnapMode,
+					"algorithmIds": snapConfig.AlgorithmId,
+					"streamPath":   t.TransformJob.StreamPath,
+				}, nil)
+			}
 		}
 	}
 	return nil
@@ -402,6 +415,8 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			if err != nil {
 				t.job.Plugin.Error("detect error", "error", err.Error())
 				result.err = err
+				// 触发 onDetectionError webhook
+				t.SendDetectionWebhook(HookOnDetectionError, algId, req, err)
 				results <- result
 				return
 			}
@@ -409,6 +424,8 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			if !detectResult.IsSuccess() {
 				t.job.Plugin.Error("algorithm api request failed or no detections found")
 				result.err = errors.New("algorithm api request failed or no detections found")
+				// 触发 onDetectionError webhook
+				t.SendDetectionWebhook(HookOnDetectionError, algId, req, result.err)
 				results <- result
 				return
 			}
@@ -501,6 +518,9 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 
 		// 发送HTTP回调
 		t.sendHTTPCallback(client, callbackEntity)
+
+		// 触发 onDetectionResult webhook
+		t.SendDetectionWebhook(HookOnDetectionResult, result.algId, callbackEntity, nil)
 	}
 
 	return nil
@@ -623,4 +643,45 @@ func getObjectKey(accessUrl string) string {
 	// 移除路径开头的斜杠（如果存在）
 	path := strings.TrimPrefix(parsedURL.Path, "/")
 	return path
+}
+
+// SendDetectionWebhook 发送检测相关的webhook
+func (t *SnapTask) SendDetectionWebhook(webhookType config.HookType, algorithmID uint8, data interface{}, err error) {
+	// 获取服务器信息
+	hostname, _ := os.Hostname()
+	ipAddr := "unknown"
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					ipAddr = ipnet.IP.String()
+					break
+				}
+			}
+		}
+	}
+
+	webhookData := m7s.AlarmInfo{
+		StreamPath: t.job.StreamPath,
+		ServerInfo: fmt.Sprintf("%s (%s)", hostname, ipAddr),
+		AlarmName:  webhookType,
+		Data:       convertToMap(data),
+	}
+
+	if sender, webhook := t.job.Plugin.GetHookSender(webhookType); sender != nil {
+		sender(webhook, webhookData)
+	}
+}
+
+// 添加辅助函数 convertToMap
+func convertToMap(v interface{}) map[string]interface{} {
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
+	// 可选：尝试通过 JSON 序列化反序列化转换结构体
+	b, _ := json.Marshal(v)
+	var result map[string]interface{}
+	json.Unmarshal(b, &result)
+	return result
 }
