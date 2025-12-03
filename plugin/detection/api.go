@@ -96,10 +96,10 @@ func (p *DetectionPlugin) RegisterHandler() map[string]http.HandlerFunc {
 }
 
 type ListDetectRequest struct {
-	StreamPath  string  `json:"streamPath" desc:"流地址"`
-	AlgorithmId []uint8 `json:"algorithmId" default:"[]" desc:"算法ID"`
-	Page        int     `json:"page" default:"1" desc:"页码"`
-	PageSize    int     `json:"pageSize" default:"10" desc:"每页数量"`
+	StreamPath  string  `json:"streamPath,omitempty" desc:"流地址"`
+	AlgorithmId []uint8 `json:"algorithmId,omitempty" default:"[]" desc:"算法ID"`
+	Page        int     `json:"page,omitempty" default:"1" desc:"页码"`
+	PageSize    int     `json:"pageSize,omitempty" default:"10" desc:"每页数量"`
 }
 type ListDetectItem struct {
 	AlgorithmId    uint8   `json:"algorithmId" desc:"算法 ID"`
