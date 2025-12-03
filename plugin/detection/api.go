@@ -468,5 +468,5 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 		ret = make([]*ListDetectItem, 0)
 	}
 
-	sendListResponse(rw, 0, "", total, req.Page, req.PageSize, ret)
+	sendListResponse(rw, 0, "success", total, req.Page, req.PageSize, ret)
 }
