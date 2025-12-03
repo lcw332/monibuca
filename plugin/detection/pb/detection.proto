@@ -4,71 +4,140 @@ syntax = "proto3";
 package detection;
 option go_package="m7s.live/v5/plugin/detection/pb";
 
-// Request for object detection
+// 检测服务定义
+service DetectionService {
+  // 目标检测接口
+  rpc Detect(DetectRequest) returns (DetectResponse);
+  // 变化检测接口
+  rpc DetectChange(ChangeDetectRequest) returns (ChangeDetectResponse);
+  // 健康检查接口
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+  // 获取版本信息接口
+  rpc GetVersion(VersionRequest) returns (VersionResponse);
+}
+
+// 目标检测请求消息
 message DetectRequest {
+  // 算法ID
   int32 algorithm_id = 1;
+  // 图像数据(base64编码或其他格式)
   string image = 2;
+  // 置信度阈值
   float conf_threshold = 3;
 }
 
-// Response for object detection
+// 目标检测响应消息
 message DetectResponse {
+  // 返回码
   int32 code = 1;
+  // 返回消息
   string message = 2;
+  // 检测数据
   DetectionData data = 3;
 }
 
-// Detection data structure containing results
+// 检测结果数据
 message DetectionData {
+  // 算法ID
   int32 algorithm_id = 1;
+  // 算法名称
   string algorithm_name = 2;
+  // 检测到的目标列表
   repeated Detection detections = 3;
+  // 检测到的目标总数
   int32 total_count = 4;
+  // 检测耗时(毫秒)
   float detect_time = 5;
 }
 
-// Single detection result
+// 单个目标检测结果
 message Detection {
+  // 类别ID
   int32 class_id = 1;
+  // 英文类别名称
   string class_name = 2;
+  // 中文类别名称
   string class_name_cn = 3;
+  // 置信度
   float confidence = 4;
+  // 边界框坐标 [x1, y1, x2, y2]
   repeated float bbox = 5;
+  // 车牌号码(针对车牌识别)
+  string plate_number = 6;
+  // 车牌类型(针对车牌识别)
+  string plate_type = 7;
+  // 车牌置信度(针对车牌识别)
+  float plate_confidence = 8;
 }
 
-// Health check request (empty)
+// 变化检测请求消息
+message ChangeDetectRequest {
+  // 第一张图像
+  string image1 = 1;
+  // 第二张图像
+  string image2 = 2;
+}
+
+// 变化检测响应消息
+message ChangeDetectResponse {
+  // 返回码
+  int32 code = 1;
+  // 返回消息
+  string message = 2;
+  // 变化掩码图像(base64编码)
+  string mask = 3;
+  // 图像宽度
+  int32 width = 4;
+  // 图像高度
+  int32 height = 5;
+  // 变化比例
+  float change_ratio = 6;
+  // 检测耗时(毫秒)
+  float detect_time = 7;
+}
+
+// 健康检查请求消息
 message HealthRequest {}
 
-// Health check response with system information
+// 健康检查响应消息
 message HealthResponse {
+  // 服务状态
   string status = 1;
+  // 运行设备(CPU/GPU)
   string device = 2;
+  // YOLOv5仓库路径
   string yolov5_repo = 3;
+  // 已缓存模型数量
   int32 models_cached = 4;
+  // 图像处理后端
   string image_backend = 5;
+  // GPU名称
   string gpu_name = 6;
+  // GPU已分配内存(MB)
   float gpu_memory_allocated_mb = 7;
+  // GPU已预留内存(MB)
   float gpu_memory_reserved_mb = 8;
 }
 
-// Version request (empty)
+// 版本查询请求消息
 message VersionRequest {}
 
-// Version response with environment details
+// 版本查询响应消息
 message VersionResponse {
+  // 服务版本号
   string version = 1;
+  // 运行模式
   string mode = 2;
+  // PyTorch版本
   string pytorch_version = 3;
+  // OpenCV版本
   string opencv_version = 4;
+  // 运行设备
   string device = 5;
+  // CUDA是否可用
   bool cuda_available = 6;
+  // 默认置信度阈值
   float default_conf_threshold = 7;
+  // 支持的算法列表
   repeated int32 algo_supported = 8;
-}
-
-// Detection service definition
-service DetectionService {
-  rpc Detect(DetectRequest) returns (DetectResponse);
-  rpc HealthCheck(HealthRequest) returns (HealthResponse);
-  rpc GetVersion(VersionRequest) returns (VersionResponse);
 }

@@ -21,19 +21,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DetectionService_Detect_FullMethodName      = "/detection.DetectionService/Detect"
-	DetectionService_HealthCheck_FullMethodName = "/detection.DetectionService/HealthCheck"
-	DetectionService_GetVersion_FullMethodName  = "/detection.DetectionService/GetVersion"
+	DetectionService_Detect_FullMethodName       = "/detection.DetectionService/Detect"
+	DetectionService_DetectChange_FullMethodName = "/detection.DetectionService/DetectChange"
+	DetectionService_HealthCheck_FullMethodName  = "/detection.DetectionService/HealthCheck"
+	DetectionService_GetVersion_FullMethodName   = "/detection.DetectionService/GetVersion"
 )
 
 // DetectionServiceClient is the client API for DetectionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Detection service definition
+// 检测服务定义
 type DetectionServiceClient interface {
+	// 目标检测接口
 	Detect(ctx context.Context, in *DetectRequest, opts ...grpc.CallOption) (*DetectResponse, error)
+	// 变化检测接口
+	DetectChange(ctx context.Context, in *ChangeDetectRequest, opts ...grpc.CallOption) (*ChangeDetectResponse, error)
+	// 健康检查接口
 	HealthCheck(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
+	// 获取版本信息接口
 	GetVersion(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
 }
 
@@ -49,6 +55,16 @@ func (c *detectionServiceClient) Detect(ctx context.Context, in *DetectRequest, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DetectResponse)
 	err := c.cc.Invoke(ctx, DetectionService_Detect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *detectionServiceClient) DetectChange(ctx context.Context, in *ChangeDetectRequest, opts ...grpc.CallOption) (*ChangeDetectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChangeDetectResponse)
+	err := c.cc.Invoke(ctx, DetectionService_DetectChange_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +95,15 @@ func (c *detectionServiceClient) GetVersion(ctx context.Context, in *VersionRequ
 // All implementations must embed UnimplementedDetectionServiceServer
 // for forward compatibility.
 //
-// Detection service definition
+// 检测服务定义
 type DetectionServiceServer interface {
+	// 目标检测接口
 	Detect(context.Context, *DetectRequest) (*DetectResponse, error)
+	// 变化检测接口
+	DetectChange(context.Context, *ChangeDetectRequest) (*ChangeDetectResponse, error)
+	// 健康检查接口
 	HealthCheck(context.Context, *HealthRequest) (*HealthResponse, error)
+	// 获取版本信息接口
 	GetVersion(context.Context, *VersionRequest) (*VersionResponse, error)
 	mustEmbedUnimplementedDetectionServiceServer()
 }
@@ -96,6 +117,9 @@ type UnimplementedDetectionServiceServer struct{}
 
 func (UnimplementedDetectionServiceServer) Detect(context.Context, *DetectRequest) (*DetectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Detect not implemented")
+}
+func (UnimplementedDetectionServiceServer) DetectChange(context.Context, *ChangeDetectRequest) (*ChangeDetectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DetectChange not implemented")
 }
 func (UnimplementedDetectionServiceServer) HealthCheck(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -138,6 +162,24 @@ func _DetectionService_Detect_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DetectionServiceServer).Detect(ctx, req.(*DetectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DetectionService_DetectChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeDetectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DetectionServiceServer).DetectChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DetectionService_DetectChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DetectionServiceServer).DetectChange(ctx, req.(*ChangeDetectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -188,6 +230,10 @@ var DetectionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Detect",
 			Handler:    _DetectionService_Detect_Handler,
+		},
+		{
+			MethodName: "DetectChange",
+			Handler:    _DetectionService_DetectChange_Handler,
 		},
 		{
 			MethodName: "HealthCheck",
