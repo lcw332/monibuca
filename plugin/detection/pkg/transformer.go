@@ -245,17 +245,6 @@ func (t *Transformer) Start() (err error) {
 		}
 		if task != nil {
 			t.AddTask(task)
-
-			// 触发 onDetectionInit webhook
-			if snapTask, ok := task.(interface {
-				SendDetectionWebhook(string, uint8, interface{}, error)
-			}); ok {
-				snapTask.SendDetectionWebhook("onDetectionInit", 0, map[string]interface{}{
-					"snapMode":     snapConfig.SnapMode,
-					"algorithmIds": snapConfig.AlgorithmId,
-					"streamPath":   t.TransformJob.StreamPath,
-				}, nil)
-			}
 		}
 	}
 	return nil
