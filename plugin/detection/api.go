@@ -405,26 +405,10 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 
 	// 获取所有检测配置项
 	transforms := p.Server.Transforms.Items
-	total := len(transforms)
-
-	// 计算分页起始和结束位置
-	startIndex := (req.Page - 1) * req.PageSize
-	endIndex := startIndex + req.PageSize
-
-	// 边界检查
-	if startIndex >= total {
-		startIndex = total
-	}
-	if endIndex > total {
-		endIndex = total
-	}
-
-	// 应用分页
-	pagedTransforms := transforms[startIndex:endIndex]
 
 	// 构造返回列表
 	var ret []*ListDetectItem
-	for _, transform := range pagedTransforms {
+	for _, transform := range transforms {
 		// 从TransformJob中获取详细配置信息
 		if transform.TransformJob != nil && transform.TransformJob.Config.Output != nil {
 			for _, output := range transform.TransformJob.Config.Output {
@@ -467,46 +451,52 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 如果指定了算法ID过滤条件
-	if len(req.AlgorithmId) > 0 {
-		var filtered []*ListDetectItem
-		algorithmIdMap := make(map[uint8]bool)
-		for _, id := range req.AlgorithmId {
-			algorithmIdMap[id] = true
+	// 应用过滤条件
+	var filtered []*ListDetectItem
+	for _, item := range ret {
+		// StreamPath 过滤
+		if req.StreamPath != "" && item.StreamPath != req.StreamPath {
+			continue
 		}
 
-		for _, item := range ret {
-			if algorithmIdMap[item.AlgorithmId] {
-				filtered = append(filtered, item)
+		// AlgorithmId 过滤
+		if len(req.AlgorithmId) > 0 {
+			found := false
+			for _, id := range req.AlgorithmId {
+				if item.AlgorithmId == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
 			}
 		}
-		ret = filtered
-		total = len(ret)
+
+		filtered = append(filtered, item)
 	}
+	ret = filtered
+	total := len(ret)
 
-	// 应用分页到过滤后的结果
-	if len(req.AlgorithmId) > 0 && total > 0 {
-		startIndex := (req.Page - 1) * req.PageSize
-		endIndex := startIndex + req.PageSize
+	// 应用分页
+	startIndex := (req.Page - 1) * req.PageSize
+	endIndex := startIndex + req.PageSize
 
-		if startIndex >= total {
-			startIndex = total
-		}
-		if endIndex > total {
-			endIndex = total
-		}
-
-		if startIndex < len(ret) {
-			ret = ret[startIndex:endIndex]
-		} else {
-			ret = []*ListDetectItem{}
-		}
+	// 边界检查
+	if startIndex >= total {
+		startIndex = total
+	}
+	if endIndex > total {
+		endIndex = total
 	}
 
 	// 确保返回空数组而不是 null
-	if ret == nil {
-		ret = make([]*ListDetectItem, 0)
+	var pagedResult []*ListDetectItem
+	if startIndex < len(ret) {
+		pagedResult = ret[startIndex:endIndex]
+	} else {
+		pagedResult = []*ListDetectItem{}
 	}
 
-	sendListResponse(rw, 0, "success", total, req.Page, req.PageSize, ret)
+	sendListResponse(rw, 0, "success", total, req.Page, req.PageSize, pagedResult)
 }
