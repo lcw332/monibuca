@@ -1,3 +1,5 @@
+//go:build s3
+
 package storage
 
 import (
@@ -108,43 +110,17 @@ func (s *S3Storage) CreateFile(ctx context.Context, path string) (File, error) {
 		storage:   s,
 		objectKey: objectKey,
 		ctx:       ctx,
+		readOnly:  false,
 	}, nil
 }
 
 func (s *S3Storage) OpenFile(ctx context.Context, path string) (File, error) {
 	objectKey := s.getObjectKey(path)
-
-	// 下载文件到临时文件
-	tempFile, err := os.CreateTemp("", "s3-download-*")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			tempFile.Close()
-			os.Remove(tempFile.Name())
-		}
-	}()
-
-	_, err = s.downloader.DownloadWithContext(ctx, tempFile, &s3.GetObjectInput{
-		Bucket: aws.String(s.config.Bucket),
-		Key:    aws.String(objectKey),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to download file: %w", err)
-	}
-
-	// 重置文件指针到开始
-	if _, err = tempFile.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("failed to seek temp file: %w", err)
-	}
-
 	return &S3File{
 		storage:   s,
 		objectKey: objectKey,
 		ctx:       ctx,
-		tempFile:  tempFile,
-		filePath:  tempFile.Name(),
+		readOnly:  true, // 只读模式
 	}, nil
 }
 
@@ -273,6 +249,7 @@ type S3File struct {
 	ctx       context.Context
 	tempFile  *os.File // 本地临时文件，用于支持随机访问
 	filePath  string   // 临时文件路径
+	readOnly  bool     // 只读模式，不上传到S3
 }
 
 func (w *S3File) Name() string {
@@ -283,18 +260,14 @@ func (w *S3File) Write(p []byte) (n int, err error) {
 	// 如果还没有创建临时文件，先创建
 	if w.tempFile == nil {
 		if err = w.createTempFile(); err != nil {
-			return 0, fmt.Errorf("failed to create temp file: %w", err)
+			return 0, err
 		}
 	}
 
 	// 写入到临时文件
-	n, err = w.tempFile.Write(p)
-	if err != nil {
-		return n, fmt.Errorf("failed to write to temp file: %w", err)
-	}
-
-	return n, nil
+	return w.tempFile.Write(p)
 }
+
 func (w *S3File) Read(p []byte) (n int, err error) {
 	// 如果还没有创建缓存文件，先下载到本地
 	if w.tempFile == nil {
@@ -332,24 +305,30 @@ func (w *S3File) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (w *S3File) Sync() error {
+	// 只读模式不上传
+	if w.readOnly {
+		if w.tempFile != nil {
+			return w.tempFile.Sync()
+		}
+		return nil
+	}
+
 	// 如果使用临时文件，先同步到磁盘
 	if w.tempFile != nil {
 		if err := w.tempFile.Sync(); err != nil {
-			return fmt.Errorf("failed to sync temp file to disk: %w", err)
+			return err
 		}
-
-		// 获取文件信息
-		_, err := w.tempFile.Stat()
-		if err != nil {
-			return fmt.Errorf("failed to stat temp file: %w", err)
+		// 获取文件大小用于日志
+		if stat, err := w.tempFile.Stat(); err == nil {
+			fmt.Printf("[S3File.Sync] tempFile size: %d bytes, path: %s\n", stat.Size(), w.filePath)
 		}
 	}
-
 	if err := w.uploadTempFile(); err != nil {
 		return err
 	}
 	return nil
 }
+
 func (w *S3File) Seek(offset int64, whence int) (int64, error) {
 	// 如果还没有创建临时文件，先创建或下载
 	if w.tempFile == nil {
@@ -394,20 +373,17 @@ func (w *S3File) Stat() (os.FileInfo, error) {
 
 // uploadTempFile 上传临时文件到S3
 func (w *S3File) uploadTempFile() (err error) {
-	if w.tempFile == nil {
-		return fmt.Errorf("temp file is nil")
-	}
-
-	// 获取文件信息以记录大小
-	_, err = w.tempFile.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat temp file: %w", err)
-	}
-
-	// 重置文件指针到开始位置，确保从文件头开始读取
+	// 重置文件指针到开头
 	if _, err := w.tempFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("failed to seek to beginning: %w", err)
+		fmt.Printf("[S3File.uploadTempFile] failed to seek: %v\n", err)
+		return fmt.Errorf("failed to seek temp file: %w", err)
 	}
+
+	// 获取文件大小
+	stat, _ := w.tempFile.Stat()
+	fmt.Printf("[S3File.uploadTempFile] uploading to S3: bucket=%s, key=%s, size=%d\n",
+		w.storage.config.Bucket, w.objectKey, stat.Size())
+
 	// 上传到S3
 	_, err = w.storage.uploader.UploadWithContext(w.ctx, &s3manager.UploadInput{
 		Bucket:      aws.String(w.storage.config.Bucket),
@@ -415,6 +391,13 @@ func (w *S3File) uploadTempFile() (err error) {
 		Body:        w.tempFile,
 		ContentType: aws.String("application/octet-stream"),
 	})
+
+	if err != nil {
+		fmt.Printf("[S3File.uploadTempFile] upload failed: %v\n", err)
+		return fmt.Errorf("failed to upload to S3: %w", err)
+	}
+
+	fmt.Printf("[S3File.uploadTempFile] upload successful: %s\n", w.objectKey)
 	return nil
 }
 
