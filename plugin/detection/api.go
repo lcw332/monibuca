@@ -327,15 +327,19 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 		Output: outputs,
 	})
 
-	publisher.OnDispose(func() {
-		trans.TransformJob.Stop(task.ErrTaskComplete)
+	trans.TransformJob.OnDispose(func() {
 		// 触发 onDetectionClose webhook 用于 disposeDetection
 		closeData := m7s.AlarmInfo{
-			AlarmDesc: "manual_dispose",
+			StreamPath: streamPath,
+			AlarmName:  detection.HookOnDetectionClose,
+			AlarmDesc:  "manual_dispose",
 		}
 		if sender, webhook := p.GetHookSender(detection.HookOnDetectionClose); sender != nil {
 			sender(webhook, closeData)
 		}
+	})
+	publisher.OnDispose(func() {
+		trans.TransformJob.Stop(task.ErrTaskComplete)
 	})
 
 	err = trans.WaitStarted()
