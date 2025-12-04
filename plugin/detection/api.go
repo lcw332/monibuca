@@ -457,32 +457,8 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 	for _, item := range ret {
 		// StreamPath 过滤
 		if req.StreamPath != "" {
-			matched := false
-			if strings.Contains(req.StreamPath, "*") {
-				// 支持通配符搜索，将*替换为%进行LIKE模式匹配
-				pattern := strings.ReplaceAll(req.StreamPath, "*", "%")
-				// 简单的通配符匹配实现
-				if strings.HasPrefix(pattern, "%") && strings.HasSuffix(pattern, "%") {
-					// 中间匹配：abc -> %abc%
-					middle := strings.Trim(pattern, "%")
-					matched = strings.Contains(item.StreamPath, middle)
-				} else if strings.HasSuffix(pattern, "%") {
-					// 前缀匹配：abc* -> abc%
-					prefix := strings.TrimSuffix(pattern, "%")
-					matched = strings.HasPrefix(item.StreamPath, prefix)
-				} else if strings.HasPrefix(pattern, "%") {
-					// 后缀匹配：*abc -> %abc
-					suffix := strings.TrimPrefix(pattern, "%")
-					matched = strings.HasSuffix(item.StreamPath, suffix)
-				} else {
-					// 精确匹配
-					matched = item.StreamPath == req.StreamPath
-				}
-			} else {
-				// 模糊匹配，检查item.StreamPath是否包含req.StreamPath
-				matched = strings.Contains(item.StreamPath, req.StreamPath)
-			}
-			if !matched {
+			// 全匹配，不区分大小写
+			if !strings.EqualFold(item.StreamPath, req.StreamPath) {
 				continue
 			}
 		}
