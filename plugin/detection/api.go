@@ -410,6 +410,11 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 	// 构造返回列表
 	var ret []*ListDetectItem
 	for _, transform := range transforms {
+		// 检查是否匹配请求的StreamPath
+		if req.StreamPath != "" && !strings.EqualFold(transform.StreamPath, req.StreamPath) {
+			continue
+		}
+
 		// 从TransformJob中获取详细配置信息
 		if transform.TransformJob != nil && transform.TransformJob.Config.Output != nil {
 			for _, output := range transform.TransformJob.Config.Output {
@@ -425,6 +430,20 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 
 					// 创建配置项，每个算法ID对应一个配置项
 					for i, algorithmId := range snapConfig.AlgorithmId {
+						// 如果请求指定了算法ID，则只返回匹配的算法
+						if len(req.AlgorithmId) > 0 {
+							found := false
+							for _, id := range req.AlgorithmId {
+								if algorithmId == id {
+									found = true
+									break
+								}
+							}
+							if !found {
+								continue
+							}
+						}
+
 						item := &ListDetectItem{
 							AlgorithmId:   algorithmId,
 							AlgorithmName: p.getAlgorithmName(algorithmId),
@@ -445,41 +464,16 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			// 如果没有详细配置，只返回基础信息
-			item := &ListDetectItem{
-				StreamPath: transform.StreamPath,
-			}
-			ret = append(ret, item)
-		}
-	}
-
-	// 应用过滤条件
-	var filtered []*ListDetectItem
-	for _, item := range ret {
-		// StreamPath 过滤
-		if req.StreamPath != "" {
-			// 全匹配，不区分大小写
-			if !strings.EqualFold(item.StreamPath, req.StreamPath) {
-				continue
-			}
-		}
-
-		// AlgorithmId 过滤
-		if len(req.AlgorithmId) > 0 {
-			found := false
-			for _, id := range req.AlgorithmId {
-				if item.AlgorithmId == id {
-					found = true
-					break
+			// 但仅当未指定算法ID过滤条件时才返回
+			if len(req.AlgorithmId) == 0 {
+				item := &ListDetectItem{
+					StreamPath: transform.StreamPath,
 				}
-			}
-			if !found {
-				continue
+				ret = append(ret, item)
 			}
 		}
-
-		filtered = append(filtered, item)
 	}
-	ret = filtered
+
 	total := len(ret)
 
 	// 应用分页
