@@ -82,6 +82,7 @@ type CallbackDetection struct {
 	Args       struct {
 		AccessUrl     string            `json:"access_url,omitempty" desc:"对象存储访问链接"`
 		ObjectKey     string            `json:"object_key,omitempty" desc:"对象存储 Key"`
+		ObjectBase64  string            `json:"object_base64,omitempty" desc:"对象 base64"`
 		AlgorithmID   int               `json:"algorithm_id"`
 		AlgorithmName string            `json:"algorithm_name"`
 		Detections    []DetectionResult `json:"detections"`

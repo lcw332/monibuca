@@ -122,8 +122,9 @@ func (t *Transformer) Start() (err error) {
 	plugin := t.TransformJob.Plugin
 
 	ossConfig := plugin.Config.Get("oss")
+	ossEnable := ossConfig.Get("enable")
 	var ossPlugin storage.Storage
-	if ossConfig != nil && ossConfig.File != nil {
+	if ossConfig != nil && ossEnable.GetValue() == true && ossConfig.File != nil {
 		ossPlugin, err = storage.CreateStorage("s3", ossConfig.File)
 		if err != nil {
 			plugin.Error("create s3 storage failed", "error", err.Error())
@@ -132,8 +133,9 @@ func (t *Transformer) Start() (err error) {
 	}
 
 	apiConfig := plugin.Config.Get("algorithmApi")
+	apiEnable := apiConfig.Get("enable")
 	var globalAlgApi *AlgorithmAPI
-	if apiConfig != nil {
+	if apiConfig != nil && apiEnable.GetValue() == true && apiConfig.File != nil {
 		globalAlgApi = &AlgorithmAPI{}
 		switch v := apiConfig.File.(type) {
 		case *AlgorithmAPI:
@@ -144,8 +146,9 @@ func (t *Transformer) Start() (err error) {
 	}
 
 	bboxConfig := plugin.Config.Get("bbox")
+	bboxEnable := bboxConfig.Get("enable")
 	var globalBbox *Bbox
-	if bboxConfig != nil {
+	if bboxConfig != nil && bboxEnable.GetValue() == true && bboxConfig.File != nil {
 		globalBbox = &Bbox{}
 		switch v := bboxConfig.File.(type) {
 		case *Bbox:
@@ -167,8 +170,9 @@ func (t *Transformer) Start() (err error) {
 
 	// 初始化MQTT客户端
 	mqttConfig := plugin.Config.Get("mqtt")
+	mqttEnable := mqttConfig.Get("enable")
 	var globalMQTTConfig *MQTTConfig
-	if mqttConfig != nil {
+	if mqttConfig != nil && mqttEnable.GetValue() == true && mqttConfig.File != nil {
 		globalMQTTConfig = &MQTTConfig{}
 		switch v := mqttConfig.File.(type) {
 		case *MQTTConfig:
@@ -371,7 +375,7 @@ func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, 
 	}
 
 	// 处理检测结果（上传到OSS、发送MQTT消息和HTTP回调）
-	return t.handleDetectionResults(validResults, imgInfo, now)
+	return t.handleDetectionResults(validResults, imgInfo, base64ImageData, now)
 }
 
 // executeParallelDetection 并行执行算法检测
@@ -479,7 +483,7 @@ func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData 
 }
 
 // handleDetectionResults 处理检测结果（包括上传OSS、发送MQTT消息和HTTP回调）
-func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, now time.Time) error {
+func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, imgBase64 string, now time.Time) error {
 	// 创建OSS文件映射，避免重复上传相同图像
 	uploadedFiles := make(map[string]struct {
 		accessUrl      string
@@ -503,8 +507,12 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 			continue
 		}
 
-		callbackEntity.Args.AccessUrl = accessUrl
 		callbackEntity.Args.ObjectKey = objKey
+		if accessUrl != "" {
+			callbackEntity.Args.AccessUrl = accessUrl
+		} else {
+			callbackEntity.Args.ObjectBase64 = imgBase64
+		}
 
 		// 发送HTTP回调
 		t.sendHTTPCallback(client, callbackEntity)
