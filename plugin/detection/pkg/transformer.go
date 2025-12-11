@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -88,6 +87,8 @@ type (
 		result *DetectionResponse
 		// 原图数据
 		rawImgData []byte
+		// 原图 base64
+		rawImgBase64 string
 		// 错误
 		err error
 	}
@@ -374,7 +375,7 @@ func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, 
 	}
 
 	// 处理检测结果（上传到OSS、发送MQTT消息和HTTP回调）
-	return t.handleDetectionResults(validResults, imgInfo, base64ImageData, now)
+	return t.handleDetectionResults(validResults, imgInfo, now)
 }
 
 // executeParallelDetection 并行执行算法检测
@@ -389,8 +390,9 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			defer wg.Done()
 
 			result := &algorithmResult{
-				algId: algId,
-				index: idx,
+				algId:        algId,
+				index:        idx,
+				rawImgBase64: base64ImageData,
 			}
 
 			req := DetectionRequest{
@@ -482,7 +484,7 @@ func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData 
 }
 
 // handleDetectionResults 处理检测结果（包括上传OSS、发送MQTT消息和HTTP回调）
-func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, imgBase64 string, now time.Time) error {
+func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, now time.Time) error {
 	// 创建OSS文件映射，避免重复上传相同图像
 	uploadedFiles := make(map[string]struct {
 		accessUrl      string
@@ -490,7 +492,6 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 		processedImage []byte
 	})
 
-	client := &http.Client{Timeout: 10 * time.Second}
 	publishId := uuid.New()
 
 	// 处理每个检测结果
@@ -498,9 +499,15 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
 		// 发送MQTT消息
 		t.sendMQTTMessage(result, callbackEntity, t.mqttClient, t.config.MQTT)
+		// 绘制边界框（移到这里执行，避免重复绘制）
+		processedImage, err := t.drawBoundingBoxes(result.result, result.rawImgData, imgInfo)
+		if err != nil {
+			t.job.Plugin.Error("draw bounding box error", "error", err.Error())
+			continue
+		}
 
 		// 上传到OSS（如果需要）
-		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, imgInfo, now, uploadedFiles)
+		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, &processedImage, now, uploadedFiles)
 		if err != nil {
 			t.job.Plugin.Error("upload to OSS failed", "error", err.Error())
 			continue
@@ -510,21 +517,19 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 		if accessUrl != "" {
 			callbackEntity.Args.AccessUrl = accessUrl
 		} else {
-			callbackEntity.Args.ObjectBase64 = imgBase64
+			callbackEntity.Args.ObjectRaw = result.rawImgBase64
+			callbackEntity.Args.ObjectArtifacts = SnapFrameToBase64WithFFmpeg(processedImage)
 		}
 
-		// 发送HTTP回调
-		t.sendHTTPCallback(client, callbackEntity)
-
 		// 触发 onDetectionResult webhook
-		t.SendDetectionWebhook(HookOnDetectionResult, result.algId, callbackEntity, nil)
+		t.SendDetectionWebhook(HookOnDetectionResult, result.algId, callbackEntity.Args, nil)
 	}
 
 	return nil
 }
 
 // uploadToOSSIfNeeded 如需要则上传到OSS
-func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo, now time.Time, uploadedFiles map[string]struct {
+func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, bboxImg *[]byte, now time.Time, uploadedFiles map[string]struct {
 	accessUrl      string
 	objKey         string
 	processedImage []byte
@@ -537,12 +542,6 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo,
 	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.algId)
 	if uploaded, exists := uploadedFiles[key]; exists {
 		return uploaded.accessUrl, uploaded.objKey, nil
-	}
-
-	// 绘制边界框（移到这里执行，避免重复绘制）
-	processedImage, err := t.drawBoundingBoxes(result.result, result.rawImgData, imgInfo)
-	if err != nil {
-		return "", "", err
 	}
 
 	ossFilename := fmt.Sprintf("%s/alg_%d/%s.%s",
@@ -560,7 +559,7 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo,
 	}
 	defer file.Close()
 
-	_, err = file.Write(processedImage)
+	_, err = file.Write(*bboxImg)
 	if err != nil {
 		return "", "", err
 	}
@@ -585,7 +584,7 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, imgInfo ImgInfo,
 		accessUrl      string
 		objKey         string
 		processedImage []byte
-	}{accessUrl, objKey, processedImage}
+	}{accessUrl, objKey, *bboxImg}
 
 	return accessUrl, objKey, nil
 }
@@ -602,31 +601,6 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 		if err != nil {
 			t.job.Plugin.Error("MQTT publish failed", "error", err.Error())
 		}
-	}
-}
-
-// sendHTTPCallback 发送HTTP回调
-func (t *SnapTask) sendHTTPCallback(client *http.Client, callbackEntity *CallbackDetection) {
-	if t.config.AlgorithmAPI.CallbackURL == "" {
-		return
-	}
-
-	jsonData, marshalErr := json.Marshal(callbackEntity)
-	if marshalErr != nil {
-		t.job.Plugin.Warn("marshal callback entity error", "error", marshalErr.Error())
-		return
-	}
-
-	resp, postErr := client.Post(t.config.AlgorithmAPI.CallbackURL, "application/json", bytes.NewReader(jsonData))
-	if postErr != nil {
-		t.job.Plugin.Error("callback error", "error", postErr.Error())
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		t.job.Plugin.Warn("callback response status not ok", "status", resp.Status, "body", string(body))
 	}
 }
 

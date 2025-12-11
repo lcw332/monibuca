@@ -59,6 +59,12 @@ type DetectionResult struct {
 	ClassNameCn string    `json:"class_name_cn"`
 	Confidence  float64   `json:"confidence"`
 	BBox        []float64 `json:"bbox"`
+	// 车牌号码(针对车牌识别)
+	PlateNumber string `json:"plate_number,omitempty"`
+	// 车牌类型(针对车牌识别)
+	PlateType string `json:"plate_type,omitempty"`
+	// 车牌置信度(针对车牌识别)
+	PlateConfidence float64 `json:"plate_confidence,omitempty"`
 }
 
 // DetectionResponse 定义响应结构体
@@ -80,14 +86,15 @@ type CallbackDetection struct {
 	Event      string `json:"event"`
 	StreamPath string `json:"streamPath"`
 	Args       struct {
-		AccessUrl     string            `json:"access_url,omitempty" desc:"对象存储访问链接"`
-		ObjectKey     string            `json:"object_key,omitempty" desc:"对象存储 Key"`
-		ObjectBase64  string            `json:"object_base64,omitempty" desc:"对象 base64"`
-		AlgorithmID   int               `json:"algorithm_id"`
-		AlgorithmName string            `json:"algorithm_name"`
-		Detections    []DetectionResult `json:"detections"`
-		TotalCount    int               `json:"total_count"`
-		DetectTime    float64           `json:"detect_time"`
+		AccessUrl       string            `json:"access_url,omitempty" desc:"对象存储访问链接"`
+		ObjectKey       string            `json:"object_key,omitempty" desc:"对象存储 Key"`
+		ObjectRaw       string            `json:"object_raw,omitempty" desc:"原图 base64"`
+		ObjectArtifacts string            `json:"object_artifacts,omitempty" desc:"加工后图片 base64"`
+		AlgorithmID     int               `json:"algorithm_id"`
+		AlgorithmName   string            `json:"algorithm_name"`
+		Detections      []DetectionResult `json:"detections"`
+		TotalCount      int               `json:"total_count"`
+		DetectTime      float64           `json:"detect_time"`
 	} `json:"args"`
 	PublishId  uuid.UUID `json:"publishId"`
 	RemoteAddr string    `json:"remoteAddr"`
