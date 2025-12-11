@@ -146,9 +146,8 @@ func (t *Transformer) Start() (err error) {
 	}
 
 	bboxConfig := plugin.Config.Get("bbox")
-	bboxEnable := bboxConfig.Get("enable")
 	var globalBbox *Bbox
-	if bboxConfig != nil && bboxEnable.GetValue() == true && bboxConfig.File != nil {
+	if bboxConfig != nil && bboxConfig.File != nil {
 		globalBbox = &Bbox{}
 		switch v := bboxConfig.File.(type) {
 		case *Bbox:
