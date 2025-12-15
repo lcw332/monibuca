@@ -37,6 +37,7 @@ type (
 		SnapMode       int           `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
 		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+		SnapOriginal   bool          `json:"snapOriginal" default:"false" desc:"是否保存原始图片"`
 		SavePath       string        `json:"savePath" desc:"截图保存路径"`
 		FontPath       string        `json:"fontPath" default:"" desc:"检测框字体文件路径"`
 		AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
@@ -47,10 +48,9 @@ type (
 	}
 
 	Bbox struct {
-		SnapOriginal bool   `json:"snapOriginal" default:"true" desc:"是否保存原始图片"`
-		FontPath     string `json:"fontPath" default:"" desc:"水印字体文件路径"`
-		FontColor    string `json:"fontColor" default:"red" desc:"截图文字颜色，支持rgba格式"`
-		FontSize     uint8  `json:"fontSize" default:"12" desc:"截图字体大小"`
+		FontPath  string `json:"fontPath" default:"" desc:"水印字体文件路径"`
+		FontColor string `json:"fontColor" default:"red" desc:"截图文字颜色，支持rgba格式"`
+		FontSize  uint8  `json:"fontSize" default:"12" desc:"截图字体大小"`
 	}
 	AlgorithmAPI struct {
 		Enable        bool              `json:"enable" default:"false" desc:"是否启用算法分析"`
@@ -517,7 +517,9 @@ func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgIn
 		if accessUrl != "" {
 			callbackEntity.Args.AccessUrl = accessUrl
 		} else {
-			callbackEntity.Args.ObjectRaw = result.rawImgBase64
+			if t.config.SnapOriginal {
+				callbackEntity.Args.ObjectRaw = result.rawImgBase64
+			}
 			callbackEntity.Args.ObjectArtifacts = SnapFrameToBase64WithFFmpeg(processedImage)
 		}
 
