@@ -25,6 +25,7 @@ type (
 		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 		AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
 		ConfThreshold  []float32     `default:"[]" desc:"全局置信度配置，与算法ID一一对应"`
+		SnapOriginal   bool          `json:"snapOriginal" default:"false" desc:"是否保存原始图片"`
 		// 对象
 		AlgorithmAPI detection.AlgorithmAPI `json:"algorithmApi" default:"{}" desc:"算法API配置"`
 		Oss          detection.Oss          `json:"oss" default:"{}" desc:"对象存储公共配置"`
