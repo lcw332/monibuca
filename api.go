@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"m7s.live/v5/pb"
 	"m7s.live/v5/pkg"
 	"m7s.live/v5/pkg/format"
+	"m7s.live/v5/pkg/storage"
 	"m7s.live/v5/pkg/util"
 )
 
@@ -723,7 +725,7 @@ func (s *Server) GetConfigFile(_ context.Context, req *emptypb.Empty) (res *pb.G
 func (s *Server) UpdateConfigFile(_ context.Context, req *pb.UpdateConfigFileRequest) (res *pb.SuccessResponse, err error) {
 	if s.configFileContent != nil {
 		s.configFileContent = []byte(req.Content)
-		os.WriteFile(s.configFilePath, s.configFileContent, 0644)
+		err = os.WriteFile(s.configFilePath, s.configFileContent, 0644)
 		res = &pb.SuccessResponse{}
 	} else {
 		err = pkg.ErrNotFound
@@ -765,6 +767,243 @@ func (s *Server) GetConfig(_ context.Context, req *pb.GetConfigRequest) (res *pb
 	}
 	res.Data.Merged = string(mm)
 	return
+}
+
+func (s *Server) SetArming(_ context.Context, req *pb.SetArmingRequest) (res *pb.SuccessResponse, err error) {
+	// 修改内存中的 Armed 配置
+	s.ServerConfig.Armed = req.Armed
+
+	// 修改配置文件
+	if s.configFileContent != nil {
+		content := string(s.configFileContent)
+		armedValue := "false"
+		if req.Armed {
+			armedValue = "true"
+		}
+
+		// 使用正则表达式查找并替换 armed 配置
+		// 匹配模式：armed: true 或 armed: false（可能有空格）
+		re := regexp.MustCompile(`(?m)^(\s*)armed:\s*(true|false)\s*$`)
+
+		if re.MatchString(content) {
+			// 找到了 armed 配置，直接替换
+			content = re.ReplaceAllString(content, "${1}armed: "+armedValue)
+		} else {
+			// 没有找到 armed 配置，需要添加到 global 节点下
+			// 查找 global: 行后的第一个子节点，获取缩进
+			globalRe := regexp.MustCompile(`(?m)^global:\s*\n(\s+)`)
+			matches := globalRe.FindStringSubmatch(content)
+
+			if len(matches) > 1 {
+				// 找到 global 节点和缩进，在 global: 后插入 armed
+				indent := matches[1] // 获取第一个子节点的缩进
+				// 在 global: 后面插入新行
+				content = strings.Replace(content, matches[0], "global:\n"+indent+"armed: "+armedValue+"\n"+indent, 1)
+			} else {
+				// 没有找到 global 节点或其子节点，使用默认缩进（2个空格）
+				// 先尝试查找 global: 行
+				simpleGlobalRe := regexp.MustCompile(`(?m)^global:\s*$`)
+				if simpleGlobalRe.MatchString(content) {
+					// 找到 global: 但没有子节点，使用默认2个空格缩进
+					content = simpleGlobalRe.ReplaceAllString(content, "global:\n  armed: "+armedValue)
+				} else {
+					// 没有 global 节点，在文件开头添加
+					content = "global:\n  armed: " + armedValue + "\n" + content
+				}
+			}
+		}
+
+		// 写入文件
+		s.configFileContent = []byte(content)
+		if err = os.WriteFile(s.configFilePath, []byte(content), 0644); err != nil {
+			s.Error("SetArming", "error", "write file failed", "err", err)
+			return nil, err
+		}
+	}
+
+	// 记录日志
+	status := "撤防(禁用录像)"
+	if req.Armed {
+		status = "布防(启用录像)"
+	}
+	s.Info("SetArming", "status", status, "armed", req.Armed)
+
+	// 返回成功响应
+	res = &pb.SuccessResponse{
+		Code:    0,
+		Message: "设置成功",
+	}
+	return
+}
+
+func (s *Server) GetFormily(_ context.Context, req *pb.GetConfigRequest) (res *pb.GetConfigResponse, err error) {
+	res = &pb.GetConfigResponse{
+		Data: &pb.ConfigData{},
+	}
+	var conf *config.Config
+	if req.Name == "global" || req.Name == "" {
+		conf = &s.Config
+	} else {
+		p, ok := s.Plugins.Get(req.Name)
+		if !ok {
+			err = pkg.ErrNotFound
+			return
+		}
+		conf = &p.Config
+	}
+	formily := conf.GetFormily()
+	var mm []byte
+	mm, err = json.Marshal(formily)
+	if err != nil {
+		return
+	}
+	res.Data.Merged = string(mm)
+	return
+}
+
+// ModifyConfig 保存配置
+// 1. 备份旧配置文件
+// 2. 只保存用户输入的值（非默认值、非全局配置值）
+// 3. 重新生成配置文件
+func (s *Server) ModifyConfig(_ context.Context, req *pb.ModifyConfigRequest) (res *pb.SuccessResponse, err error) {
+	res = &pb.SuccessResponse{}
+
+	// 解析前端传来的配置数据（YAML 格式）
+	var userConfig map[string]any
+	if err = yaml.Unmarshal([]byte(req.Yaml), &userConfig); err != nil {
+		return nil, err
+	}
+
+	// 获取对应的配置对象
+	var conf *config.Config
+	if req.Name == "global" || req.Name == "" {
+		conf = &s.Config
+	} else {
+		p, ok := s.Plugins.Get(req.Name)
+		if !ok {
+			err = pkg.ErrNotFound
+			return
+		}
+		conf = &p.Config
+	}
+
+	// 过滤出用户输入的值（非默认值、非全局配置值）
+	filteredConfig := filterUserInputConfig(conf, userConfig)
+
+	// 备份旧配置文件
+	if s.configFilePath != "" && s.configFileContent != nil {
+		backupPath := s.configFilePath + ".bak." + time.Now().Format("20060102150405")
+		if err = os.WriteFile(backupPath, s.configFileContent, 0644); err != nil {
+			s.Error("备份配置文件失败", "error", err)
+			// 继续执行，不中断
+		}
+	}
+
+	// 读取现有配置文件内容
+	var existingConfig map[string]any
+	if s.configFileContent != nil {
+		yaml.Unmarshal(s.configFileContent, &existingConfig)
+	}
+	if existingConfig == nil {
+		existingConfig = make(map[string]any)
+	}
+
+	// 更新对应的配置段（使用小写）
+	configKey := strings.ToLower(req.Name)
+	if configKey == "" {
+		configKey = "global"
+	}
+
+	if len(filteredConfig) > 0 {
+		existingConfig[configKey] = filteredConfig
+	} else {
+		// 如果没有用户输入的值，删除该配置段
+		delete(existingConfig, configKey)
+	}
+
+	// 清理 null 值
+	cleanNullValues(existingConfig)
+
+	// 生成新的配置文件内容
+	var newContent []byte
+	newContent, err = yaml.Marshal(existingConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// 写入配置文件
+	if s.configFilePath != "" {
+		if err = os.WriteFile(s.configFilePath, newContent, 0644); err != nil {
+			return nil, err
+		}
+		s.configFileContent = newContent
+	}
+
+	// 应用配置修改
+	conf.ParseModifyFile(filteredConfig)
+
+	return
+}
+
+// filterUserInputConfig 过滤出用户输入的配置值
+// 只保留用户实际修改的值，排除默认值和全局配置值
+func filterUserInputConfig(conf *config.Config, userConfig map[string]any) map[string]any {
+	result := make(map[string]any)
+
+	for key, value := range userConfig {
+		prop := conf.Get(key)
+		if prop == nil {
+			continue
+		}
+
+		// 如果是嵌套配置
+		if nestedConfig, ok := value.(map[string]any); ok {
+			if len(prop.GetProps()) > 0 {
+				// 递归过滤嵌套配置
+				filtered := filterUserInputConfig(prop, nestedConfig)
+				if len(filtered) > 0 {
+					result[key] = filtered
+				}
+			} else {
+				result[key] = value
+			}
+			continue
+		}
+
+		// 检查值是否与默认值相同
+		if prop.IsDefaultValue(value) {
+			continue
+		}
+
+		// 检查值是否与全局配置值相同
+		if prop.IsGlobalValue(value) {
+			continue
+		}
+
+		// 用户输入的值，保留
+		result[key] = value
+	}
+
+	return result
+}
+
+// cleanNullValues 递归清理 map 中的 null 值
+// 删除值为 nil 的键，并递归处理嵌套的 map
+func cleanNullValues(m map[string]any) {
+	for key, value := range m {
+		if value == nil {
+			delete(m, key)
+			continue
+		}
+		// 递归处理嵌套的 map
+		if nested, ok := value.(map[string]any); ok {
+			cleanNullValues(nested)
+			// 如果清理后 map 为空，也删除该键
+			if len(nested) == 0 {
+				delete(m, key)
+			}
+		}
+	}
 }
 
 func (s *Server) GetRecordList(ctx context.Context, req *pb.ReqRecordList) (resp *pb.RecordResponseList, err error) {
@@ -1217,4 +1456,12 @@ func (s *Server) GetAlarmList(ctx context.Context, req *pb.AlarmListRequest) (re
 	}
 
 	return res, nil
+}
+
+// GetStorageSchemas 获取所有已注册的存储类型 Schema
+// 用于前端动态渲染存储配置表单
+func (s *Server) GetStorageSchemas(w http.ResponseWriter, r *http.Request) {
+	schemas := storage.GetSchemas()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(schemas)
 }

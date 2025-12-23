@@ -282,7 +282,7 @@ func (t *TranscodePlugin) Launch(ctx context.Context, transReq *pb.TransRequest)
 	}
 	conf = strings.Join(inputs, " -i ") + fmt.Sprintf(" %s ", filterStr) + transReq.Scale + transReq.Encodec
 
-	cfg.Output = []config.TransformOutput{
+	cfg.Output = []config.TransfromOutput{
 		{
 			Target:     targetURL,
 			StreamPath: streamPath,

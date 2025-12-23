@@ -128,19 +128,25 @@ func NewPlatform(pm *gb28181.PlatformModel, plugin *GB28181Plugin, unRegister bo
 }
 
 func (p *Platform) Start() error {
-	if p.unRegister {
-		err := p.Unregister()
-		if err != nil {
-			p.Error("failed to unregister", "err", err)
-		}
-		p.unRegister = false
-	}
-	register := NewRegister(p, "firstRegister")
-	register.OnStart(func() {
-		register.Tick(nil)
+	p.SetDescriptions(task.Description{
+		"name":       p.PlatformModel.Name,
+		"serverGBID": p.PlatformModel.ServerGBID,
 	})
-	p.register = register
-	p.AddTask(register)
+	if p.PlatformModel.Enable {
+		if p.unRegister {
+			err := p.Unregister()
+			if err != nil {
+				p.Error("failed to unregister", "err", err)
+			}
+			p.unRegister = false
+		}
+		register := NewRegister(p, "firstRegister")
+		register.OnStart(func() {
+			register.Tick(nil)
+		})
+		p.register = register
+		p.AddTask(register)
+	}
 	return nil
 }
 
@@ -973,7 +979,7 @@ func (p *Platform) buildChannelItem(channel gb28181.DeviceChannel) string {
 		channel.RegisterWay, // 直接使用整数值
 		channel.Secrecy,     // 直接使用整数值
 		parentID,
-		channel.Parental,  // 直接使用整数值
+		channel.Parental, // 直接使用整数值
 		channel.SafetyWay) // 直接使用整数值
 }
 
@@ -1006,19 +1012,20 @@ func (p *Platform) handleDeviceControl(req *sip.Request, tx sip.ServerTransactio
 	}
 
 	// 创建转发请求
-	request := sip.NewRequest(sip.MESSAGE, device.Recipient)
-
-	// 设置From头部，使用平台信息
-	fromHeader := device.fromHDR
-	fromTag, _ := req.From().Params.Get("tag")
-	fromHeader.Params.Add("tag", fromTag)
-	request.AppendHeader(&fromHeader)
-
-	// 添加To头部，使用设备信息
-	toHeader := sip.ToHeader{
-		Address: device.Recipient,
-	}
-	request.AppendHeader(&toHeader)
+	request := device.CreateRequest(sip.MESSAGE, nil)
+	//request := sip.NewRequest(sip.MESSAGE, device.Recipient)
+	//
+	//// 设置From头部，使用平台信息
+	//fromHeader := device.fromHDR
+	//fromTag, _ := req.From().Params.Get("tag")
+	//fromHeader.Params.Add("tag", fromTag)
+	//request.AppendHeader(&fromHeader)
+	//
+	//// 添加To头部，使用设备信息
+	//toHeader := sip.ToHeader{
+	//	Address: device.Recipient,
+	//}
+	//request.AppendHeader(&toHeader)
 
 	// 添加Via头部
 	//viaHeader := sip.ViaHeader{
@@ -1033,8 +1040,8 @@ func (p *Platform) handleDeviceControl(req *sip.Request, tx sip.ServerTransactio
 	//request.AppendHeader(&viaHeader)
 
 	// 设置Content-Type
-	contentTypeHeader := sip.ContentTypeHeader("Application/MANSCDP+xml")
-	request.AppendHeader(&contentTypeHeader)
+	//contentTypeHeader := sip.ContentTypeHeader("Application/MANSCDP+xml")
+	//request.AppendHeader(&contentTypeHeader)
 
 	// 直接使用原始消息体
 	request.SetBody(req.Body())
@@ -1043,7 +1050,7 @@ func (p *Platform) handleDeviceControl(req *sip.Request, tx sip.ServerTransactio
 	request.SetTransport(strings.ToUpper(device.Transport))
 
 	// 发送请求
-	_, err = device.client.Do(p, request)
+	_, err = device.send(request)
 	if err != nil {
 		p.Error("发送控制命令失败", "error", err.Error())
 		return fmt.Errorf("send control command failed: %v", err)
@@ -1542,4 +1549,12 @@ func (p *Platform) handlePresetQuery(req *sip.Request, tx sip.ServerTransaction,
 // GetKey 返回平台的唯一标识符
 func (p *Platform) GetKey() string {
 	return p.PlatformModel.ServerGBID
+}
+
+func (p *Platform) Dispose() {
+	if p.plugin.DB != nil {
+		if err := p.plugin.DB.Save(p.PlatformModel).Error; err != nil {
+			p.Error("保存平台数据出错", "error", err)
+		}
+	}
 }

@@ -132,14 +132,14 @@ type (
 		Storage           map[string]any `json:"storage" desc:"存储配置" gorm:"-"` // 存储配置
 		SecondaryFilePath string         `json:"secondaryFilePath" desc:"录制文件次级路径" gorm:"-"`
 	}
-	TransformOutput struct {
+	TransfromOutput struct {
 		Target     string `desc:"转码目标"` // 转码目标
 		StreamPath string
 		Conf       any
 	}
 	Transform struct {
 		Input  any
-		Output []TransformOutput
+		Output []TransfromOutput
 	}
 	OnPublish struct {
 		Push      map[Regexp]Push
@@ -218,7 +218,7 @@ func (v HTTPValues) DeepClone() (ret HTTPValues) {
 	return
 }
 
-func (r *TransformOutput) UnmarshalYAML(node *yaml.Node) error {
+func (r *TransfromOutput) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		// If it's a string, assign it to Target
 		return node.Decode(&r.Target)

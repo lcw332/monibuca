@@ -74,7 +74,10 @@ func (r *DefaultRecorder) CreateStream(start time.Time, customFileName func(*Rec
 	filePath := customFileName(recordJob)
 
 	var storageType string
-	recordJob.storage, storageType = r.createStorage(recordJob.RecConf.Storage)
+	recordJob.storage = recordJob.Plugin.Server.Storage
+	if recordJob.storage != nil {
+		storageType = recordJob.storage.GetKey()
+	}
 
 	if recordJob.storage == nil {
 		return fmt.Errorf("storage config is required")
@@ -181,7 +184,7 @@ func (p *RecordJob) Init(recorder IRecorder, plugin *Plugin, streamPath string, 
 		"fragment":   conf.Fragment,
 	})
 	recorder.SetRetry(-1, time.Second)
-	if sender, webhook := plugin.GetHookSender(config.HookOnRecordStart); sender != nil {
+	if sender, webhook := plugin.getHookSender(config.HookOnRecordStart); sender != nil {
 		recorder.OnStart(func() {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnRecordStart),
@@ -193,7 +196,7 @@ func (p *RecordJob) Init(recorder IRecorder, plugin *Plugin, streamPath string, 
 		})
 	}
 
-	if sender, webhook := plugin.GetHookSender(config.HookOnRecordEnd); sender != nil {
+	if sender, webhook := plugin.getHookSender(config.HookOnRecordEnd); sender != nil {
 		recorder.OnDispose(func() {
 			alarmInfo := AlarmInfo{
 				AlarmType:  config.AlarmStorageException,

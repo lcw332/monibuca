@@ -428,9 +428,14 @@ func (t *WebHookTask) Go() error {
 			t.plugin.Error("保存告警到数据库失败", "error", err)
 		} else {
 			dbID = t.alarm.ID
-			t.plugin.Info(""+
-				"", "id", dbID)
+			t.plugin.Info("告警已保存到数据库", "id", dbID)
 		}
+	}
+
+	// 检查全局布防状态，撤防时不发送 HTTP 请求
+	if !t.plugin.Server.ServerConfig.Armed {
+		t.plugin.Debug("WebHook skipped due to disarmed state", "url", t.conf.URL, "dbID", dbID)
+		return task.ErrTaskComplete
 	}
 
 	req, err := http.NewRequest(t.conf.Method, t.conf.URL, bytes.NewBuffer(t.jsonData))
@@ -617,7 +622,7 @@ func (p *Plugin) PublishWithConfig(ctx context.Context, streamPath string, conf 
 	for {
 		err = p.Server.Streams.Add(publisher, ctx).WaitStarted()
 		if err == nil {
-			if sender, webhook := p.GetHookSender(config.HookOnPublishEnd); sender != nil {
+			if sender, webhook := p.getHookSender(config.HookOnPublishEnd); sender != nil {
 				publisher.OnDispose(func() {
 					alarmInfo := AlarmInfo{
 						AlarmName:  string(config.HookOnPublishEnd),
@@ -628,7 +633,7 @@ func (p *Plugin) PublishWithConfig(ctx context.Context, streamPath string, conf 
 					sender(webhook, alarmInfo)
 				})
 			}
-			if sender, webhook := p.GetHookSender(config.HookOnPublishStart); sender != nil {
+			if sender, webhook := p.getHookSender(config.HookOnPublishStart); sender != nil {
 				alarmInfo := AlarmInfo{
 					AlarmName:  string(config.HookOnPublishStart),
 					AlarmType:  config.AlarmPublishRecover,
@@ -685,7 +690,7 @@ func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, con
 		}
 	}
 	if err == nil {
-		if sender, webhook := p.GetHookSender(config.HookOnSubscribeEnd); sender != nil {
+		if sender, webhook := p.getHookSender(config.HookOnSubscribeEnd); sender != nil {
 			subscriber.OnDispose(func() {
 				alarmInfo := AlarmInfo{
 					AlarmName:  string(config.HookOnSubscribeEnd),
@@ -696,7 +701,7 @@ func (p *Plugin) SubscribeWithConfig(ctx context.Context, streamPath string, con
 				sender(webhook, alarmInfo)
 			})
 		}
-		if sender, webhook := p.GetHookSender(config.HookOnSubscribeStart); sender != nil {
+		if sender, webhook := p.getHookSender(config.HookOnSubscribeStart); sender != nil {
 			alarmInfo := AlarmInfo{
 				AlarmName:  string(config.HookOnSubscribeStart),
 				AlarmType:  config.AlarmSubscribeRecover,
@@ -816,7 +821,7 @@ func (p *Plugin) handle(pattern string, handler http.Handler) {
 	p.Server.apiList = append(p.Server.apiList, pattern)
 }
 
-func (p *Plugin) GetHookSender(hookType config.HookType) (sender func(webhook config.Webhook, data any) *task.Task, conf config.Webhook) {
+func (p *Plugin) getHookSender(hookType config.HookType) (sender func(webhook config.Webhook, data any) *task.Task, conf config.Webhook) {
 	if p.config.Hook != nil {
 		if _, ok := p.config.Hook[hookType]; ok {
 			sender = p.SendWebhook
@@ -826,11 +831,11 @@ func (p *Plugin) GetHookSender(hookType config.HookType) (sender func(webhook co
 			conf = p.config.Hook[config.HookDefault]
 		} else if p.Server.config.Hook != nil {
 			if _, ok := p.Server.config.Hook[hookType]; ok {
-				conf = p.config.Hook[hookType]
+				conf = p.Server.config.Hook[hookType]
 				sender = p.Server.SendWebhook
 			} else if _, ok := p.Server.config.Hook[config.HookDefault]; ok {
 				sender = p.Server.SendWebhook
-				conf = p.config.Hook[config.HookDefault]
+				conf = p.Server.config.Hook[config.HookDefault]
 			}
 		}
 	}
@@ -847,7 +852,7 @@ func (t *ServerKeepAliveTask) GetTickInterval() time.Duration {
 }
 
 func (t *ServerKeepAliveTask) Tick(now any) {
-	sender, webhook := t.plugin.GetHookSender(config.HookOnServerKeepAlive)
+	sender, webhook := t.plugin.getHookSender(config.HookOnServerKeepAlive)
 	if sender == nil {
 		return
 	}

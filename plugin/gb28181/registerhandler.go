@@ -217,6 +217,8 @@ func (task *registerHandlerTask) Run() (err error) {
 				channel.Status = "OFF"
 				return true
 			})
+			d.DeviceKeepaliveTickTask.seconds = time.Minute * 1440
+			d.DeviceKeepaliveTickTask.Tick(nil)
 			//d.Stop(errors.New("unregister"))
 		}
 	} else {
@@ -325,6 +327,8 @@ func (task *registerHandlerTask) RecoverDevice(d *Device, req *sip.Request) {
 		//}
 		task.gb.DB.Save(d)
 	}
+	d.DeviceKeepaliveTickTask.seconds = time.Second * 30
+	d.DeviceKeepaliveTickTask.Tick(nil)
 	go d.catalog()
 	return
 }
@@ -438,7 +442,6 @@ func (task *registerHandlerTask) StoreDevice(deviceid string, req *sip.Request, 
 	d.LocalPort = myPort
 
 	d.Logger = task.gb.Logger.With("deviceid", deviceid)
-	d.fromHDR.Params.Add("tag", sip.GenerateTagN(16))
 	// 根据设备访问的本地IP、端口和传输协议获取或创建对应的Client
 	client, err := task.gb.getOrCreateClient(d.SipIp, d.LocalPort, d.Transport)
 	if err != nil {

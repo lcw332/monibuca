@@ -17,7 +17,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	"github.com/langhuihui/gotask"
+	task "github.com/langhuihui/gotask"
 	"m7s.live/v5/pkg/util"
 	gb28181 "m7s.live/v5/plugin/gb28181/pkg"
 	mrtp "m7s.live/v5/plugin/rtp/pkg"
@@ -44,6 +44,8 @@ func (d *DeviceKeepaliveTickTask) GetTickInterval() time.Duration {
 }
 
 func (d *DeviceKeepaliveTickTask) Tick(any) {
+	d.SetDescription("deviceid", d.device.DeviceId)
+	d.SetDescription("tick seconds", d.seconds)
 	keepaliveSeconds := 60
 	if d.device.KeepaliveInterval >= 5 {
 		keepaliveSeconds = d.device.KeepaliveInterval
@@ -58,6 +60,8 @@ func (d *DeviceKeepaliveTickTask) Tick(any) {
 			channel.Status = "OFF"
 			return true
 		})
+		d.seconds = time.Minute * 1440
+		//d.Stop(fmt.Errorf("device keeplive time out,deviceid is " + d.device.DeviceId))
 	}
 }
 
@@ -99,24 +103,24 @@ type Device struct {
 	// channels              []gb28181.DeviceChannel `gorm:"foreignKey:DeviceDBID;references:ID"` // 设备通道列表
 
 	// 保留原有字段
-	Status                DeviceStatus
-	SN                    int
-	Recipient             sip.Uri                               `gorm:"-:all"`
-	channels              util.Collection[string, *Channel]     `gorm:"-:all"`
-	catalogReqs           util.Collection[int, *CatalogRequest] `gorm:"-:all"`
-	MediaIp               string                                `desc:"收流IP"`
-	Longitude, Latitude   string                                // 经度,纬度
-	eventChan             chan any                              `gorm:"-:all"`
-	client                *sipgo.Client
-	contactHDR            sip.ContactHeader
-	fromHDR               sip.FromHeader
-	toHDR                 sip.ToHeader
-	plugin                *GB28181Plugin `gorm:"-:all"`
-	LocalPort             int
-	CatalogSubscribeTask  *CatalogSubscribeTask  `gorm:"-:all"`
-	PositionSubscribeTask *PositionSubscribeTask `gorm:"-:all"`
-	AlarmSubscribeTask    *AlarmSubscribeTask    `gorm:"-:all"`
-	Cataloging            bool                   `gorm:"-:all" default:"false"`
+	Status                  DeviceStatus
+	SN                      int
+	Recipient               sip.Uri                               `gorm:"-:all"`
+	channels                util.Collection[string, *Channel]     `gorm:"-:all"`
+	catalogReqs             util.Collection[int, *CatalogRequest] `gorm:"-:all"`
+	MediaIp                 string                                `desc:"收流IP"`
+	Longitude, Latitude     string                                // 经度,纬度
+	eventChan               chan any                              `gorm:"-:all"`
+	client                  *sipgo.Client
+	contactHDR              sip.ContactHeader
+	fromHDR                 sip.FromHeader
+	plugin                  *GB28181Plugin `gorm:"-:all"`
+	LocalPort               int
+	CatalogSubscribeTask    *CatalogSubscribeTask    `gorm:"-:all"`
+	PositionSubscribeTask   *PositionSubscribeTask   `gorm:"-:all"`
+	AlarmSubscribeTask      *AlarmSubscribeTask      `gorm:"-:all"`
+	Cataloging              bool                     `gorm:"-:all" default:"false"`
+	DeviceKeepaliveTickTask *DeviceKeepaliveTickTask `gorm:"-:all" default:"false"`
 }
 
 func (d *Device) TableName() string {
@@ -159,11 +163,13 @@ func (d *Device) GetKey() string {
 }
 
 // CatalogRequest 目录请求结构体
+// 注意：由于 catalogHandlerTask.Run() 在 Work 的串行协程中执行，
+// 所有对 CatalogRequest 字段的访问都是串行的，不需要锁保护
 type CatalogRequest struct {
 	SN, SumNum, TotalCount int
-	FirstResponse          bool // 是否为第一个响应
+	FirstResponse          bool      // 是否为第一个响应
+	CreateTime             time.Time // 创建时间，用于超时检测
 	*util.Promise
-	sync.Mutex // 保护并发访问
 }
 
 func (r *CatalogRequest) GetKey() int {
@@ -172,21 +178,25 @@ func (r *CatalogRequest) GetKey() int {
 
 // AddResponse 处理响应并返回是否是第一个响应
 func (r *CatalogRequest) AddResponse() bool {
-	r.Lock()
-	defer r.Unlock()
-	fmt.Println("r.FirstResponse: " + fmt.Sprintf("%v", r.FirstResponse))
 	wasFirst := r.FirstResponse
 	r.FirstResponse = false
-	fmt.Println("r.FirstResponse after: " + fmt.Sprintf("%v", r.FirstResponse))
-
 	return wasFirst
 }
 
 // IsComplete 检查是否完成接收
 func (r *CatalogRequest) IsComplete() bool {
-	r.Lock()
-	defer r.Unlock()
 	return r.TotalCount >= r.SumNum
+}
+
+// IsTimeout 检查是否超时（默认10秒超时）
+func (r *CatalogRequest) IsTimeout() bool {
+	timeout := 10 * time.Second
+	return time.Since(r.CreateTime) > timeout
+}
+
+// AddChannelCount 增加通道计数
+func (r *CatalogRequest) AddChannelCount(count int) {
+	r.TotalCount += count
 }
 
 type CatalogHandlerQueueTask struct {
@@ -206,6 +216,23 @@ func (c *catalogHandlerTask) Run() (err error) {
 	d := c.d
 	d.Cataloging = true
 	msg := c.msg
+
+	// 获取当前消息实际解析的通道数量
+	actualChannelCount := len(msg.DeviceList.DeviceChannelList)
+	deviceNum := msg.DeviceList.DeviceNum
+
+	// 验证DeviceNum和实际解析的通道数是否一致
+	// 注意：设备可能分多次发送Catalog响应，每次可能只包含部分通道
+	// 所以应该使用实际解析的通道数来累加TotalCount
+	if deviceNum > 0 && deviceNum != actualChannelCount {
+		d.Warn("Catalog响应通道数不一致",
+			"SN", msg.SN,
+			"DeviceNum", deviceNum,
+			"实际解析通道数", actualChannelCount,
+			"SumNum", msg.SumNum,
+			"说明", "可能XML解析不完整，使用实际解析的通道数")
+	}
+
 	catalogReq, exists := d.catalogReqs.Get(msg.SN)
 	if !exists {
 		// 创建新的目录请求
@@ -214,44 +241,83 @@ func (c *catalogHandlerTask) Run() (err error) {
 			SumNum:        msg.SumNum,
 			TotalCount:    0,
 			FirstResponse: true,
+			CreateTime:    time.Now(),
 			Promise:       util.NewPromise(context.Background()),
 		}
 		d.catalogReqs.Set(catalogReq)
+		d.Debug("创建新的Catalog请求", "SN", msg.SN, "SumNum", msg.SumNum)
+	} else {
+		// 验证SumNum是否一致（不同响应的SumNum应该相同）
+		if catalogReq.SumNum != msg.SumNum {
+			d.Warn("Catalog响应SumNum不一致",
+				"SN", msg.SN,
+				"已有SumNum", catalogReq.SumNum,
+				"当前SumNum", msg.SumNum)
+		}
+	}
+
+	// 检查超时
+	if catalogReq.IsTimeout() {
+		d.Warn("Catalog请求超时",
+			"SN", msg.SN,
+			"SumNum", catalogReq.SumNum,
+			"TotalCount", catalogReq.TotalCount,
+			"已等待", time.Since(catalogReq.CreateTime))
+		// 超时后强制完成
+		if !catalogReq.IsComplete() {
+			catalogReq.TotalCount = catalogReq.SumNum // 强制设置为完成
+		}
 	}
 
 	// 添加响应并获取是否是第一个响应
 	isFirst := catalogReq.AddResponse()
 
 	// 更新设备信息到数据库
-	// 如果是第一个响应，将所有通道状态标记为OFF
+	// 如果是第一个响应，先清空原有通道，并记录期望的总通道数
 	if isFirst {
 		d.channels.Clear()
+		d.ChannelCount = msg.SumNum
+		d.Debug("清空通道列表，开始接收Catalog响应", "SN", msg.SN, "SumNum", msg.SumNum)
 	}
 
 	// 更新通道信息
-	for _, c := range msg.DeviceList.DeviceChannelList {
+	for _, channelItem := range msg.DeviceList.DeviceChannelList {
 		// 设置关联的设备数据库ID
-		c.ChannelId = c.DeviceId
-		c.DeviceId = d.DeviceId
-		c.ID = d.DeviceId + "_" + c.ChannelId
-		if c.CustomChannelId == "" {
-			c.CustomChannelId = c.ChannelId
+		channelItem.ChannelId = channelItem.DeviceId
+		channelItem.DeviceId = d.DeviceId
+		channelItem.ID = d.DeviceId + "_" + channelItem.ChannelId
+		if channelItem.CustomChannelId == "" {
+			channelItem.CustomChannelId = channelItem.ChannelId
 		}
-		if c.CustomName == "" {
-			c.CustomName = c.Name
+		if channelItem.CustomName == "" {
+			channelItem.CustomName = channelItem.Name
 		}
 		// 使用 Save 进行 upsert 操作
-		d.Debug("ready to addOrUpdateChannel", "channel.ID is", c.ID, "channel.Status is", c.Status, "channel.Name", c.Name, "channel.Owner", c.Owner, "channel.Address", c.Address)
-		d.addOrUpdateChannel(c)
-		catalogReq.TotalCount++
+		d.Debug("ready to addOrUpdateChannel", "channel.ID is", channelItem.ID, "channel.Status is", channelItem.Status, "channel.Name", channelItem.Name, "channel.Owner", channelItem.Owner, "channel.Address", channelItem.Address)
+		d.addOrUpdateChannel(channelItem)
 	}
 
-	// 更新当前设备的通道数
-	d.ChannelCount = msg.SumNum
+	// 使用实际解析的通道数更新TotalCount，而不是循环计数
+	// 这样可以确保即使XML解析不完整，也能正确计数
+	catalogReq.AddChannelCount(actualChannelCount)
+
+	d.Debug("处理Catalog响应",
+		"SN", msg.SN,
+		"DeviceNum", deviceNum,
+		"实际通道数", actualChannelCount,
+		"当前消息通道数", actualChannelCount,
+		"SumNum", msg.SumNum,
+		"TotalCount", catalogReq.TotalCount,
+		"是否第一个响应", isFirst)
 	d.UpdateTime = time.Now()
 
 	// 在所有通道都添加完成后，检查是否完成接收
 	if catalogReq.IsComplete() {
+		d.Info("Catalog响应接收完成",
+			"SN", msg.SN,
+			"SumNum", catalogReq.SumNum,
+			"TotalCount", catalogReq.TotalCount,
+			"耗时", time.Since(catalogReq.CreateTime))
 		catalogReq.Resolve()
 		d.catalogReqs.RemoveByKey(msg.SN)
 		d.Cataloging = false
@@ -514,7 +580,17 @@ func (d *Device) Go() (err error) {
 		seconds: time.Second * 30,
 		device:  d,
 	}
+	d.DeviceKeepaliveTickTask = deviceKeepaliveTickTask
 	d.AddTask(deviceKeepaliveTickTask)
+	d.SetDescription("deviceid", d.DeviceId)
+	d.SetDescription("device.MediaIp", d.MediaIp)
+	d.SetDescription("device.IP", d.IP)
+	d.SetDescription("device.Port", d.Port)
+	d.SetDescription("device.SipIp", d.SipIp)
+	d.SetDescription("device.LocalPort", d.LocalPort)
+	d.SetDescription("device.LocalPort", d.Online)
+	d.SetDescription("device.ChannelCount", d.ChannelCount)
+	d.SetDescription("device.RealChannelCount", d.channels.Length)
 	return deviceKeepaliveTickTask.WaitStopped()
 }
 
@@ -525,7 +601,13 @@ func (d *Device) CreateRequest(Method sip.RequestMethod, Recipient any) *sip.Req
 	} else {
 		req = sip.NewRequest(Method, d.Recipient)
 	}
-	fromHDR := d.fromHDR
+	// 创建新的 FromHeader 并克隆 Params，避免并发问题
+	// 因为 HeaderParams 是 map 类型，直接拷贝会共享同一个 map 引用
+	fromHDR := sip.FromHeader{
+		DisplayName: d.fromHDR.DisplayName,
+		Address:     d.fromHDR.Address,
+		Params:      d.fromHDR.Params.Clone(),
+	}
 	fromHDR.Params.Add("tag", sip.GenerateTagN(32))
 	req.AppendHeader(&fromHDR)
 	contentType := sip.ContentTypeHeader("Application/MANSCDP+xml")
@@ -596,6 +678,7 @@ func (d *Device) queryDeviceStatus() (*sip.Response, error) {
 
 func (d *Device) subscribePosition(interval int) (*sip.Response, error) {
 	request := d.CreateRequest(sip.SUBSCRIBE, nil)
+	request.AppendHeader(sip.NewHeader("Event", "MobilePosition"))
 	request.AppendHeader(sip.NewHeader("Expires", strconv.Itoa(d.SubscribePosition)))
 	request.SetBody(gb28181.BuildDevicePositionXML(d.SN, d.DeviceId, interval))
 	return d.send(request)
