@@ -117,7 +117,7 @@ func (m *mqttClientImpl) connect() {
 
 	m.client = mqtt.NewClient(opts)
 
-	if token := m.client.Connect(); token.Wait() && token.Error() != nil {
+	if token := m.client.Connect(); token.WaitTimeout(30*time.Second) && token.Error() != nil {
 		m.logger.Error("MQTT connect failed", "error", token.Error())
 		return
 	}
