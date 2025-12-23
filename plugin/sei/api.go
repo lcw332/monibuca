@@ -30,7 +30,7 @@ func (conf *SEIPlugin) Insert(ctx context.Context, req *pb.InsertRequest) (*glob
 	} else {
 		transformer = sei.NewTransform().(*sei.Transformer)
 		transformer.TransformJob.Init(transformer, &conf.Plugin, publisher, config.Transform{
-			Output: []config.TransfromOutput{
+			Output: []config.TransformOutput{
 				{
 					Target:     targetStreamPath,
 					StreamPath: targetStreamPath,
