@@ -27,3 +27,4 @@ shutdown.sh
 shutdown.bat3rd/ffmpeg6
 /monibuca_amd64
 /monibuca_arm64
+example/*
