@@ -579,6 +579,12 @@ func (p *MP4Plugin) StartRecord(ctx context.Context, req *mp4pb.ReqStartRecord) 
 		Fragment: fragment,
 		FilePath: filePath,
 	}
+
+	// 使用默认存储配置
+	if req.UseDefaultStorage {
+		recordConf.Storage = p.Storage
+	}
+
 	var stream *m7s.Publisher
 	var ok bool
 	if stream, ok = p.Server.Streams.SafeGet(req.StreamPath); !ok {

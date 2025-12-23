@@ -4,7 +4,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/duration.proto";
 import "global.proto";
 package mp4;
-option go_package="m7s.live/v5/plugin/mp4/pb";
+option go_package = "m7s.live/v5/plugin/mp4/pb";
 
 service api {
   rpc List (ReqRecordList) returns (global.RecordResponseList) {
@@ -106,6 +106,7 @@ message ReqStartRecord {
   string streamPath = 1;
   google.protobuf.Duration fragment = 2;
   string filePath = 3;
+  bool useDefaultStorage = 4;
 }
 
 message ResponseStartRecord {
