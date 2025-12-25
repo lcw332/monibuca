@@ -18,33 +18,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// AlgorithmMap 定义算法映射关系
-type AlgorithmId map[int]string
-
-var AlgorithmMap = AlgorithmId{
-	1:  "松线虫害识别",
-	2:  "河道淤积识别",
-	3:  "漂浮物识别",
-	4:  "游泳涉水识别",
-	5:  "车牌识别",
-	6:  "交通拥堵识别",
-	7:  "路面破损识别",
-	8:  "路面污染",
-	9:  "人群聚集识别",
-	10: "非法垂钓识别",
-	11: "施工识别",
-	12: "秸秆焚烧",
-	14: "占道经营识别",
-	15: "垃圾堆放识别",
-	16: "裸土未覆盖识别",
-	18: "烟火识别",
-	19: "光伏板缺陷检测",
-	20: "园区夜间入侵检测",
-	21: "外立面病害识别",
-	22: "罂粟识别",
-	24: "林业侵占",
-}
-
 // DetectionRequest 定义请求结构体
 type DetectionRequest struct {
 	AlgorithmID   uint8   `json:"algorithm_id"`
