@@ -62,7 +62,6 @@ type (
 		RetryCount    int               `json:"retryCount" default:"3" desc:"失败重试次数"`
 		RetryInterval time.Duration     `json:"retryInterval" default:"5s" desc:"重试间隔"`
 		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
-		CallbackURL   string            `json:"callbackURL" default:"" desc:"回调地址"`
 	}
 	Oss struct {
 		Enable          bool          `default:"false" desc:"是否启用Oss配置" `
@@ -332,7 +331,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 	}
 
 	// 请求yolo算法接口，获取检测结果，然后hook到指定url
-	if t.config.AlgorithmAPI.Enable && t.config.AlgorithmAPI.Url != "" {
+	if t.config.AlgorithmAPI.Enable {
 		return t.processAlgorithmDetection(imageData, imgInfo, now)
 	}
 

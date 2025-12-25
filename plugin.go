@@ -843,7 +843,7 @@ func (p *Plugin) getHookSender(hookType config.HookType) (sender func(webhook co
 }
 
 func (p *Plugin) GetHookSender(hookType config.HookType) (sender func(webhook config.Webhook, data any) *task.Task, conf config.Webhook) {
-	p.getHookSender(hookType)
+	sender, conf = p.getHookSender(hookType)
 	return
 }
 
