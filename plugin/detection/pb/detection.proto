@@ -1,102 +1,113 @@
 syntax = "proto3";
 
-//import "global.proto";
 package detection;
 option go_package="m7s.live/v5/plugin/detection/pb";
 
+// ============================================================
 // 检测服务定义
+// ============================================================
 service DetectionService {
-  // 目标检测接口
+  // 通用检测接口
   rpc Detect(DetectRequest) returns (DetectResponse);
-  // 变化检测接口
+
+  // 变化检测接口（algorithm_id=13）
   rpc DetectChange(ChangeDetectRequest) returns (ChangeDetectResponse);
-  // 健康检查接口
+
+  // 健康检查
   rpc HealthCheck(HealthRequest) returns (HealthResponse);
-  // 获取版本信息接口
+
+  // 获取版本信息
   rpc GetVersion(VersionRequest) returns (VersionResponse);
 }
 
-// 目标检测请求消息
+// ============================================================
+// 通用检测请求（目标检测类算法）
+// ============================================================
 message DetectRequest {
-  // 算法ID
-  int32 algorithm_id = 1;
-  // 图像数据(base64编码或其他格式)
-  string image = 2;
-  // 置信度阈值
-  float conf_threshold = 3;
+  int32 algorithm_id = 1;           // 算法ID
+  string image = 2;                 // 图片（base64编码，不含data:前缀）
+  float conf_threshold = 3;         // 置信度阈值
 }
 
-// 目标检测响应消息
-message DetectResponse {
-  // 返回码
-  int32 code = 1;
-  // 返回消息
-  string message = 2;
-  // 检测数据
-  DetectionData data = 3;
-}
-
-// 检测结果数据
-message DetectionData {
-  // 算法ID
-  int32 algorithm_id = 1;
-  // 算法名称
-  string algorithm_name = 2;
-  // 检测到的目标列表
-  repeated Detection detections = 3;
-  // 检测到的目标总数
-  int32 total_count = 4;
-  // 检测耗时(毫秒)
-  float detect_time = 5;
-}
-
-// 单个目标检测结果
-message Detection {
-  // 类别ID
-  int32 class_id = 1;
-  // 英文类别名称
-  string class_name = 2;
-  // 中文类别名称
-  string class_name_cn = 3;
-  // 置信度
-  float confidence = 4;
-  // 边界框坐标 [x1, y1, x2, y2]
-  repeated float bbox = 5;
-  // 车牌号码(针对车牌识别)
-  string plate_number = 6;
-  // 车牌类型(针对车牌识别)
-  string plate_type = 7;
-  // 车牌置信度(针对车牌识别)
-  float plate_confidence = 8;
-}
-
-// 变化检测请求消息
+// ============================================================
+// 变化检测请求（algorithm_id=13）
+// 输入: 两张PNG图片，base64编码
+// ============================================================
 message ChangeDetectRequest {
-  // 第一张图像
-  string image1 = 1;
-  // 第二张图像
-  string image2 = 2;
+  string image1 = 1;                // 第一张PNG图片（base64编码）
+  string image2 = 2;                // 第二张PNG图片（base64编码）
+
+  // ===== v3.7.0 新增参数（可选，不传则用默认值）=====
+  int32 sensitivity = 3;            // 灵敏度阈值 (10-250)，默认125，越大越不敏感
+  int32 min_area = 4;               // 最小区域面积 (10-3000)，默认1500px，过滤小噪点
 }
 
-// 变化检测响应消息
+// ============================================================
+// 变化区域定义（v3.7.0 新增）
+// ============================================================
+message ChangeRegion {
+  int32 id = 1;                     // 区域编号 (1, 2, 3...)
+  repeated float bbox = 2;          // 像素坐标 [x1, y1, x2, y2]
+  repeated float bbox_normalized = 3; // 归一化坐标 [x1, y1, x2, y2] (0.0-1.0)
+  int32 area = 4;                   // 面积（像素）
+  int32 x = 5;                      // 左上角 X 坐标
+  int32 y = 6;                      // 左上角 Y 坐标
+  int32 width = 7;                  // 宽度
+  int32 height = 8;                 // 高度
+}
+
+// ============================================================
+// 变化检测响应
+// 输出: PNG格式的差异高亮图，base64编码
+// ============================================================
 message ChangeDetectResponse {
-  // 返回码
-  int32 code = 1;
-  // 返回消息
-  string message = 2;
-  // 变化掩码图像(base64编码)
-  string mask = 3;
-  // 图像宽度
-  int32 width = 4;
-  // 图像高度
-  int32 height = 5;
-  // 变化比例
-  float change_ratio = 6;
-  // 检测耗时(毫秒)
-  float detect_time = 7;
+  int32 code = 1;                   // 状态码 (200=成功)
+  string message = 2;               // 状态消息
+  string mask = 3;                  // 差异高亮图PNG（base64编码）
+  // v3.7.0: 改为彩色高亮图，带矩形框标注
+  int32 width = 4;                  // 图片宽度
+  int32 height = 5;                 // 图片高度
+  float change_ratio = 6;           // 变化区域占比 (0.0 ~ 1.0)
+  float detect_time = 7;            // 推理耗时（秒）
+
+  // ===== v3.7.0 新增字段 =====
+  repeated ChangeRegion regions = 8; // 变化区域列表
+  int32 total_count = 9;            // 变化区域数量
 }
 
-// 健康检查请求消息
+// ============================================================
+// 通用检测响应（目标检测类算法）
+// ============================================================
+message Detection {
+  int32 class_id = 1;               // 类别ID
+  string class_name = 2;            // 类别英文名
+  string class_name_cn = 3;         // 类别中文名
+  float confidence = 4;             // 置信度
+  repeated float bbox = 5;          // 边界框 [x1, y1, x2, y2] 归一化坐标
+
+  // 车牌识别相关字段（仅算法5使用）
+  string plate_number = 6;          // 车牌号
+  string plate_type = 7;            // 车牌类型
+  float plate_confidence = 8;       // 车牌识别置信度
+}
+
+message DetectionData {
+  int32 algorithm_id = 1;           // 算法ID
+  string algorithm_name = 2;        // 算法名称
+  repeated Detection detections = 3; // 检测结果列表
+  int32 total_count = 4;            // 检测总数
+  float detect_time = 5;            // 检测耗时（秒）
+}
+
+message DetectResponse {
+  int32 code = 1;                   // 状态码 (200=成功)
+  string message = 2;               // 状态消息
+  DetectionData data = 3;           // 检测数据
+}
+
+// ============================================================
+// 健康检查
+// ============================================================
 message HealthRequest {}
 
 // 健康检查响应消息
@@ -119,7 +130,9 @@ message HealthResponse {
   float gpu_memory_reserved_mb = 8;
 }
 
-// 版本查询请求消息
+// ============================================================
+// 版本信息
+// ============================================================
 message VersionRequest {}
 
 // 版本查询响应消息

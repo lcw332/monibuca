@@ -4,8 +4,6 @@
 // - protoc             v6.33.0
 // source: detection.proto
 
-//import "global.proto";
-
 package pb
 
 import (
@@ -31,15 +29,17 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
+// ============================================================
 // 检测服务定义
+// ============================================================
 type DetectionServiceClient interface {
-	// 目标检测接口
+	// 通用检测接口
 	Detect(ctx context.Context, in *DetectRequest, opts ...grpc.CallOption) (*DetectResponse, error)
-	// 变化检测接口
+	// 变化检测接口（algorithm_id=13）
 	DetectChange(ctx context.Context, in *ChangeDetectRequest, opts ...grpc.CallOption) (*ChangeDetectResponse, error)
-	// 健康检查接口
+	// 健康检查
 	HealthCheck(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
-	// 获取版本信息接口
+	// 获取版本信息
 	GetVersion(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
 }
 
@@ -95,15 +95,17 @@ func (c *detectionServiceClient) GetVersion(ctx context.Context, in *VersionRequ
 // All implementations must embed UnimplementedDetectionServiceServer
 // for forward compatibility.
 //
+// ============================================================
 // 检测服务定义
+// ============================================================
 type DetectionServiceServer interface {
-	// 目标检测接口
+	// 通用检测接口
 	Detect(context.Context, *DetectRequest) (*DetectResponse, error)
-	// 变化检测接口
+	// 变化检测接口（algorithm_id=13）
 	DetectChange(context.Context, *ChangeDetectRequest) (*ChangeDetectResponse, error)
-	// 健康检查接口
+	// 健康检查
 	HealthCheck(context.Context, *HealthRequest) (*HealthResponse, error)
-	// 获取版本信息接口
+	// 获取版本信息
 	GetVersion(context.Context, *VersionRequest) (*VersionResponse, error)
 	mustEmbedUnimplementedDetectionServiceServer()
 }

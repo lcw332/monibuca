@@ -4,8 +4,6 @@
 // 	protoc        v6.33.0
 // source: detection.proto
 
-//import "global.proto";
-
 package pb
 
 import (
@@ -23,15 +21,14 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 目标检测请求消息
+// ============================================================
+// 通用检测请求（目标检测类算法）
+// ============================================================
 type DetectRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 算法ID
-	AlgorithmId int32 `protobuf:"varint,1,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`
-	// 图像数据(base64编码或其他格式)
-	Image string `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
-	// 置信度阈值
-	ConfThreshold float32 `protobuf:"fixed32,3,opt,name=conf_threshold,json=confThreshold,proto3" json:"conf_threshold,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AlgorithmId   int32                  `protobuf:"varint,1,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`        // 算法ID
+	Image         string                 `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`                                        // 图片（base64编码，不含data:前缀）
+	ConfThreshold float32                `protobuf:"fixed32,3,opt,name=conf_threshold,json=confThreshold,proto3" json:"conf_threshold,omitempty"` // 置信度阈值
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -87,33 +84,35 @@ func (x *DetectRequest) GetConfThreshold() float32 {
 	return 0
 }
 
-// 目标检测响应消息
-type DetectResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 返回码
-	Code int32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	// 返回消息
-	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	// 检测数据
-	Data          *DetectionData `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+// ============================================================
+// 变化检测请求（algorithm_id=13）
+// 输入: 两张PNG图片，base64编码
+// ============================================================
+type ChangeDetectRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Image1 string                 `protobuf:"bytes,1,opt,name=image1,proto3" json:"image1,omitempty"` // 第一张PNG图片（base64编码）
+	Image2 string                 `protobuf:"bytes,2,opt,name=image2,proto3" json:"image2,omitempty"` // 第二张PNG图片（base64编码）
+	// ===== v3.7.0 新增参数（可选，不传则用默认值）=====
+	Sensitivity   int32 `protobuf:"varint,3,opt,name=sensitivity,proto3" json:"sensitivity,omitempty"`        // 灵敏度阈值 (10-250)，默认125，越大越不敏感
+	MinArea       int32 `protobuf:"varint,4,opt,name=min_area,json=minArea,proto3" json:"min_area,omitempty"` // 最小区域面积 (10-3000)，默认1500px，过滤小噪点
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DetectResponse) Reset() {
-	*x = DetectResponse{}
+func (x *ChangeDetectRequest) Reset() {
+	*x = ChangeDetectRequest{}
 	mi := &file_detection_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DetectResponse) String() string {
+func (x *ChangeDetectRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DetectResponse) ProtoMessage() {}
+func (*ChangeDetectRequest) ProtoMessage() {}
 
-func (x *DetectResponse) ProtoReflect() protoreflect.Message {
+func (x *ChangeDetectRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_detection_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -125,140 +124,277 @@ func (x *DetectResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DetectResponse.ProtoReflect.Descriptor instead.
-func (*DetectResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChangeDetectRequest.ProtoReflect.Descriptor instead.
+func (*ChangeDetectRequest) Descriptor() ([]byte, []int) {
 	return file_detection_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *DetectResponse) GetCode() int32 {
+func (x *ChangeDetectRequest) GetImage1() string {
+	if x != nil {
+		return x.Image1
+	}
+	return ""
+}
+
+func (x *ChangeDetectRequest) GetImage2() string {
+	if x != nil {
+		return x.Image2
+	}
+	return ""
+}
+
+func (x *ChangeDetectRequest) GetSensitivity() int32 {
+	if x != nil {
+		return x.Sensitivity
+	}
+	return 0
+}
+
+func (x *ChangeDetectRequest) GetMinArea() int32 {
+	if x != nil {
+		return x.MinArea
+	}
+	return 0
+}
+
+// ============================================================
+// 变化区域定义（v3.7.0 新增）
+// ============================================================
+type ChangeRegion struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`                                                       // 区域编号 (1, 2, 3...)
+	Bbox           []float32              `protobuf:"fixed32,2,rep,packed,name=bbox,proto3" json:"bbox,omitempty"`                                           // 像素坐标 [x1, y1, x2, y2]
+	BboxNormalized []float32              `protobuf:"fixed32,3,rep,packed,name=bbox_normalized,json=bboxNormalized,proto3" json:"bbox_normalized,omitempty"` // 归一化坐标 [x1, y1, x2, y2] (0.0-1.0)
+	Area           int32                  `protobuf:"varint,4,opt,name=area,proto3" json:"area,omitempty"`                                                   // 面积（像素）
+	X              int32                  `protobuf:"varint,5,opt,name=x,proto3" json:"x,omitempty"`                                                         // 左上角 X 坐标
+	Y              int32                  `protobuf:"varint,6,opt,name=y,proto3" json:"y,omitempty"`                                                         // 左上角 Y 坐标
+	Width          int32                  `protobuf:"varint,7,opt,name=width,proto3" json:"width,omitempty"`                                                 // 宽度
+	Height         int32                  `protobuf:"varint,8,opt,name=height,proto3" json:"height,omitempty"`                                               // 高度
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ChangeRegion) Reset() {
+	*x = ChangeRegion{}
+	mi := &file_detection_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeRegion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeRegion) ProtoMessage() {}
+
+func (x *ChangeRegion) ProtoReflect() protoreflect.Message {
+	mi := &file_detection_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeRegion.ProtoReflect.Descriptor instead.
+func (*ChangeRegion) Descriptor() ([]byte, []int) {
+	return file_detection_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ChangeRegion) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ChangeRegion) GetBbox() []float32 {
+	if x != nil {
+		return x.Bbox
+	}
+	return nil
+}
+
+func (x *ChangeRegion) GetBboxNormalized() []float32 {
+	if x != nil {
+		return x.BboxNormalized
+	}
+	return nil
+}
+
+func (x *ChangeRegion) GetArea() int32 {
+	if x != nil {
+		return x.Area
+	}
+	return 0
+}
+
+func (x *ChangeRegion) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *ChangeRegion) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *ChangeRegion) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ChangeRegion) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+// ============================================================
+// 变化检测响应
+// 输出: PNG格式的差异高亮图，base64编码
+// ============================================================
+type ChangeDetectResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Code    int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`      // 状态码 (200=成功)
+	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"` // 状态消息
+	Mask    string                 `protobuf:"bytes,3,opt,name=mask,proto3" json:"mask,omitempty"`       // 差异高亮图PNG（base64编码）
+	// v3.7.0: 改为彩色高亮图，带矩形框标注
+	Width       int32   `protobuf:"varint,4,opt,name=width,proto3" json:"width,omitempty"`                                 // 图片宽度
+	Height      int32   `protobuf:"varint,5,opt,name=height,proto3" json:"height,omitempty"`                               // 图片高度
+	ChangeRatio float32 `protobuf:"fixed32,6,opt,name=change_ratio,json=changeRatio,proto3" json:"change_ratio,omitempty"` // 变化区域占比 (0.0 ~ 1.0)
+	DetectTime  float32 `protobuf:"fixed32,7,opt,name=detect_time,json=detectTime,proto3" json:"detect_time,omitempty"`    // 推理耗时（秒）
+	// ===== v3.7.0 新增字段 =====
+	Regions       []*ChangeRegion `protobuf:"bytes,8,rep,name=regions,proto3" json:"regions,omitempty"`                          // 变化区域列表
+	TotalCount    int32           `protobuf:"varint,9,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"` // 变化区域数量
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangeDetectResponse) Reset() {
+	*x = ChangeDetectResponse{}
+	mi := &file_detection_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeDetectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeDetectResponse) ProtoMessage() {}
+
+func (x *ChangeDetectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_detection_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeDetectResponse.ProtoReflect.Descriptor instead.
+func (*ChangeDetectResponse) Descriptor() ([]byte, []int) {
+	return file_detection_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ChangeDetectResponse) GetCode() int32 {
 	if x != nil {
 		return x.Code
 	}
 	return 0
 }
 
-func (x *DetectResponse) GetMessage() string {
+func (x *ChangeDetectResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
 }
 
-func (x *DetectResponse) GetData() *DetectionData {
+func (x *ChangeDetectResponse) GetMask() string {
 	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-// 检测结果数据
-type DetectionData struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 算法ID
-	AlgorithmId int32 `protobuf:"varint,1,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`
-	// 算法名称
-	AlgorithmName string `protobuf:"bytes,2,opt,name=algorithm_name,json=algorithmName,proto3" json:"algorithm_name,omitempty"`
-	// 检测到的目标列表
-	Detections []*Detection `protobuf:"bytes,3,rep,name=detections,proto3" json:"detections,omitempty"`
-	// 检测到的目标总数
-	TotalCount int32 `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
-	// 检测耗时(毫秒)
-	DetectTime    float32 `protobuf:"fixed32,5,opt,name=detect_time,json=detectTime,proto3" json:"detect_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DetectionData) Reset() {
-	*x = DetectionData{}
-	mi := &file_detection_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DetectionData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DetectionData) ProtoMessage() {}
-
-func (x *DetectionData) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DetectionData.ProtoReflect.Descriptor instead.
-func (*DetectionData) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *DetectionData) GetAlgorithmId() int32 {
-	if x != nil {
-		return x.AlgorithmId
-	}
-	return 0
-}
-
-func (x *DetectionData) GetAlgorithmName() string {
-	if x != nil {
-		return x.AlgorithmName
+		return x.Mask
 	}
 	return ""
 }
 
-func (x *DetectionData) GetDetections() []*Detection {
+func (x *ChangeDetectResponse) GetWidth() int32 {
 	if x != nil {
-		return x.Detections
-	}
-	return nil
-}
-
-func (x *DetectionData) GetTotalCount() int32 {
-	if x != nil {
-		return x.TotalCount
+		return x.Width
 	}
 	return 0
 }
 
-func (x *DetectionData) GetDetectTime() float32 {
+func (x *ChangeDetectResponse) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *ChangeDetectResponse) GetChangeRatio() float32 {
+	if x != nil {
+		return x.ChangeRatio
+	}
+	return 0
+}
+
+func (x *ChangeDetectResponse) GetDetectTime() float32 {
 	if x != nil {
 		return x.DetectTime
 	}
 	return 0
 }
 
-// 单个目标检测结果
+func (x *ChangeDetectResponse) GetRegions() []*ChangeRegion {
+	if x != nil {
+		return x.Regions
+	}
+	return nil
+}
+
+func (x *ChangeDetectResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+// ============================================================
+// 通用检测响应（目标检测类算法）
+// ============================================================
 type Detection struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 类别ID
-	ClassId int32 `protobuf:"varint,1,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
-	// 英文类别名称
-	ClassName string `protobuf:"bytes,2,opt,name=class_name,json=className,proto3" json:"class_name,omitempty"`
-	// 中文类别名称
-	ClassNameCn string `protobuf:"bytes,3,opt,name=class_name_cn,json=classNameCn,proto3" json:"class_name_cn,omitempty"`
-	// 置信度
-	Confidence float32 `protobuf:"fixed32,4,opt,name=confidence,proto3" json:"confidence,omitempty"`
-	// 边界框坐标 [x1, y1, x2, y2]
-	Bbox []float32 `protobuf:"fixed32,5,rep,packed,name=bbox,proto3" json:"bbox,omitempty"`
-	// 车牌号码(针对车牌识别)
-	PlateNumber string `protobuf:"bytes,6,opt,name=plate_number,json=plateNumber,proto3" json:"plate_number,omitempty"`
-	// 车牌类型(针对车牌识别)
-	PlateType string `protobuf:"bytes,7,opt,name=plate_type,json=plateType,proto3" json:"plate_type,omitempty"`
-	// 车牌置信度(针对车牌识别)
-	PlateConfidence float32 `protobuf:"fixed32,8,opt,name=plate_confidence,json=plateConfidence,proto3" json:"plate_confidence,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ClassId     int32                  `protobuf:"varint,1,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`              // 类别ID
+	ClassName   string                 `protobuf:"bytes,2,opt,name=class_name,json=className,proto3" json:"class_name,omitempty"`         // 类别英文名
+	ClassNameCn string                 `protobuf:"bytes,3,opt,name=class_name_cn,json=classNameCn,proto3" json:"class_name_cn,omitempty"` // 类别中文名
+	Confidence  float32                `protobuf:"fixed32,4,opt,name=confidence,proto3" json:"confidence,omitempty"`                      // 置信度
+	Bbox        []float32              `protobuf:"fixed32,5,rep,packed,name=bbox,proto3" json:"bbox,omitempty"`                           // 边界框 [x1, y1, x2, y2] 归一化坐标
+	// 车牌识别相关字段（仅算法5使用）
+	PlateNumber     string  `protobuf:"bytes,6,opt,name=plate_number,json=plateNumber,proto3" json:"plate_number,omitempty"`               // 车牌号
+	PlateType       string  `protobuf:"bytes,7,opt,name=plate_type,json=plateType,proto3" json:"plate_type,omitempty"`                     // 车牌类型
+	PlateConfidence float32 `protobuf:"fixed32,8,opt,name=plate_confidence,json=plateConfidence,proto3" json:"plate_confidence,omitempty"` // 车牌识别置信度
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Detection) Reset() {
 	*x = Detection{}
-	mi := &file_detection_proto_msgTypes[3]
+	mi := &file_detection_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +406,7 @@ func (x *Detection) String() string {
 func (*Detection) ProtoMessage() {}
 
 func (x *Detection) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[3]
+	mi := &file_detection_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +419,7 @@ func (x *Detection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Detection.ProtoReflect.Descriptor instead.
 func (*Detection) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{3}
+	return file_detection_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Detection) GetClassId() int32 {
@@ -342,96 +478,31 @@ func (x *Detection) GetPlateConfidence() float32 {
 	return 0
 }
 
-// 变化检测请求消息
-type ChangeDetectRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 第一张图像
-	Image1 string `protobuf:"bytes,1,opt,name=image1,proto3" json:"image1,omitempty"`
-	// 第二张图像
-	Image2        string `protobuf:"bytes,2,opt,name=image2,proto3" json:"image2,omitempty"`
+type DetectionData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AlgorithmId   int32                  `protobuf:"varint,1,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`      // 算法ID
+	AlgorithmName string                 `protobuf:"bytes,2,opt,name=algorithm_name,json=algorithmName,proto3" json:"algorithm_name,omitempty"` // 算法名称
+	Detections    []*Detection           `protobuf:"bytes,3,rep,name=detections,proto3" json:"detections,omitempty"`                            // 检测结果列表
+	TotalCount    int32                  `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`         // 检测总数
+	DetectTime    float32                `protobuf:"fixed32,5,opt,name=detect_time,json=detectTime,proto3" json:"detect_time,omitempty"`        // 检测耗时（秒）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangeDetectRequest) Reset() {
-	*x = ChangeDetectRequest{}
-	mi := &file_detection_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ChangeDetectRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChangeDetectRequest) ProtoMessage() {}
-
-func (x *ChangeDetectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChangeDetectRequest.ProtoReflect.Descriptor instead.
-func (*ChangeDetectRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ChangeDetectRequest) GetImage1() string {
-	if x != nil {
-		return x.Image1
-	}
-	return ""
-}
-
-func (x *ChangeDetectRequest) GetImage2() string {
-	if x != nil {
-		return x.Image2
-	}
-	return ""
-}
-
-// 变化检测响应消息
-type ChangeDetectResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 返回码
-	Code int32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	// 返回消息
-	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	// 变化掩码图像(base64编码)
-	Mask string `protobuf:"bytes,3,opt,name=mask,proto3" json:"mask,omitempty"`
-	// 图像宽度
-	Width int32 `protobuf:"varint,4,opt,name=width,proto3" json:"width,omitempty"`
-	// 图像高度
-	Height int32 `protobuf:"varint,5,opt,name=height,proto3" json:"height,omitempty"`
-	// 变化比例
-	ChangeRatio float32 `protobuf:"fixed32,6,opt,name=change_ratio,json=changeRatio,proto3" json:"change_ratio,omitempty"`
-	// 检测耗时(毫秒)
-	DetectTime    float32 `protobuf:"fixed32,7,opt,name=detect_time,json=detectTime,proto3" json:"detect_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ChangeDetectResponse) Reset() {
-	*x = ChangeDetectResponse{}
+func (x *DetectionData) Reset() {
+	*x = DetectionData{}
 	mi := &file_detection_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangeDetectResponse) String() string {
+func (x *DetectionData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangeDetectResponse) ProtoMessage() {}
+func (*DetectionData) ProtoMessage() {}
 
-func (x *ChangeDetectResponse) ProtoReflect() protoreflect.Message {
+func (x *DetectionData) ProtoReflect() protoreflect.Message {
 	mi := &file_detection_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -443,61 +514,109 @@ func (x *ChangeDetectResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangeDetectResponse.ProtoReflect.Descriptor instead.
-func (*ChangeDetectResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use DetectionData.ProtoReflect.Descriptor instead.
+func (*DetectionData) Descriptor() ([]byte, []int) {
 	return file_detection_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ChangeDetectResponse) GetCode() int32 {
+func (x *DetectionData) GetAlgorithmId() int32 {
 	if x != nil {
-		return x.Code
+		return x.AlgorithmId
 	}
 	return 0
 }
 
-func (x *ChangeDetectResponse) GetMessage() string {
+func (x *DetectionData) GetAlgorithmName() string {
 	if x != nil {
-		return x.Message
+		return x.AlgorithmName
 	}
 	return ""
 }
 
-func (x *ChangeDetectResponse) GetMask() string {
+func (x *DetectionData) GetDetections() []*Detection {
 	if x != nil {
-		return x.Mask
+		return x.Detections
 	}
-	return ""
+	return nil
 }
 
-func (x *ChangeDetectResponse) GetWidth() int32 {
+func (x *DetectionData) GetTotalCount() int32 {
 	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *ChangeDetectResponse) GetHeight() int32 {
-	if x != nil {
-		return x.Height
+		return x.TotalCount
 	}
 	return 0
 }
 
-func (x *ChangeDetectResponse) GetChangeRatio() float32 {
-	if x != nil {
-		return x.ChangeRatio
-	}
-	return 0
-}
-
-func (x *ChangeDetectResponse) GetDetectTime() float32 {
+func (x *DetectionData) GetDetectTime() float32 {
 	if x != nil {
 		return x.DetectTime
 	}
 	return 0
 }
 
-// 健康检查请求消息
+type DetectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`      // 状态码 (200=成功)
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"` // 状态消息
+	Data          *DetectionData         `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`       // 检测数据
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DetectResponse) Reset() {
+	*x = DetectResponse{}
+	mi := &file_detection_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DetectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DetectResponse) ProtoMessage() {}
+
+func (x *DetectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_detection_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DetectResponse.ProtoReflect.Descriptor instead.
+func (*DetectResponse) Descriptor() ([]byte, []int) {
+	return file_detection_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DetectResponse) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *DetectResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DetectResponse) GetData() *DetectionData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// ============================================================
+// 健康检查
+// ============================================================
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -506,7 +625,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_detection_proto_msgTypes[6]
+	mi := &file_detection_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -518,7 +637,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[6]
+	mi := &file_detection_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,7 +650,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{6}
+	return file_detection_proto_rawDescGZIP(), []int{7}
 }
 
 // 健康检查响应消息
@@ -559,7 +678,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_detection_proto_msgTypes[7]
+	mi := &file_detection_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +690,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[7]
+	mi := &file_detection_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +703,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{7}
+	return file_detection_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -643,7 +762,9 @@ func (x *HealthResponse) GetGpuMemoryReservedMb() float32 {
 	return 0
 }
 
-// 版本查询请求消息
+// ============================================================
+// 版本信息
+// ============================================================
 type VersionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -652,7 +773,7 @@ type VersionRequest struct {
 
 func (x *VersionRequest) Reset() {
 	*x = VersionRequest{}
-	mi := &file_detection_proto_msgTypes[8]
+	mi := &file_detection_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -664,7 +785,7 @@ func (x *VersionRequest) String() string {
 func (*VersionRequest) ProtoMessage() {}
 
 func (x *VersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[8]
+	mi := &file_detection_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +798,7 @@ func (x *VersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionRequest.ProtoReflect.Descriptor instead.
 func (*VersionRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{8}
+	return file_detection_proto_rawDescGZIP(), []int{9}
 }
 
 // 版本查询响应消息
@@ -705,7 +826,7 @@ type VersionResponse struct {
 
 func (x *VersionResponse) Reset() {
 	*x = VersionResponse{}
-	mi := &file_detection_proto_msgTypes[9]
+	mi := &file_detection_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +838,7 @@ func (x *VersionResponse) String() string {
 func (*VersionResponse) ProtoMessage() {}
 
 func (x *VersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[9]
+	mi := &file_detection_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +851,7 @@ func (x *VersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionResponse.ProtoReflect.Descriptor instead.
 func (*VersionResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{9}
+	return file_detection_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *VersionResponse) GetVersion() string {
@@ -797,21 +918,33 @@ const file_detection_proto_rawDesc = "" +
 	"\rDetectRequest\x12!\n" +
 	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12%\n" +
-	"\x0econf_threshold\x18\x03 \x01(\x02R\rconfThreshold\"l\n" +
-	"\x0eDetectResponse\x12\x12\n" +
+	"\x0econf_threshold\x18\x03 \x01(\x02R\rconfThreshold\"\x82\x01\n" +
+	"\x13ChangeDetectRequest\x12\x16\n" +
+	"\x06image1\x18\x01 \x01(\tR\x06image1\x12\x16\n" +
+	"\x06image2\x18\x02 \x01(\tR\x06image2\x12 \n" +
+	"\vsensitivity\x18\x03 \x01(\x05R\vsensitivity\x12\x19\n" +
+	"\bmin_area\x18\x04 \x01(\x05R\aminArea\"\xb9\x01\n" +
+	"\fChangeRegion\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
+	"\x04bbox\x18\x02 \x03(\x02R\x04bbox\x12'\n" +
+	"\x0fbbox_normalized\x18\x03 \x03(\x02R\x0ebboxNormalized\x12\x12\n" +
+	"\x04area\x18\x04 \x01(\x05R\x04area\x12\f\n" +
+	"\x01x\x18\x05 \x01(\x05R\x01x\x12\f\n" +
+	"\x01y\x18\x06 \x01(\x05R\x01y\x12\x14\n" +
+	"\x05width\x18\a \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\b \x01(\x05R\x06height\"\x9e\x02\n" +
+	"\x14ChangeDetectResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12,\n" +
-	"\x04data\x18\x03 \x01(\v2\x18.detection.DetectionDataR\x04data\"\xd1\x01\n" +
-	"\rDetectionData\x12!\n" +
-	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12%\n" +
-	"\x0ealgorithm_name\x18\x02 \x01(\tR\ralgorithmName\x124\n" +
-	"\n" +
-	"detections\x18\x03 \x03(\v2\x14.detection.DetectionR\n" +
-	"detections\x12\x1f\n" +
-	"\vtotal_count\x18\x04 \x01(\x05R\n" +
-	"totalCount\x12\x1f\n" +
-	"\vdetect_time\x18\x05 \x01(\x02R\n" +
-	"detectTime\"\x8a\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x12\n" +
+	"\x04mask\x18\x03 \x01(\tR\x04mask\x12\x14\n" +
+	"\x05width\x18\x04 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x05 \x01(\x05R\x06height\x12!\n" +
+	"\fchange_ratio\x18\x06 \x01(\x02R\vchangeRatio\x12\x1f\n" +
+	"\vdetect_time\x18\a \x01(\x02R\n" +
+	"detectTime\x121\n" +
+	"\aregions\x18\b \x03(\v2\x17.detection.ChangeRegionR\aregions\x12\x1f\n" +
+	"\vtotal_count\x18\t \x01(\x05R\n" +
+	"totalCount\"\x8a\x02\n" +
 	"\tDetection\x12\x19\n" +
 	"\bclass_id\x18\x01 \x01(\x05R\aclassId\x12\x1d\n" +
 	"\n" +
@@ -824,19 +957,21 @@ const file_detection_proto_rawDesc = "" +
 	"\fplate_number\x18\x06 \x01(\tR\vplateNumber\x12\x1d\n" +
 	"\n" +
 	"plate_type\x18\a \x01(\tR\tplateType\x12)\n" +
-	"\x10plate_confidence\x18\b \x01(\x02R\x0fplateConfidence\"E\n" +
-	"\x13ChangeDetectRequest\x12\x16\n" +
-	"\x06image1\x18\x01 \x01(\tR\x06image1\x12\x16\n" +
-	"\x06image2\x18\x02 \x01(\tR\x06image2\"\xca\x01\n" +
-	"\x14ChangeDetectResponse\x12\x12\n" +
+	"\x10plate_confidence\x18\b \x01(\x02R\x0fplateConfidence\"\xd1\x01\n" +
+	"\rDetectionData\x12!\n" +
+	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12%\n" +
+	"\x0ealgorithm_name\x18\x02 \x01(\tR\ralgorithmName\x124\n" +
+	"\n" +
+	"detections\x18\x03 \x03(\v2\x14.detection.DetectionR\n" +
+	"detections\x12\x1f\n" +
+	"\vtotal_count\x18\x04 \x01(\x05R\n" +
+	"totalCount\x12\x1f\n" +
+	"\vdetect_time\x18\x05 \x01(\x02R\n" +
+	"detectTime\"l\n" +
+	"\x0eDetectResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x12\n" +
-	"\x04mask\x18\x03 \x01(\tR\x04mask\x12\x14\n" +
-	"\x05width\x18\x04 \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\x05 \x01(\x05R\x06height\x12!\n" +
-	"\fchange_ratio\x18\x06 \x01(\x02R\vchangeRatio\x12\x1f\n" +
-	"\vdetect_time\x18\a \x01(\x02R\n" +
-	"detectTime\"\x0f\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12,\n" +
+	"\x04data\x18\x03 \x01(\v2\x18.detection.DetectionDataR\x04data\"\x0f\n" +
 	"\rHealthRequest\"\xb2\x02\n" +
 	"\x0eHealthResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x16\n" +
@@ -877,35 +1012,37 @@ func file_detection_proto_rawDescGZIP() []byte {
 	return file_detection_proto_rawDescData
 }
 
-var file_detection_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_detection_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_detection_proto_goTypes = []any{
 	(*DetectRequest)(nil),        // 0: detection.DetectRequest
-	(*DetectResponse)(nil),       // 1: detection.DetectResponse
-	(*DetectionData)(nil),        // 2: detection.DetectionData
-	(*Detection)(nil),            // 3: detection.Detection
-	(*ChangeDetectRequest)(nil),  // 4: detection.ChangeDetectRequest
-	(*ChangeDetectResponse)(nil), // 5: detection.ChangeDetectResponse
-	(*HealthRequest)(nil),        // 6: detection.HealthRequest
-	(*HealthResponse)(nil),       // 7: detection.HealthResponse
-	(*VersionRequest)(nil),       // 8: detection.VersionRequest
-	(*VersionResponse)(nil),      // 9: detection.VersionResponse
+	(*ChangeDetectRequest)(nil),  // 1: detection.ChangeDetectRequest
+	(*ChangeRegion)(nil),         // 2: detection.ChangeRegion
+	(*ChangeDetectResponse)(nil), // 3: detection.ChangeDetectResponse
+	(*Detection)(nil),            // 4: detection.Detection
+	(*DetectionData)(nil),        // 5: detection.DetectionData
+	(*DetectResponse)(nil),       // 6: detection.DetectResponse
+	(*HealthRequest)(nil),        // 7: detection.HealthRequest
+	(*HealthResponse)(nil),       // 8: detection.HealthResponse
+	(*VersionRequest)(nil),       // 9: detection.VersionRequest
+	(*VersionResponse)(nil),      // 10: detection.VersionResponse
 }
 var file_detection_proto_depIdxs = []int32{
-	2, // 0: detection.DetectResponse.data:type_name -> detection.DetectionData
-	3, // 1: detection.DetectionData.detections:type_name -> detection.Detection
-	0, // 2: detection.DetectionService.Detect:input_type -> detection.DetectRequest
-	4, // 3: detection.DetectionService.DetectChange:input_type -> detection.ChangeDetectRequest
-	6, // 4: detection.DetectionService.HealthCheck:input_type -> detection.HealthRequest
-	8, // 5: detection.DetectionService.GetVersion:input_type -> detection.VersionRequest
-	1, // 6: detection.DetectionService.Detect:output_type -> detection.DetectResponse
-	5, // 7: detection.DetectionService.DetectChange:output_type -> detection.ChangeDetectResponse
-	7, // 8: detection.DetectionService.HealthCheck:output_type -> detection.HealthResponse
-	9, // 9: detection.DetectionService.GetVersion:output_type -> detection.VersionResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2,  // 0: detection.ChangeDetectResponse.regions:type_name -> detection.ChangeRegion
+	4,  // 1: detection.DetectionData.detections:type_name -> detection.Detection
+	5,  // 2: detection.DetectResponse.data:type_name -> detection.DetectionData
+	0,  // 3: detection.DetectionService.Detect:input_type -> detection.DetectRequest
+	1,  // 4: detection.DetectionService.DetectChange:input_type -> detection.ChangeDetectRequest
+	7,  // 5: detection.DetectionService.HealthCheck:input_type -> detection.HealthRequest
+	9,  // 6: detection.DetectionService.GetVersion:input_type -> detection.VersionRequest
+	6,  // 7: detection.DetectionService.Detect:output_type -> detection.DetectResponse
+	3,  // 8: detection.DetectionService.DetectChange:output_type -> detection.ChangeDetectResponse
+	8,  // 9: detection.DetectionService.HealthCheck:output_type -> detection.HealthResponse
+	10, // 10: detection.DetectionService.GetVersion:output_type -> detection.VersionResponse
+	7,  // [7:11] is the sub-list for method output_type
+	3,  // [3:7] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_detection_proto_init() }
@@ -919,7 +1056,7 @@ func file_detection_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_detection_proto_rawDesc), len(file_detection_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
