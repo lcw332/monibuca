@@ -3,9 +3,7 @@ package plugin_detection
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -113,6 +111,7 @@ type ListDetectItem struct {
 	SnapMode       int     `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔"`
 	TimerInterval  string  `json:"timeInterval,omitempty" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 	IFrameInterval int     `json:"iframeInterval,omitempty" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
+	FrameCheck     int     `json:"frameCheck,omitempty" desc:"连续帧检测次数, 0表示不开启"`
 }
 
 // getAlgorithmName 根据算法ID获取算法名称
@@ -121,32 +120,6 @@ func (p *DetectionPlugin) getAlgorithmName(algorithmId uint8) string {
 		return name
 	}
 	return fmt.Sprintf("算法%d", algorithmId)
-}
-
-// getHostname 获取主机名
-func getHostname() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "unknown"
-	}
-	return hostname
-}
-
-// getLocalIP 获取本地IP地址
-func getLocalIP() string {
-	ipAddr := "unknown"
-	addrs, err := net.InterfaceAddrs()
-	if err == nil {
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				if ipnet.IP.To4() != nil {
-					ipAddr = ipnet.IP.String()
-					break
-				}
-			}
-		}
-	}
-	return ipAddr
 }
 
 type UpdateDetectRequest struct {
@@ -160,6 +133,7 @@ type Configuration struct {
 	IFrameInterval []int     `json:"iframeInterval" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 	AlgorithmId    []uint8   `json:"algorithmId" default:"[]" desc:"算法ID"`
 	Threshold      []float32 `json:"threshold" default:"[]" desc:"置信度配置，与算法ID一一对应"`
+	FrameCheck     []int     `json:"frameCheck" default:"[]" desc:"连续帧检测，如: 设置参数为3, 如果某个目标连续出现三次及以上则认为是 sameObj, 若参数设置为0则不开启连续帧检测"`
 }
 
 // launchDetection 启动图像检测
@@ -302,11 +276,20 @@ func (p *DetectionPlugin) launchDetection(rw http.ResponseWriter, r *http.Reques
 			thresholds = []float32{0.5}
 		}
 
+		// 获取FrameCheck配置
+		var frameCheck []int
+		if len(configuration.FrameCheck) > i {
+			frameCheck = []int{configuration.FrameCheck[i]}
+		} else if len(configuration.FrameCheck) > 0 {
+			frameCheck = []int{configuration.FrameCheck[0]}
+		}
+
 		conf := detection.SnapConfig{
 			SnapMode:       configuration.SnapMode[i],
 			IFrameInterval: configuration.IFrameInterval[i],
 			AlgorithmId:    algorithmIds,
 			ConfThreshold:  thresholds,
+			FrameCheck:     frameCheck,
 		}
 
 		if configuration.SnapMode[i] == 0 && i < len(timerIntervals) {
@@ -457,6 +440,12 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 							SnapMode:       snapConfig.SnapMode,
 							TimerInterval:  snapConfig.TimeInterval.String(),
 							IFrameInterval: snapConfig.IFrameInterval,
+							FrameCheck: func() int {
+								if i < len(snapConfig.FrameCheck) {
+									return snapConfig.FrameCheck[i]
+								}
+								return 0 // 默认不开启
+							}(),
 						}
 						ret = append(ret, item)
 					}

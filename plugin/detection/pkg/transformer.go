@@ -23,6 +23,8 @@ import (
 	"m7s.live/v5/pkg/storage"
 )
 
+// ==================== 截图模式常量 ====================
+
 type SnapMode int
 
 const (
@@ -31,67 +33,19 @@ const (
 	SnapModeManual
 )
 
-type (
-	SnapConfig struct {
-		SnapImgFormat  string        `json:"snapImgFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
-		SnapMode       int           `json:"snapMode" default:"0" desc:"截图模式: 0-时间间隔，1-关键帧间隔 2-HTTP请求模式（手动触发）"`
-		TimeInterval   time.Duration `json:"timeInterval" default:"1s" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
-		IFrameInterval int           `json:"iframeInterval" default:"1" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
-		SnapOriginal   bool          `json:"snapOriginal" default:"false" desc:"是否保存原始图片"`
-		SavePath       string        `json:"savePath" desc:"截图保存路径"`
-		FontPath       string        `json:"fontPath" default:"" desc:"检测框字体文件路径"`
-		AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
-		ConfThreshold  []float32     `default:"[]" desc:"置信度配置，与算法ID一一对应"`
-		AlgorithmAPI   *AlgorithmAPI `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
-		Bbox           *Bbox         `json:"bbox" default:"{}" desc:"检测框配置"`
-		MQTT           *MQTTConfig   `json:"mqtt" default:"{}" desc:"MQTT配置"`
-	}
+// ==================== 内部结果类型 ====================
 
-	Bbox struct {
-		FontPath  string `json:"fontPath" default:"" desc:"水印字体文件路径"`
-		FontColor string `json:"fontColor" default:"red" desc:"截图文字颜色，支持rgba格式"`
-		FontSize  uint8  `json:"fontSize" default:"12" desc:"截图字体大小"`
-	}
-	AlgorithmAPI struct {
-		Enable        bool              `json:"enable" default:"false" desc:"是否启用算法分析"`
-		Url           string            `json:"url" default:"" desc:"算法服务地址"`
-		Method        string            `json:"method" default:"POST" desc:"算法服务请求方式"`
-		Headers       map[string]string `json:"headers" default:"{}" desc:"自定义请求头"`
-		Timeout       time.Duration     `json:"timeout" default:"30s" desc:"请求超时时间"`
-		ApiKey        string            `json:"apiKey" default:"" desc:"认证密钥"`
-		RetryCount    int               `json:"retryCount" default:"3" desc:"失败重试次数"`
-		RetryInterval time.Duration     `json:"retryInterval" default:"5s" desc:"重试间隔"`
-		AsyncMode     bool              `json:"asyncMode" default:"true" desc:"是否异步调用"`
-	}
-	Oss struct {
-		Enable          bool          `default:"false" desc:"是否启用Oss配置" `
-		Endpoint        string        `desc:"S3服务端点"`
-		Region          string        `desc:"AWS区域" default:"us-east-1"`
-		AccessKeyID     string        `desc:"S3访问密钥ID"`
-		SecretAccessKey string        `desc:"S3秘密访问密钥"`
-		Bucket          string        `desc:"S3存储桶名称"`
-		PathPrefix      string        `desc:"文件路径前缀"`
-		ForcePathStyle  bool          `desc:"强制路径样式（MinIO需要）"`
-		UseSSL          bool          `desc:"是否使用SSL" default:"false"`
-		Timeout         time.Duration `desc:"上传超时时间" default:"30s"`
-	}
+// algorithmResult 存储算法检测结果
+type algorithmResult struct {
+	algId        uint8
+	index        int
+	result       *DetectionResponse
+	rawImgData   []byte
+	rawImgBase64 string
+	err          error
+}
 
-	// algorithmResult 用于存储算法检测结果
-	algorithmResult struct {
-		// 算法 ID
-		algId uint8
-		// 索引
-		index int
-		// 检测结果
-		result *DetectionResponse
-		// 原图数据
-		rawImgData []byte
-		// 原图 base64
-		rawImgBase64 string
-		// 错误
-		err error
-	}
-)
+// ==================== Transformer 结构体 ====================
 
 type Transformer struct {
 	task.Job
@@ -103,11 +57,14 @@ type SnapTask struct {
 	ossPlugin  storage.Storage
 	config     SnapConfig
 	mqttClient MQTTClient
+	tracker    *Tracker // 帧跟踪器
 }
 
 type AlgTask struct {
 	job *m7s.TransformJob
 }
+
+// ==================== Transformer 接口实现 ====================
 
 func (t *Transformer) GetTransformJob() *m7s.TransformJob {
 	return &t.TransformJob
@@ -117,10 +74,11 @@ func NewTransform() m7s.ITransformer {
 	return &Transformer{}
 }
 
-// Start #TaskStarter 启动一个定时任务
+// Start 启动任务
 func (t *Transformer) Start() (err error) {
 	plugin := t.TransformJob.Plugin
 
+	// 初始化OSS插件
 	ossConfig := plugin.Config.Get("oss")
 	ossEnable := ossConfig.Get("enable")
 	var ossPlugin storage.Storage
@@ -132,6 +90,7 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	// 初始化算法API配置
 	apiConfig := plugin.Config.Get("algorithmApi")
 	apiEnable := apiConfig.Get("enable")
 	var globalAlgApi *AlgorithmAPI
@@ -145,6 +104,7 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	// 初始化Bbox配置
 	bboxConfig := plugin.Config.Get("bbox")
 	var globalBbox *Bbox
 	if bboxConfig != nil && bboxConfig.File != nil {
@@ -157,6 +117,7 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
+	// 初始化截图格式配置
 	snapImgFormat := plugin.Config.Get("snapImgFormat")
 	var globalSnapImgFormat string
 	if snapImgFormat != nil {
@@ -167,7 +128,7 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
-	// 初始化MQTT客户端
+	// 初始化MQTT配置
 	mqttConfig := plugin.Config.Get("mqtt")
 	mqttEnable := mqttConfig.Get("enable")
 	var globalMQTTConfig *MQTTConfig
@@ -181,9 +142,9 @@ func (t *Transformer) Start() (err error) {
 		}
 	}
 
-	// 为每个输出配置创建一个截图任务
+	// 为每个输出配置创建截图任务
 	for _, output := range t.TransformJob.Config.Output {
-		var task task.ITask
+		var snapTask task.ITask
 		var snapConfig SnapConfig
 
 		if output.Conf != nil {
@@ -195,24 +156,8 @@ func (t *Transformer) Start() (err error) {
 			}
 		}
 
-		// 如果 snapConfig 的 algorithmApi没有配置则使用全局的 api 配置
-		if snapConfig.AlgorithmAPI == nil && apiConfig != nil {
-			snapConfig.AlgorithmAPI = globalAlgApi
-		}
-
-		// 如果 snapConfig 的 bbox 没有配置则使用全局的 bbox 配置
-		if snapConfig.Bbox == nil && globalBbox != nil {
-			snapConfig.Bbox = globalBbox
-		}
-
-		if snapConfig.SnapImgFormat == "" && globalSnapImgFormat != "" {
-			snapConfig.SnapImgFormat = globalSnapImgFormat
-		}
-
-		// 如果 snapConfig 的 mqtt 没有配置则使用全局的 mqtt 配置
-		if snapConfig.MQTT == nil && globalMQTTConfig != nil {
-			snapConfig.MQTT = globalMQTTConfig
-		}
+		// 应用全局配置
+		applyGlobalConfig(&snapConfig, globalAlgApi, globalBbox, globalSnapImgFormat, globalMQTTConfig)
 
 		// 创建MQTT客户端
 		var mqttClient MQTTClient
@@ -220,47 +165,65 @@ func (t *Transformer) Start() (err error) {
 			mqttClient, _ = NewMQTTClient(globalMQTTConfig, plugin.Logger)
 		}
 
-		switch snapConfig.SnapMode {
-		case int(SnapModeTimeInterval):
-			// 时间间隔模式截图逻辑
-			timeTask := &TimeSnapTask{
-				SnapTask: SnapTask{
-					config:     snapConfig,
-					job:        &t.TransformJob,
-					ossPlugin:  ossPlugin,
-					mqttClient: mqttClient,
-				},
-			}
-			task = timeTask
-		case int(SnapModeIFrameInterval):
-			// 关键帧间隔模式截图逻辑
-			iframeTask := &IFrameSnapTask{
-				SnapTask: SnapTask{
-					config:     snapConfig,
-					job:        &t.TransformJob,
-					ossPlugin:  ossPlugin,
-					mqttClient: mqttClient,
-				},
-			}
-			task = iframeTask
-		case int(SnapModeManual):
-			// 手动触发模式截图逻辑
-		}
-		if task != nil {
-			t.AddTask(task)
+		// 根据截图模式创建任务
+		snapTask = createSnapTask(snapConfig, &t.TransformJob, ossPlugin, mqttClient)
+		if snapTask != nil {
+			t.AddTask(snapTask)
 		}
 	}
 	return nil
 }
 
-// IFrameSnapTask #ITask 帧间隔截图任务
+// applyGlobalConfig 应用全局配置到任务配置
+func applyGlobalConfig(snapConfig *SnapConfig, globalAlgApi *AlgorithmAPI, globalBbox *Bbox, globalSnapImgFormat string, globalMQTTConfig *MQTTConfig) {
+	if snapConfig.AlgorithmAPI == nil && globalAlgApi != nil {
+		snapConfig.AlgorithmAPI = globalAlgApi
+	}
+	if snapConfig.Bbox == nil && globalBbox != nil {
+		snapConfig.Bbox = globalBbox
+	}
+	if snapConfig.SnapImgFormat == "" && globalSnapImgFormat != "" {
+		snapConfig.SnapImgFormat = globalSnapImgFormat
+	}
+	if snapConfig.MQTT == nil && globalMQTTConfig != nil {
+		snapConfig.MQTT = globalMQTTConfig
+	}
+}
+
+// createSnapTask 根据截图模式创建任务
+func createSnapTask(snapConfig SnapConfig, job *m7s.TransformJob, ossPlugin storage.Storage, mqttClient MQTTClient) task.ITask {
+	baseTask := SnapTask{
+		config:     snapConfig,
+		job:        job,
+		ossPlugin:  ossPlugin,
+		mqttClient: mqttClient,
+		tracker:    NewTracker(),
+	}
+
+	switch snapConfig.SnapMode {
+	case int(SnapModeTimeInterval):
+		return &TimeSnapTask{
+			SnapTask: baseTask,
+		}
+	case int(SnapModeIFrameInterval):
+		return &IFrameSnapTask{
+			SnapTask: baseTask,
+		}
+	case int(SnapModeManual):
+		return nil
+	}
+	return nil
+}
+
+// ==================== IFrameSnapTask 关键帧间隔截图任务 ====================
+
 type IFrameSnapTask struct {
 	task.Task
 	SnapTask
 	subscriber *m7s.Subscriber
 }
 
-// Start #TaskStarter 启动一个帧间隔截图任务
+// Start 启动关键帧间隔截图任务
 func (t *IFrameSnapTask) Start() (err error) {
 	subConfig := t.job.Plugin.GetCommonConf().Subscribe
 	subConfig.SubType = m7s.SubscribeTypeTransform
@@ -269,13 +232,12 @@ func (t *IFrameSnapTask) Start() (err error) {
 	return
 }
 
-// Go #TaskRunner 帧间隔截图任务执行逻辑
+// Go 关键帧间隔截图任务执行逻辑
 func (t *IFrameSnapTask) Go() (err error) {
 	iframeCount := 0
 	err = m7s.PlayBlock(t.subscriber, (func(audio *pkg.AVFrame) error)(nil), func(video *format.AnnexB) error {
 		iframeCount++
 		if iframeCount%t.config.IFrameInterval == 0 {
-			// 原始分辨率
 			t.Logger.Debug("video info", video.GetInfo())
 			if err := t.saveSnap([]*format.AnnexB{video}, SnapModeIFrameInterval); err != nil {
 				t.Error("save snapshot failed", "error", err.Error())
@@ -289,25 +251,24 @@ func (t *IFrameSnapTask) Go() (err error) {
 	return
 }
 
-// TimeSnapTask #ITask 定时截图任务
+// ==================== TimeSnapTask 定时截图任务 ====================
+
 type TimeSnapTask struct {
 	task.TickTask
 	SnapTask
 }
 
-// GetTickInterval #TaskTicker 获取定时截图间隔
+// GetTickInterval 获取定时截图间隔
 func (t *TimeSnapTask) GetTickInterval() time.Duration {
 	return t.config.TimeInterval
 }
 
-// Tick #TaskTicker 定时截图任务执行逻辑
+// Tick 定时截图任务执行逻辑
 func (t *TimeSnapTask) Tick(any) {
-	// 如果没有publisher，直接返回
-	if nil == t.job.OriginPublisher {
+	if t.job.OriginPublisher == nil {
 		return
 	}
 
-	// 获取视频帧
 	annexb, err := GetVideoFrame(t.job.OriginPublisher, t.job.Plugin.Server)
 	if err != nil {
 		t.Error("get video frame failed", "error", err.Error())
@@ -319,9 +280,10 @@ func (t *TimeSnapTask) Tick(any) {
 	}
 }
 
-// saveSnap 保存截图，核心实现逻辑
+// ==================== 核心截图逻辑 ====================
+
+// saveSnap 保存截图
 func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) {
-	// 生成文件名
 	now := time.Now()
 
 	// 处理视频帧
@@ -330,7 +292,7 @@ func (t *SnapTask) saveSnap(annexb []*format.AnnexB, mode SnapMode) (err error) 
 		return err
 	}
 
-	// 请求yolo算法接口，获取检测结果，然后hook到指定url
+	// 调用算法检测
 	if t.config.AlgorithmAPI.Enable {
 		return t.processAlgorithmDetection(imageData, imgInfo, now)
 	}
@@ -346,7 +308,6 @@ func (t *SnapTask) processVideoFrame(annexb []*format.AnnexB) ([]byte, ImgInfo, 
 		return nil, ImgInfo{}, fmt.Errorf("process with ffmpeg error: %w", err)
 	}
 
-	// 提前编码图片用于并发传输
 	imageData := buf.Bytes()
 	if len(imageData) == 0 {
 		return nil, ImgInfo{}, errors.New("original image data is empty")
@@ -354,6 +315,8 @@ func (t *SnapTask) processVideoFrame(annexb []*format.AnnexB) ([]byte, ImgInfo, 
 
 	return imageData, imgInfo, nil
 }
+
+// ==================== 算法检测逻辑 ====================
 
 // processAlgorithmDetection 处理算法检测逻辑
 func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, now time.Time) error {
@@ -368,13 +331,15 @@ func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, 
 	// 执行并行算法检测
 	validResults := t.executeParallelDetection(detectClient, imageData, base64ImageData, imgInfo)
 
+	// 处理连续帧检测，获取带标识的检测结果
+	trackerResults := t.tracker.ProcessFrameCheck(validResults, t.config)
+
 	// 如果没有有效的检测结果，直接返回
 	if len(validResults) == 0 {
 		return nil
 	}
 
-	// 处理检测结果（上传到OSS、发送MQTT消息和HTTP回调）
-	return t.handleDetectionResults(validResults, imgInfo, now)
+	return t.handleDetectionResults(validResults, trackerResults, imgInfo, now)
 }
 
 // executeParallelDetection 并行执行算法检测
@@ -382,7 +347,6 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 	var wg sync.WaitGroup
 	results := make(chan *algorithmResult, len(t.config.AlgorithmId))
 
-	// 并行执行所有算法检测
 	for index, algorithmID := range t.config.AlgorithmId {
 		wg.Add(1)
 		go func(algId uint8, idx int) {
@@ -409,7 +373,6 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			if err != nil {
 				t.job.Plugin.Error("detect error", "error", err.Error())
 				result.err = err
-				// 触发 onDetectionError webhook
 				t.SendDetectionWebhook(HookOnDetectionError, algId, req, err)
 				results <- result
 				return
@@ -418,7 +381,6 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			if !detectResult.IsSuccess() {
 				t.job.Plugin.Error("algorithm api request failed or no detections found")
 				result.err = errors.New("algorithm api request failed or no detections found")
-				// 触发 onDetectionError webhook
 				t.SendDetectionWebhook(HookOnDetectionError, algId, req, result.err)
 				results <- result
 				return
@@ -430,17 +392,14 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 			}
 
 			result.result = detectResult
-
 			result.rawImgData = imageData
 			results <- result
 		}(algorithmID, index)
 	}
 
-	// 等待所有检测完成
 	wg.Wait()
 	close(results)
 
-	// 收集所有有效结果
 	var validResults []*algorithmResult
 	for result := range results {
 		if result.err == nil && result.result != nil {
@@ -451,6 +410,68 @@ func (t *SnapTask) executeParallelDetection(detectClient *DetectionClient, image
 	return validResults
 }
 
+// ==================== 结果处理 ====================
+
+// handleDetectionResults 处理检测结果
+func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, trackerResults map[uint8]*TrackerResult, imgInfo ImgInfo, now time.Time) error {
+	uploadedFiles := make(map[string]struct {
+		accessUrl      string
+		objKey         string
+		processedImage []byte
+	})
+
+	publishId := uuid.New()
+
+	for _, result := range validResults {
+		// 获取跟踪器结果
+		trackerResult := trackerResults[result.algId]
+		frameCheck := getFrameCheckForAlgId(t.config, result.algId)
+
+		// 如果有跟踪器结果，应用带标识的检测结果
+		if trackerResult != nil && len(trackerResult.MarkedResults) > 0 {
+			result.result.Data.Detections = trackerResult.MarkedResults
+			result.result.Data.TotalCount = len(trackerResult.MarkedResults)
+		}
+
+		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
+
+		// 添加连续帧检测相关信息到回调参数
+		callbackEntity.Args.HasFrameCheck = frameCheck > 0
+		callbackEntity.Args.FrameCheckCount = frameCheck
+		if trackerResult != nil {
+			callbackEntity.Args.SameObjTotalCount = trackerResult.SameObjTotalCount
+		}
+
+		t.sendMQTTMessage(result, callbackEntity, t.mqttClient, t.config.MQTT)
+
+		processedImage, err := t.drawBoundingBoxes(result.result, result.rawImgData, imgInfo)
+		if err != nil {
+			t.job.Plugin.Error("draw bounding box error", "error", err.Error())
+			continue
+		}
+
+		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, &processedImage, now, uploadedFiles)
+		if err != nil {
+			t.job.Plugin.Error("upload to OSS failed", "error", err.Error())
+			continue
+		}
+
+		callbackEntity.Args.ObjectKey = objKey
+		if accessUrl != "" {
+			callbackEntity.Args.AccessUrl = accessUrl
+		} else {
+			if t.config.SnapOriginal {
+				callbackEntity.Args.ObjectRaw = result.rawImgBase64
+			}
+			callbackEntity.Args.ObjectArtifacts = SnapFrameToBase64WithFFmpeg(processedImage)
+		}
+
+		t.SendDetectionWebhook(HookOnDetectionResult, result.algId, callbackEntity.Args, nil)
+	}
+
+	return nil
+}
+
 // drawBoundingBoxes 在图像上绘制检测框
 func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData []byte, imgInfo ImgInfo) ([]byte, error) {
 	processedImage := imageData
@@ -458,10 +479,8 @@ func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData 
 
 	for _, detection := range detectResult.Data.Detections {
 		bbox := FloatsToBBox(detection.BBox)
-		className := "unknown"
-		if detection.ClassNameCn != "" {
-			className = detection.ClassNameCn
-		} else if detection.ClassName != "" {
+		className := detection.ClassNameCn
+		if className == "" {
 			className = detection.ClassName
 		}
 
@@ -482,53 +501,6 @@ func (t *SnapTask) drawBoundingBoxes(detectResult *DetectionResponse, imageData 
 	return processedImage, nil
 }
 
-// handleDetectionResults 处理检测结果（包括上传OSS、发送MQTT消息和HTTP回调）
-func (t *SnapTask) handleDetectionResults(validResults []*algorithmResult, imgInfo ImgInfo, now time.Time) error {
-	// 创建OSS文件映射，避免重复上传相同图像
-	uploadedFiles := make(map[string]struct {
-		accessUrl      string
-		objKey         string
-		processedImage []byte
-	})
-
-	publishId := uuid.New()
-
-	// 处理每个检测结果
-	for _, result := range validResults {
-		callbackEntity := result.result.ToCallback(t.job.StreamPath, "", t.job.Plugin.Meta.Name, publishId)
-		// 发送MQTT消息
-		t.sendMQTTMessage(result, callbackEntity, t.mqttClient, t.config.MQTT)
-		// 绘制边界框（移到这里执行，避免重复绘制）
-		processedImage, err := t.drawBoundingBoxes(result.result, result.rawImgData, imgInfo)
-		if err != nil {
-			t.job.Plugin.Error("draw bounding box error", "error", err.Error())
-			continue
-		}
-
-		// 上传到OSS（如果需要）
-		accessUrl, objKey, err := t.uploadToOSSIfNeeded(result, &processedImage, now, uploadedFiles)
-		if err != nil {
-			t.job.Plugin.Error("upload to OSS failed", "error", err.Error())
-			continue
-		}
-
-		callbackEntity.Args.ObjectKey = objKey
-		if accessUrl != "" {
-			callbackEntity.Args.AccessUrl = accessUrl
-		} else {
-			if t.config.SnapOriginal {
-				callbackEntity.Args.ObjectRaw = result.rawImgBase64
-			}
-			callbackEntity.Args.ObjectArtifacts = SnapFrameToBase64WithFFmpeg(processedImage)
-		}
-
-		// 触发 onDetectionResult webhook
-		t.SendDetectionWebhook(HookOnDetectionResult, result.algId, callbackEntity.Args, nil)
-	}
-
-	return nil
-}
-
 // uploadToOSSIfNeeded 如需要则上传到OSS
 func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, bboxImg *[]byte, now time.Time, uploadedFiles map[string]struct {
 	accessUrl      string
@@ -539,7 +511,6 @@ func (t *SnapTask) uploadToOSSIfNeeded(result *algorithmResult, bboxImg *[]byte,
 		return "", "", nil
 	}
 
-	// 检查是否已经上传过相同图像
 	key := fmt.Sprintf("%s/alg_%d", strings.ReplaceAll(t.job.StreamPath, "/", "_"), result.algId)
 	if uploaded, exists := uploadedFiles[key]; exists {
 		return uploaded.accessUrl, uploaded.objKey, nil
@@ -596,7 +567,6 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 		return
 	}
 
-	// 遍历配置中的发布主题并发送消息
 	for i, topic := range mqttConfig.Pub {
 		err := mqttClient.PublishWithIndex(topic, i, result.algId, t.job.StreamPath, callbackEntity)
 		if err != nil {
@@ -605,34 +575,21 @@ func (t *SnapTask) sendMQTTMessage(result *algorithmResult, callbackEntity *Call
 	}
 }
 
+// ==================== Webhook 工具函数 ====================
+
+// getObjectKey 从URL提取对象Key
 func getObjectKey(accessUrl string) string {
-	// 解析URL并提取路径部分作为object key
 	parsedURL, err := url.Parse(accessUrl)
 	if err != nil {
 		return ""
 	}
-
-	// 移除路径开头的斜杠（如果存在）
-	path := strings.TrimPrefix(parsedURL.Path, "/")
-	return path
+	return strings.TrimPrefix(parsedURL.Path, "/")
 }
 
 // SendDetectionWebhook 发送检测相关的webhook
 func (t *SnapTask) SendDetectionWebhook(webhookType config.HookType, algorithmID uint8, data interface{}, err error) {
-	// 获取服务器信息
 	hostname, _ := os.Hostname()
-	ipAddr := "unknown"
-	addrs, err := net.InterfaceAddrs()
-	if err == nil {
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				if ipnet.IP.To4() != nil {
-					ipAddr = ipnet.IP.String()
-					break
-				}
-			}
-		}
-	}
+	ipAddr := getLocalIP()
 
 	webhookData := m7s.AlarmInfo{
 		StreamPath: t.job.StreamPath,
@@ -646,12 +603,27 @@ func (t *SnapTask) SendDetectionWebhook(webhookType config.HookType, algorithmID
 	}
 }
 
-// 添加辅助函数 convertToMap
+// getLocalIP 获取本地IP地址
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "unknown"
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "unknown"
+}
+
+// convertToMap 转换为map
 func convertToMap(v interface{}) map[string]interface{} {
 	if m, ok := v.(map[string]interface{}); ok {
 		return m
 	}
-	// 可选：尝试通过 JSON 序列化反序列化转换结构体
 	b, _ := json.Marshal(v)
 	var result map[string]interface{}
 	json.Unmarshal(b, &result)

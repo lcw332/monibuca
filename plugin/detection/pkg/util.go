@@ -13,28 +13,7 @@ import (
 	"m7s.live/v5/pkg/format"
 )
 
-type ImgInfo struct {
-	Size   int64
-	Width  int
-	Height int
-}
-
-type BBox struct {
-	X, Y, W, H float64
-}
-
-// FloatsToBBox float 数组转 bbox
-func FloatsToBBox(values []float64) BBox {
-	if len(values) < 4 {
-		return BBox{}
-	}
-	return BBox{
-		X: values[0],
-		Y: values[1],
-		W: values[2],
-		H: values[3],
-	}
-}
+// ==================== 视频帧处理 ====================
 
 // GetVideoFrame 获取当前视频帧
 func GetVideoFrame(publisher *m7s.Publisher, server *m7s.Server) ([]*format.AnnexB, error) {
@@ -68,6 +47,8 @@ func GetVideoFrame(publisher *m7s.Publisher, server *m7s.Server) ([]*format.Anne
 	return annexbList, nil
 }
 
+// ==================== 图像编解码 ====================
+
 // SnapFrameToBase64WithFFmpeg 使用FFmpeg将视频帧处理为Base64编码的图片
 func SnapFrameToBase64WithFFmpeg(buf []byte) string {
 	return base64.StdEncoding.EncodeToString(buf)
@@ -75,31 +56,18 @@ func SnapFrameToBase64WithFFmpeg(buf []byte) string {
 
 // SnapFrameWithFFmpeg 使用 FFmpeg 处理视频帧并生成截图
 func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format string) (ImgInfo, error) {
-	// 根据format参数确定输出格式
-	var outputFileFormat string
-	switch strings.ToLower(format) {
-	case "png":
-		outputFileFormat = "png"
-	default: // 默认为JPEG格式
-		outputFileFormat = "mjpeg"
-	}
+	outputFileFormat := getOutputFormat(format)
 
-	// 创建ffmpeg命令，使用select过滤器选择最后一帧
 	cmd := exec.Command(
 		"ffmpeg",
 		"-hide_banner",
-		"-i",
-		"pipe:0",
-		"-vf",
-		fmt.Sprintf("select='eq(n,%d)'", len(annexb)-1),
-		"-vframes",
-		"1",
-		"-f",
-		outputFileFormat,
+		"-i", "pipe:0",
+		"-vf", fmt.Sprintf("select='eq(n,%d)'", len(annexb)-1),
+		"-vframes", "1",
+		"-f", outputFileFormat,
 		"pipe:1",
 	)
 
-	// 获取输入和输出pipe
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return ImgInfo{}, err
@@ -109,12 +77,10 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 		return ImgInfo{}, err
 	}
 
-	// 启动ffmpeg进程
 	if err = cmd.Start(); err != nil {
 		return ImgInfo{}, err
 	}
 
-	// 将annexb数据写入到ffmpeg的stdin
 	for _, annex := range annexb {
 		if _, err = annex.WriteTo(stdin); err != nil {
 			stdin.Close()
@@ -123,7 +89,6 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 	}
 	stdin.Close()
 
-	// 从ffmpeg的stdout读取图片数据并写入到输出
 	var buf bytes.Buffer
 	tee := io.TeeReader(stdout, output)
 	_, err = io.Copy(&buf, tee)
@@ -131,18 +96,16 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 		return ImgInfo{}, err
 	}
 
-	// 等待ffmpeg进程结束
 	if err = cmd.Wait(); err != nil {
 		return ImgInfo{}, err
 	}
 
-	// 获取图片信息
 	imgData := buf.Bytes()
 	imgInfo := ImgInfo{
 		Size: int64(len(imgData)),
 	}
 
-	// 使用ffprobe获取更多图片信息
+	// 获取图片尺寸信息
 	probeCmd := exec.Command(
 		"ffprobe",
 		"-hide_banner",
@@ -156,7 +119,7 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 	probeStdout, _ := probeCmd.StdoutPipe()
 
 	if err = probeCmd.Start(); err != nil {
-		return imgInfo, nil // 如果ffprobe失败，至少返回已知信息
+		return imgInfo, nil
 	}
 
 	go func() {
@@ -168,8 +131,24 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 	io.Copy(&probeOutput, probeStdout)
 	probeCmd.Wait()
 
-	// 解析ffprobe输出
-	lines := strings.Split(probeOutput.String(), "\n")
+	parseProbeOutput(&imgInfo, probeOutput.String())
+
+	return imgInfo, nil
+}
+
+// getOutputFormat 根据格式字符串返回FFmpeg输出格式
+func getOutputFormat(format string) string {
+	switch strings.ToLower(format) {
+	case "png":
+		return "png"
+	default:
+		return "jpeg"
+	}
+}
+
+// parseProbeOutput 解析ffprobe输出
+func parseProbeOutput(imgInfo *ImgInfo, output string) {
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "width=") {
 			fmt.Sscanf(line, "width=%d", &imgInfo.Width)
@@ -177,20 +156,13 @@ func SnapFrameWithFFmpeg(annexb []*format.AnnexB, output io.Writer, format strin
 			fmt.Sscanf(line, "height=%d", &imgInfo.Height)
 		}
 	}
-
-	return imgInfo, nil
 }
+
+// ==================== 检测框绘制 ====================
 
 // DrawDetectionBBox 在图像上绘制检测框和标签
 func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BBox, label string, confidence float64, fontPath string, fontSize uint8, fontColor string) ([]byte, error) {
-
-	var outputFileFormat string
-	switch strings.ToLower(format) {
-	case "png":
-		outputFileFormat = "png"
-	default: // 默认为JPEG格式
-		outputFileFormat = "mjpeg"
-	}
+	outputFileFormat := getOutputFormat(format)
 
 	// 计算基于图像实际尺寸的像素坐标
 	x := bbox.X * float64(imgInfo.Width)
@@ -198,34 +170,36 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 	w := (bbox.W - bbox.X) * float64(imgInfo.Width)
 	h := (bbox.H - bbox.Y) * float64(imgInfo.Height)
 
-	// 检查系统字体可用性
 	hasFontSupport := checkFontSupport() && fontPath != ""
+	filter := buildDrawFilter(x, y, w, h, label, confidence, fontPath, fontSize, fontColor, hasFontSupport)
 
-	var filter string
+	return runFFmpegDraw(imgBytes, filter, outputFileFormat)
+}
+
+// buildDrawFilter 构建FFmpeg绘制滤镜
+func buildDrawFilter(x, y, w, h float64, label string, confidence float64, fontPath string, fontSize uint8, fontColor string, hasFontSupport bool) string {
 	if hasFontSupport {
-		// 转义文本中的特殊字符
 		escapedLabel := strings.ReplaceAll(label, "'", "\\'")
 		escapedLabel = strings.ReplaceAll(escapedLabel, ":", "\\:")
 		labelText := fmt.Sprintf("%s %.2f", escapedLabel, confidence)
-
-		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=%d:fontcolor=%s",
+		return fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2,drawtext=fontfile='%s':text='%s':x=%f:y=%f:fontsize=%d:fontcolor=%s",
 			x, y, w, h, fontPath, labelText, x, y-30, fontSize, fontColor)
-	} else {
-		// 仅绘制边框，不添加文本
-		filter = fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2", x, y, w, h)
 	}
+	return fmt.Sprintf("drawbox=x=%f:y=%f:w=%f:h=%f:color=red:thickness=2", x, y, w, h)
+}
 
+// runFFmpegDraw 执行FFmpeg绘制命令
+func runFFmpegDraw(imgBytes []byte, filter, outputFormat string) ([]byte, error) {
 	cmd := exec.Command(
 		"ffmpeg",
 		"-hide_banner",
 		"-i", "pipe:0",
 		"-vf", filter,
 		"-q:v", "2",
-		"-f", outputFileFormat,
+		"-f", outputFormat,
 		"pipe:1",
 	)
 
-	// 获取输入和输出pipe
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -239,23 +213,19 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 		return nil, err
 	}
 
-	// 启动ffmpeg进程
 	if err = cmd.Start(); err != nil {
 		return nil, err
 	}
 
-	// 将图像数据写入到ffmpeg的stdin
 	if _, err = stdin.Write(imgBytes); err != nil {
 		stdin.Close()
 		return nil, err
 	}
 	stdin.Close()
 
-	// 从ffmpeg的stdout读取处理后的图像数据
 	var buf bytes.Buffer
 	var errBuf bytes.Buffer
 
-	// 并行读取stdout和stderr
 	done := make(chan error, 2)
 	go func() {
 		_, err := io.Copy(&buf, stdout)
@@ -266,16 +236,13 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 		done <- err
 	}()
 
-	// 等待复制完成
 	<-done
 	<-done
 
-	// 等待ffmpeg进程结束
 	if err = cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("ffmpeg error: %v, stderr: %s", err, errBuf.String())
 	}
 
-	// 检查是否有输出数据
 	if buf.Len() == 0 {
 		return nil, fmt.Errorf("ffmpeg produced no output")
 	}
@@ -285,13 +252,10 @@ func DrawDetectionBBox(imgBytes []byte, imgInfo *ImgInfo, format string, bbox BB
 
 // checkFontSupport 检查系统字体支持
 func checkFontSupport() bool {
-	// 简单检查字体支持，可以通过执行简单命令测试
 	cmd := exec.Command("ffmpeg", "-hide_banner", "-filters")
 	output, err := cmd.Output()
 	if err != nil {
 		return false
 	}
-
-	// 检查输出中是否包含drawtext过滤器
 	return strings.Contains(string(output), "drawtext")
 }

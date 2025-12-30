@@ -18,76 +18,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// DetectionRequest 定义请求结构体
-type DetectionRequest struct {
-	AlgorithmID   uint8   `json:"algorithm_id"`
-	Image         string  `json:"image"`
-	ConfThreshold float32 `json:"conf_threshold,omitempty"`
-}
-
-// DetectionResult 定义检测结果结构
-type DetectionResult struct {
-	ClassID     int       `json:"class_id"`
-	ClassName   string    `json:"class_name"`
-	ClassNameCn string    `json:"class_name_cn"`
-	Confidence  float64   `json:"confidence"`
-	BBox        []float64 `json:"bbox"`
-	// 车牌号码(针对车牌识别)
-	PlateNumber string `json:"plate_number,omitempty"`
-	// 车牌类型(针对车牌识别)
-	PlateType string `json:"plate_type,omitempty"`
-	// 车牌置信度(针对车牌识别)
-	PlateConfidence float64 `json:"plate_confidence,omitempty"`
-}
-
-// DetectionResponse 定义响应结构体
-type DetectionResponse struct {
-	Code      int    `json:"code"`
-	Message   string `json:"message"`
-	RequestID string `json:"request_id,omitempty"`
-	Data      struct {
-		AlgorithmID   int               `json:"algorithm_id"`
-		AlgorithmName string            `json:"algorithm_name"`
-		Detections    []DetectionResult `json:"detections"`
-		TotalCount    int               `json:"total_count"`
-		DetectTime    float64           `json:"detect_time"`
-	} `json:"data"`
-}
-
-// CallbackDetection 回调结构体
-type CallbackDetection struct {
-	Event      string `json:"event"`
-	StreamPath string `json:"streamPath"`
-	Args       struct {
-		AccessUrl       string            `json:"access_url,omitempty" desc:"对象存储访问链接"`
-		ObjectKey       string            `json:"object_key,omitempty" desc:"对象存储 Key"`
-		ObjectRaw       string            `json:"object_raw,omitempty" desc:"原图 base64"`
-		ObjectArtifacts string            `json:"object_artifacts,omitempty" desc:"加工后图片 base64"`
-		AlgorithmID     int               `json:"algorithm_id"`
-		AlgorithmName   string            `json:"algorithm_name"`
-		Detections      []DetectionResult `json:"detections"`
-		TotalCount      int               `json:"total_count"`
-		DetectTime      float64           `json:"detect_time"`
-	} `json:"args"`
-	PublishId  uuid.UUID `json:"publishId"`
-	RemoteAddr string    `json:"remoteAddr"`
-	Type       string    `json:"type"`
-	PluginName string    `json:"pluginName"`
-	Timestamp  int       `json:"timestamp"`
-}
-
-// BatchDetectionRequest 批量检测请求
-type BatchDetectionRequest struct {
-	Requests []DetectionRequest `json:"requests"`
-}
-
-// BatchDetectionResponse 批量检测响应
-type BatchDetectionResponse struct {
-	Code      int                 `json:"code"`
-	Message   string              `json:"message"`
-	RequestID string              `json:"request_id,omitempty"`
-	Data      []DetectionResponse `json:"data"`
-}
+// ==================== 检测客户端 ====================
 
 // DetectionClient 封装检测客户端
 type DetectionClient struct {
@@ -95,7 +26,6 @@ type DetectionClient struct {
 	Method     string
 	APIKey     string
 	HTTPClient *http.Client
-	// gRPC相关字段
 	GRPCClient pb.DetectionServiceClient
 	GRPConn    *grpc.ClientConn
 	IsGRPC     bool
@@ -118,7 +48,6 @@ func NewDetectionClient(URL, Method, apiKey string) *DetectionClient {
 		client.IsGRPC = true
 		conn, err := grpc.NewClient(URL[7:], grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			// 如果gRPC连接失败，回退到HTTP模式
 			client.IsGRPC = false
 			return client
 		}
@@ -137,43 +66,36 @@ func (c *DetectionClient) Detect(req DetectionRequest) (*DetectionResponse, erro
 	return c.detectHTTP(req)
 }
 
+// ==================== HTTP 检测 ====================
+
 // detectHTTP 通过HTTP发送检测请求
 func (c *DetectionClient) detectHTTP(req DetectionRequest) (*DetectionResponse, error) {
-	// 序列化请求体
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	// 创建HTTP请求
 	httpReq, err := http.NewRequest(c.Method, c.URL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	// 设置请求头
 	httpReq.Header.Set("Content-Type", "application/json")
 	if c.APIKey != "" {
 		httpReq.Header.Set("x-api-key", c.APIKey)
 	}
 
-	// 添加自定义请求头
-	// 这里可以扩展支持从配置中读取自定义请求头
-
-	// 发送请求
 	resp, err := c.HTTPClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 读取响应体
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// 解析响应
 	var detectionResp DetectionResponse
 	if err := json.Unmarshal(respBody, &detectionResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
@@ -181,6 +103,46 @@ func (c *DetectionClient) detectHTTP(req DetectionRequest) (*DetectionResponse, 
 
 	return &detectionResp, nil
 }
+
+// batchDetectHTTP 发送HTTP批量检测请求
+func (c *DetectionClient) batchDetectHTTP(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
+	batchReq := BatchDetectionRequest{Requests: reqs}
+
+	body, err := json.Marshal(batchReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch request: %v", err)
+	}
+
+	httpReq, err := http.NewRequest(c.Method, c.URL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create batch request: %v", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if c.APIKey != "" {
+		httpReq.Header.Set("X-API-Key", c.APIKey)
+	}
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send batch request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read batch response body: %v", err)
+	}
+
+	var batchResp BatchDetectionResponse
+	if err := json.Unmarshal(respBody, &batchResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch response: %v", err)
+	}
+
+	return &batchResp, nil
+}
+
+// ==================== gRPC 检测 ====================
 
 // detectGRPC 通过gRPC发送检测请求
 func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, error) {
@@ -193,17 +155,21 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// 添加API Key到gRPC请求的metadata中
 	if c.APIKey != "" {
 		md := metadata.Pairs("x-api-key", c.APIKey)
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
+
 	grpcResp, err := c.GRPCClient.Detect(ctx, grpcReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send gRPC request: %v", err)
 	}
 
-	// 转换响应格式
+	return convertGRPCResponse(grpcResp), nil
+}
+
+// convertGRPCResponse 转换gRPC响应格式
+func convertGRPCResponse(grpcResp *pb.DetectResponse) *DetectionResponse {
 	detections := make([]DetectionResult, len(grpcResp.Data.Detections))
 	for i, d := range grpcResp.Data.Detections {
 		bbox := make([]float64, len(d.Bbox))
@@ -219,7 +185,7 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 		}
 	}
 
-	detectionResp := &DetectionResponse{
+	return &DetectionResponse{
 		Code:    int(grpcResp.Code),
 		Message: grpcResp.Message,
 		Data: struct {
@@ -236,61 +202,16 @@ func (c *DetectionClient) detectGRPC(req DetectionRequest) (*DetectionResponse, 
 			DetectTime:    float64(grpcResp.Data.DetectTime),
 		},
 	}
-
-	return detectionResp, nil
 }
+
+// ==================== 批量检测 ====================
 
 // BatchDetect 发送批量检测请求
 func (c *DetectionClient) BatchDetect(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
-	// gRPC模式下暂不支持批量检测，回退到HTTP实现
 	return c.batchDetectHTTP(reqs)
 }
 
-// batchDetectHTTP 发送HTTP批量检测请求
-func (c *DetectionClient) batchDetectHTTP(reqs []DetectionRequest) (*BatchDetectionResponse, error) {
-	batchReq := BatchDetectionRequest{
-		Requests: reqs,
-	}
-
-	// 序列化请求体
-	body, err := json.Marshal(batchReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal batch request: %v", err)
-	}
-
-	// 创建HTTP请求
-	httpReq, err := http.NewRequest(c.Method, c.URL, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create batch request: %v", err)
-	}
-
-	// 设置请求头
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.APIKey != "" {
-		httpReq.Header.Set("X-API-Key", c.APIKey)
-	}
-
-	// 发送请求
-	resp, err := c.HTTPClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send batch request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// 读取响应体
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read batch response body: %v", err)
-	}
-
-	// 解析响应
-	var batchResp BatchDetectionResponse
-	if err := json.Unmarshal(respBody, &batchResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal batch response: %v", err)
-	}
-
-	return &batchResp, nil
-}
+// ==================== 辅助方法 ====================
 
 // Close 关闭客户端连接
 func (c *DetectionClient) Close() error {
@@ -300,19 +221,9 @@ func (c *DetectionClient) Close() error {
 	return nil
 }
 
-// IsSuccess 判断响应是否成功
-func (resp *DetectionResponse) IsSuccess() bool {
-	return resp.Code == 200
-}
-
-// hasDetections 判断响应中是否有检测结果
-func (resp *DetectionResponse) hasDetections() bool {
-	return len(resp.Data.Detections) > 0
-}
-
-// ToCallback converts a DetectionResponse to a CallbackDetection
+// ToCallback 转换为回调结构
 func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName string, publishId uuid.UUID) *CallbackDetection {
-	callback := &CallbackDetection{
+	return &CallbackDetection{
 		Event:      "detection",
 		StreamPath: streamPath,
 		PublishId:  publishId,
@@ -320,12 +231,12 @@ func (resp *DetectionResponse) ToCallback(streamPath, remoteAddr, pluginName str
 		Type:       "detection",
 		PluginName: pluginName,
 		Timestamp:  int(time.Now().UnixMilli()),
+		Args: CallbackArgs{
+			AlgorithmID:   resp.Data.AlgorithmID,
+			AlgorithmName: resp.Data.AlgorithmName,
+			Detections:    resp.Data.Detections,
+			TotalCount:    resp.Data.TotalCount,
+			DetectTime:    resp.Data.DetectTime,
+		},
 	}
-
-	callback.Args.AlgorithmID = resp.Data.AlgorithmID
-	callback.Args.AlgorithmName = resp.Data.AlgorithmName
-	callback.Args.Detections = resp.Data.Detections
-	callback.Args.TotalCount = resp.Data.TotalCount
-	callback.Args.DetectTime = resp.Data.DetectTime
-	return callback
 }

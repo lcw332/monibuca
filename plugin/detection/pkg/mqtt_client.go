@@ -11,19 +11,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-// MQTTConfig MQTT配置
-type MQTTConfig struct {
-	Enable    bool     `json:"enable" default:"false" desc:"是否启用MQTT"`
-	ClientID  string   `json:"clientId" desc:"客户端ID"`
-	Pub       []string `json:"pub" default:"[]" desc:"发布主题列表"`
-	Qos       []int    `json:"qos" default:"[]" desc:"QoS等级列表"`
-	Endpoint  string   `json:"endpoint" desc:"MQTT服务器地址"`
-	Format    string   `json:"format" default:"json" desc:"消息格式(json/pb)"`
-	Username  string   `json:"username" desc:"用户名"`
-	Password  string   `json:"password" desc:"密码"`
-	KeepAlive int      `json:"keepAlive" default:"60" desc:"心跳间隔(秒)"`
-}
-
 // MQTTClient Interface
 type MQTTClient interface {
 	IsConnected() bool
@@ -54,7 +41,7 @@ func NewMQTTClient(config *MQTTConfig, logger *slog.Logger) (MQTTClient, error) 
 	}
 
 	// 使用配置的Endpoint作为唯一标识符来确保一个配置只有一个客户端实例
-	configKey := fmt.Sprintf("%s-%s", config.Endpoint, config.ClientID)
+	configKey := fmt.Sprintf("%s-%s", config.Broker, config.ClientID)
 
 	// 尝试从缓存中获取现有客户端
 	if instance, ok := clientInstances.Load(configKey); ok {
@@ -76,13 +63,13 @@ func NewMQTTClient(config *MQTTConfig, logger *slog.Logger) (MQTTClient, error) 
 
 // connect 建立MQTT连接
 func (m *mqttClientImpl) connect() {
-	if m.config.Endpoint == "" {
-		m.logger.Error("MQTT endpoint is empty")
+	if m.config.Broker == "" {
+		m.logger.Error("MQTT Broker is empty")
 		return
 	}
 
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker(fmt.Sprintf("tcp://%s", m.config.Endpoint))
+	opts.AddBroker(fmt.Sprintf("tcp://%s", m.config.Broker))
 
 	// 设置客户端ID，如果为空则生成一个
 	clientID := m.config.ClientID
@@ -122,7 +109,7 @@ func (m *mqttClientImpl) connect() {
 		return
 	}
 
-	m.logger.Info("MQTT client connected", "endpoint", m.config.Endpoint, "clientID", clientID)
+	m.logger.Info("MQTT client connected", "endpoint", m.config.Broker, "clientID", clientID)
 }
 
 // onConnect 连接回调
