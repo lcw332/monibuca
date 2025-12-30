@@ -142,7 +142,7 @@ func getOutputFormat(format string) string {
 	case "png":
 		return "png"
 	default:
-		return "jpeg"
+		return "mjpeg"
 	}
 }
 
