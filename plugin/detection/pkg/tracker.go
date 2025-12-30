@@ -82,6 +82,27 @@ func getFrameCheckForAlgId(config SnapConfig, algId uint8) int {
 	return 0
 }
 
+// getIoUThreshold 获取指定算法的IoU阈值
+func getIoUThreshold(config SnapConfig, algorithmIndex int) float64 {
+	if algorithmIndex < len(config.IoUThreshold) {
+		return float64(config.IoUThreshold[algorithmIndex])
+	}
+	if len(config.IoUThreshold) > 0 {
+		return float64(config.IoUThreshold[len(config.IoUThreshold)-1])
+	}
+	return 0.5 // 默认值
+}
+
+// getIoUThresholdForAlgId 根据算法ID获取IoU阈值
+func getIoUThresholdForAlgId(config SnapConfig, algId uint8) float64 {
+	for i, id := range config.AlgorithmId {
+		if id == algId {
+			return getIoUThreshold(config, i)
+		}
+	}
+	return 0.5 // 默认值
+}
+
 // BBox2 定义边界框 (x1, y1, x2, y2)
 type BBox2 struct {
 	X1, Y1, X2, Y2 float64
@@ -138,6 +159,7 @@ func (t *Tracker) ProcessFrameCheck(results []*algorithmResult, config SnapConfi
 
 	for _, result := range results {
 		frameCheck := getFrameCheckForAlgId(config, result.algId)
+		iouThreshold := getIoUThresholdForAlgId(config, result.algId)
 
 		history := t.getOrCreateHistory(result.algId)
 		history.mu.Lock()
@@ -179,7 +201,7 @@ func (t *Tracker) ProcessFrameCheck(results []*algorithmResult, config SnapConfi
 				existingBox := newBBox2FromFloats(obj.BBox)
 				iou := calculateIoU(existingBox, box)
 
-				if iou >= 0.5 {
+				if iou >= iouThreshold {
 					matchedObj = obj
 					matchedKey = key
 					break

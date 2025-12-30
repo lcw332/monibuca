@@ -347,13 +347,13 @@ func (t *SnapTask) processAlgorithmDetection(imageData []byte, imgInfo ImgInfo, 
 	// 执行并行算法检测
 	validResults := t.executeParallelDetection(detectClient, imageData, base64ImageData, imgInfo)
 
-	// 处理连续帧检测，获取带标识的检测结果
-	trackerResults := t.tracker.ProcessFrameCheck(validResults, t.config)
-
 	// 如果没有有效的检测结果，直接返回
 	if len(validResults) == 0 {
 		return nil
 	}
+
+	// 处理连续帧检测，获取带标识的检测结果
+	trackerResults := t.tracker.ProcessFrameCheck(validResults, t.config)
 
 	return t.handleDetectionResults(validResults, trackerResults, imgInfo, now)
 }

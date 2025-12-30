@@ -21,6 +21,7 @@ type SnapConfig struct {
 	AlgorithmId    []uint8       `default:"[]" desc:"算法ID"`
 	ConfThreshold  []float32     `default:"[]" desc:"置信度配置，与算法ID一一对应"`
 	FrameCheck     []int         `default:"[]" desc:"连续帧检测次数，与算法ID一一对应，如设置为3则目标需连续出现3次才上报"`
+	IoUThreshold   []float32     `default:"[0.5]" desc:"IoU阈值，与算法ID一一对应，用于判断是否为同一目标，范围0.1-0.9"`
 	AlgorithmAPI   *AlgorithmAPI `json:"algorithmAPI" default:"{}" desc:"算法API配置"`
 	Bbox           *Bbox         `json:"bbox" default:"{}" desc:"检测框配置"`
 	MQTT           *MQTTConfig   `json:"mqtt" default:"{}" desc:"MQTT配置"`
