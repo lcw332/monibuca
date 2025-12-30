@@ -60,6 +60,13 @@ type SnapTask struct {
 	tracker    *Tracker // 帧跟踪器
 }
 
+// Dispose 清理帧历史记录
+func (t *SnapTask) Dispose() {
+	if t.tracker != nil {
+		t.tracker.ClearAllHistory()
+	}
+}
+
 type AlgTask struct {
 	job *m7s.TransformJob
 }
@@ -200,19 +207,28 @@ func createSnapTask(snapConfig SnapConfig, job *m7s.TransformJob, ossPlugin stor
 		tracker:    NewTracker(),
 	}
 
+	var task task.ITask
 	switch snapConfig.SnapMode {
 	case int(SnapModeTimeInterval):
-		return &TimeSnapTask{
+		task = &TimeSnapTask{
 			SnapTask: baseTask,
 		}
 	case int(SnapModeIFrameInterval):
-		return &IFrameSnapTask{
+		task = &IFrameSnapTask{
 			SnapTask: baseTask,
 		}
 	case int(SnapModeManual):
 		return nil
 	}
-	return nil
+
+	// 设置 Dispose 回调，任务结束时清理帧历史
+	if task != nil {
+		task.OnDispose(func() {
+			baseTask.Dispose()
+		})
+	}
+
+	return task
 }
 
 // ==================== IFrameSnapTask 关键帧间隔截图任务 ====================

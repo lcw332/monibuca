@@ -238,11 +238,16 @@ func (t *Tracker) ProcessFrameCheck(results []*algorithmResult, config SnapConfi
 
 		// 清理消失的目标
 		// 如果目标在这一帧没有出现，重置连续计数
-		// 连续计数归零后，下次出现会作为新目标处理（连续计数从1开始）
-		for _, obj := range history.objects {
+		// 连续计数归零的目标会被删除，避免内存泄漏
+		var toDelete []string
+		for key, obj := range history.objects {
 			if _, seen := seenInThisFrame[generateBBoxSignature(newBBox2FromFloats(obj.BBox))]; !seen {
 				obj.Consecutive = 0
+				toDelete = append(toDelete, key)
 			}
+		}
+		for _, key := range toDelete {
+			delete(history.objects, key)
 		}
 
 		history.mu.Unlock()
