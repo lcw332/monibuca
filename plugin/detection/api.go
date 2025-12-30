@@ -112,6 +112,7 @@ type ListDetectItem struct {
 	TimerInterval  string  `json:"timeInterval,omitempty" desc:"截图时间间隔, 仅在SnapMode为0时生效"`
 	IFrameInterval int     `json:"iframeInterval,omitempty" desc:"间隔多少帧截图, 仅在SnapMode为1时生效"`
 	FrameCheck     int     `json:"frameCheck,omitempty" desc:"连续帧检测次数, 0表示不开启"`
+	IoUThreshold   float32 `json:"iouThreshold,omitempty" desc:"IoU阈值，用于判断是否为同一目标"`
 }
 
 // getAlgorithmName 根据算法ID获取算法名称
@@ -445,6 +446,12 @@ func (p *DetectionPlugin) listConfig(rw http.ResponseWriter, r *http.Request) {
 									return snapConfig.FrameCheck[i]
 								}
 								return 0 // 默认不开启
+							}(),
+							IoUThreshold: func() float32 {
+								if i < len(snapConfig.IoUThreshold) {
+									return snapConfig.IoUThreshold[i]
+								}
+								return 0.5 // 默认IoU阈值
 							}(),
 						}
 						ret = append(ret, item)
