@@ -38,12 +38,22 @@ type TrackerResult struct {
 type Tracker struct {
 	frameHistory map[uint8]*frameHistory
 	mu           sync.RWMutex
+	// 连续检测超时时间（毫秒），超过此时间未出现的目标会被彻底断开
+	disconnectTimeout int64
 }
 
 // NewTracker 创建新的帧跟踪器
-func NewTracker() *Tracker {
+// disconnectTimeout: 目标断开超时时间（毫秒），默认3分钟
+// 目标消失后在此时间内重新出现可以继续连续计数
+// 超过此时间则彻底断开，再次出现视为新目标
+func NewTracker(disconnectTimeout ...int64) *Tracker {
+	timeout := int64(3 * 60 * 1000) // 默认3分钟
+	if len(disconnectTimeout) > 0 {
+		timeout = disconnectTimeout[0]
+	}
 	return &Tracker{
-		frameHistory: make(map[uint8]*frameHistory),
+		frameHistory:      make(map[uint8]*frameHistory),
+		disconnectTimeout: timeout,
 	}
 }
 
@@ -198,6 +208,11 @@ func (t *Tracker) ProcessFrameCheck(results []*algorithmResult, config SnapConfi
 					continue
 				}
 
+				// 如果目标已经断开太久（超过超时时间），视为新目标
+				if now-obj.LastSeen > t.disconnectTimeout {
+					continue
+				}
+
 				existingBox := newBBox2FromFloats(obj.BBox)
 				iou := calculateIoU(existingBox, box)
 
@@ -259,14 +274,17 @@ func (t *Tracker) ProcessFrameCheck(results []*algorithmResult, config SnapConfi
 		}
 
 		// 清理消失的目标
-		// 如果目标在这一帧没有出现，重置连续计数
-		// 连续计数归零的目标会被删除，避免内存泄漏
+		// - 只有超过 disconnectTimeout 才彻底删除
+		// - 目标消失期间保留其连续计数，下次出现继续累加
+		// - 这样短暂消失后重新出现可以保持连续计数
 		var toDelete []string
 		for key, obj := range history.objects {
-			if _, seen := seenInThisFrame[generateBBoxSignature(newBBox2FromFloats(obj.BBox))]; !seen {
-				obj.Consecutive = 0
+			absentDuration := now - obj.LastSeen
+			if absentDuration > t.disconnectTimeout {
+				// 超过超时时间，彻底删除
 				toDelete = append(toDelete, key)
 			}
+			// 注意：不重置 Consecutive，保留以便目标重新出现时继续累加
 		}
 		for _, key := range toDelete {
 			delete(history.objects, key)
