@@ -87,7 +87,7 @@ func (p *DetectionPlugin) LaunchDetection(ctx context.Context, req *pb.LaunchDet
 	for _, cfg := range req.Configurations {
 		conf := detection.SnapConfig{
 			SnapMode:       int(cfg.SnapMode),
-			TimeInterval:   parseGrpcDuration(cfg.TimerInterval),
+			TimeInterval:   parseGrpcDuration(cfg.TimeInterval),
 			IFrameInterval: int(cfg.IframeInterval),
 			AlgorithmId:    []uint8{uint8(cfg.AlgorithmId)},
 			ConfThreshold:  []float32{cfg.Threshold},
@@ -205,7 +205,7 @@ func (p *DetectionPlugin) ListDetections(ctx context.Context, req *pb.ListDetect
 						StreamPath:     transform.StreamPath,
 						Threshold:      threshold,
 						SnapMode:       int32(snapConfig.SnapMode),
-						TimerInterval:  snapConfig.TimeInterval.String(),
+						TimeInterval:   snapConfig.TimeInterval.String(),
 						IframeInterval: int32(snapConfig.IFrameInterval),
 						FrameCheck:     int32(frameCheck),
 						IouThreshold:   iouThreshold,
@@ -288,7 +288,7 @@ func (p *DetectionPlugin) GetDetection(ctx context.Context, req *pb.GetDetection
 					StreamPath:     transform.StreamPath,
 					Threshold:      threshold,
 					SnapMode:       int32(snapConfig.SnapMode),
-					TimerInterval:  snapConfig.TimeInterval.String(),
+					TimeInterval:   snapConfig.TimeInterval.String(),
 					IframeInterval: int32(snapConfig.IFrameInterval),
 					FrameCheck:     int32(frameCheck),
 					IouThreshold:   iouThreshold,
