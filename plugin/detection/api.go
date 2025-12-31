@@ -186,15 +186,15 @@ func (p *DetectionPlugin) ListDetections(ctx context.Context, req *pb.ListDetect
 						}
 					}
 
-					threshold := float32(0.5)
+					var threshold float32
 					if i < len(snapConfig.ConfThreshold) {
 						threshold = snapConfig.ConfThreshold[i]
 					}
-					frameCheck := 0
+					var frameCheck int
 					if i < len(snapConfig.FrameCheck) {
 						frameCheck = snapConfig.FrameCheck[i]
 					}
-					iouThreshold := float32(0.5)
+					var iouThreshold float32
 					if i < len(snapConfig.IoUThreshold) {
 						iouThreshold = snapConfig.IoUThreshold[i]
 					}
@@ -269,15 +269,15 @@ func (p *DetectionPlugin) GetDetection(ctx context.Context, req *pb.GetDetection
 			}
 
 			for i, algorithmId := range snapConfig.AlgorithmId {
-				threshold := float32(0.5)
+				var threshold float32
 				if i < len(snapConfig.ConfThreshold) {
 					threshold = snapConfig.ConfThreshold[i]
 				}
-				frameCheck := 0
+				var frameCheck int
 				if i < len(snapConfig.FrameCheck) {
 					frameCheck = snapConfig.FrameCheck[i]
 				}
-				iouThreshold := float32(0.5)
+				var iouThreshold float32
 				if i < len(snapConfig.IoUThreshold) {
 					iouThreshold = snapConfig.IoUThreshold[i]
 				}
