@@ -303,7 +303,7 @@ type DetectionConfigItem struct {
 	StreamPath     string                 `protobuf:"bytes,3,opt,name=stream_path,json=streamPath,proto3" json:"stream_path,omitempty"`              // 流地址
 	Threshold      float32                `protobuf:"fixed32,4,opt,name=threshold,proto3" json:"threshold,omitempty"`                                // 置信度阈值
 	SnapMode       int32                  `protobuf:"varint,5,opt,name=snap_mode,json=snapMode,proto3" json:"snap_mode,omitempty"`                   // 截图模式: 0-时间间隔，1-关键帧间隔
-	TimerInterval  string                 `protobuf:"bytes,6,opt,name=timer_interval,json=timerInterval,proto3" json:"timer_interval,omitempty"`     // 截图时间间隔（如 "1s"）
+	TimeInterval   string                 `protobuf:"bytes,6,opt,name=time_interval,json=timeInterval,proto3" json:"time_interval,omitempty"`        // 截图时间间隔（如 "1s"）
 	IframeInterval int32                  `protobuf:"varint,7,opt,name=iframe_interval,json=iframeInterval,proto3" json:"iframe_interval,omitempty"` // 关键帧间隔
 	FrameCheck     int32                  `protobuf:"varint,8,opt,name=frame_check,json=frameCheck,proto3" json:"frame_check,omitempty"`             // 连续帧检测次数
 	IouThreshold   float32                `protobuf:"fixed32,9,opt,name=iou_threshold,json=iouThreshold,proto3" json:"iou_threshold,omitempty"`      // IoU阈值
@@ -376,9 +376,9 @@ func (x *DetectionConfigItem) GetSnapMode() int32 {
 	return 0
 }
 
-func (x *DetectionConfigItem) GetTimerInterval() string {
+func (x *DetectionConfigItem) GetTimeInterval() string {
 	if x != nil {
-		return x.TimerInterval
+		return x.TimeInterval
 	}
 	return ""
 }
@@ -599,7 +599,7 @@ func (x *GetDetectionResponse) GetData() []*DetectionConfigItem {
 type DetectionConfig struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	SnapMode       int32                  `protobuf:"varint,1,opt,name=snap_mode,json=snapMode,proto3" json:"snap_mode,omitempty"`                   // 截图模式: 0-时间间隔，1-关键帧间隔
-	TimerInterval  string                 `protobuf:"bytes,2,opt,name=timer_interval,json=timerInterval,proto3" json:"timer_interval,omitempty"`     // 截图时间间隔（如 "1s"）
+	TimeInterval   string                 `protobuf:"bytes,2,opt,name=time_interval,json=timeInterval,proto3" json:"time_interval,omitempty"`        // 截图时间间隔（如 "1s"）
 	IframeInterval int32                  `protobuf:"varint,3,opt,name=iframe_interval,json=iframeInterval,proto3" json:"iframe_interval,omitempty"` // 关键帧间隔
 	AlgorithmId    int32                  `protobuf:"varint,4,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`          // 算法ID
 	Threshold      float32                `protobuf:"fixed32,5,opt,name=threshold,proto3" json:"threshold,omitempty"`                                // 置信度阈值
@@ -646,9 +646,9 @@ func (x *DetectionConfig) GetSnapMode() int32 {
 	return 0
 }
 
-func (x *DetectionConfig) GetTimerInterval() string {
+func (x *DetectionConfig) GetTimeInterval() string {
 	if x != nil {
-		return x.TimerInterval
+		return x.TimeInterval
 	}
 	return ""
 }
@@ -711,15 +711,15 @@ const file_detection_api_proto_rawDesc = "" +
 	"streamPath\x12!\n" +
 	"\falgorithm_id\x18\x02 \x03(\x05R\valgorithmId\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xd1\x02\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xcf\x02\n" +
 	"\x13DetectionConfigItem\x12!\n" +
 	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12%\n" +
 	"\x0ealgorithm_name\x18\x02 \x01(\tR\ralgorithmName\x12\x1f\n" +
 	"\vstream_path\x18\x03 \x01(\tR\n" +
 	"streamPath\x12\x1c\n" +
 	"\tthreshold\x18\x04 \x01(\x02R\tthreshold\x12\x1b\n" +
-	"\tsnap_mode\x18\x05 \x01(\x05R\bsnapMode\x12%\n" +
-	"\x0etimer_interval\x18\x06 \x01(\tR\rtimerInterval\x12'\n" +
+	"\tsnap_mode\x18\x05 \x01(\x05R\bsnapMode\x12#\n" +
+	"\rtime_interval\x18\x06 \x01(\tR\ftimeInterval\x12'\n" +
 	"\x0fiframe_interval\x18\a \x01(\x05R\x0eiframeInterval\x12\x1f\n" +
 	"\vframe_check\x18\b \x01(\x05R\n" +
 	"frameCheck\x12#\n" +
@@ -737,10 +737,10 @@ const file_detection_api_proto_rawDesc = "" +
 	"\x14GetDetectionResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x122\n" +
-	"\x04data\x18\x03 \x03(\v2\x1e.detection.DetectionConfigItemR\x04data\"\x85\x02\n" +
+	"\x04data\x18\x03 \x03(\v2\x1e.detection.DetectionConfigItemR\x04data\"\x83\x02\n" +
 	"\x0fDetectionConfig\x12\x1b\n" +
-	"\tsnap_mode\x18\x01 \x01(\x05R\bsnapMode\x12%\n" +
-	"\x0etimer_interval\x18\x02 \x01(\tR\rtimerInterval\x12'\n" +
+	"\tsnap_mode\x18\x01 \x01(\x05R\bsnapMode\x12#\n" +
+	"\rtime_interval\x18\x02 \x01(\tR\ftimeInterval\x12'\n" +
 	"\x0fiframe_interval\x18\x03 \x01(\x05R\x0eiframeInterval\x12!\n" +
 	"\falgorithm_id\x18\x04 \x01(\x05R\valgorithmId\x12\x1c\n" +
 	"\tthreshold\x18\x05 \x01(\x02R\tthreshold\x12\x1f\n" +

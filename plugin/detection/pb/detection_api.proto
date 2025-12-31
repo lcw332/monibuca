@@ -80,7 +80,7 @@ message DetectionConfigItem {
   string stream_path = 3;           // 流地址
   float threshold = 4;              // 置信度阈值
   int32 snap_mode = 5;              // 截图模式: 0-时间间隔，1-关键帧间隔
-  string timer_interval = 6;        // 截图时间间隔（如 "1s"）
+  string time_interval = 6;         // 截图时间间隔（如 "1s"）
   int32 iframe_interval = 7;        // 关键帧间隔
   int32 frame_check = 8;            // 连续帧检测次数
   float iou_threshold = 9;          // IoU阈值
@@ -111,7 +111,7 @@ message GetDetectionResponse {
 // 检测配置
 message DetectionConfig {
   int32 snap_mode = 1;              // 截图模式: 0-时间间隔，1-关键帧间隔
-  string timer_interval = 2;        // 截图时间间隔（如 "1s"）
+  string time_interval = 2;         // 截图时间间隔（如 "1s"）
   int32 iframe_interval = 3;        // 关键帧间隔
   int32 algorithm_id = 4;           // 算法ID
   float threshold = 5;              // 置信度阈值
