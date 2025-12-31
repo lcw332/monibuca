@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.33.0
-// source: detection.proto
+// source: detection_3rd.proto
 
 package pb
 
@@ -30,7 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // ============================================================
-// 检测服务定义
+// 检测服务 gRPC 接口（外部客户端使用）
 // ============================================================
 type DetectionServiceClient interface {
 	// 通用检测接口
@@ -96,7 +96,7 @@ func (c *detectionServiceClient) GetVersion(ctx context.Context, in *VersionRequ
 // for forward compatibility.
 //
 // ============================================================
-// 检测服务定义
+// 检测服务 gRPC 接口（外部客户端使用）
 // ============================================================
 type DetectionServiceServer interface {
 	// 通用检测接口
@@ -247,5 +247,5 @@ var DetectionService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "detection.proto",
+	Metadata: "detection_3rd.proto",
 }

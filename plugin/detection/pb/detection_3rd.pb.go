@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v6.33.0
-// source: detection.proto
+// source: detection_3rd.proto
 
 package pb
 
@@ -35,7 +35,7 @@ type DetectRequest struct {
 
 func (x *DetectRequest) Reset() {
 	*x = DetectRequest{}
-	mi := &file_detection_proto_msgTypes[0]
+	mi := &file_detection_3rd_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +47,7 @@ func (x *DetectRequest) String() string {
 func (*DetectRequest) ProtoMessage() {}
 
 func (x *DetectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[0]
+	mi := &file_detection_3rd_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +60,7 @@ func (x *DetectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetectRequest.ProtoReflect.Descriptor instead.
 func (*DetectRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{0}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *DetectRequest) GetAlgorithmId() int32 {
@@ -101,7 +101,7 @@ type ChangeDetectRequest struct {
 
 func (x *ChangeDetectRequest) Reset() {
 	*x = ChangeDetectRequest{}
-	mi := &file_detection_proto_msgTypes[1]
+	mi := &file_detection_3rd_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -113,7 +113,7 @@ func (x *ChangeDetectRequest) String() string {
 func (*ChangeDetectRequest) ProtoMessage() {}
 
 func (x *ChangeDetectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[1]
+	mi := &file_detection_3rd_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -126,7 +126,7 @@ func (x *ChangeDetectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeDetectRequest.ProtoReflect.Descriptor instead.
 func (*ChangeDetectRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{1}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ChangeDetectRequest) GetImage1() string {
@@ -176,7 +176,7 @@ type ChangeRegion struct {
 
 func (x *ChangeRegion) Reset() {
 	*x = ChangeRegion{}
-	mi := &file_detection_proto_msgTypes[2]
+	mi := &file_detection_3rd_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -188,7 +188,7 @@ func (x *ChangeRegion) String() string {
 func (*ChangeRegion) ProtoMessage() {}
 
 func (x *ChangeRegion) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[2]
+	mi := &file_detection_3rd_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -201,7 +201,7 @@ func (x *ChangeRegion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeRegion.ProtoReflect.Descriptor instead.
 func (*ChangeRegion) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{2}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ChangeRegion) GetId() int32 {
@@ -283,7 +283,7 @@ type ChangeDetectResponse struct {
 
 func (x *ChangeDetectResponse) Reset() {
 	*x = ChangeDetectResponse{}
-	mi := &file_detection_proto_msgTypes[3]
+	mi := &file_detection_3rd_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -295,7 +295,7 @@ func (x *ChangeDetectResponse) String() string {
 func (*ChangeDetectResponse) ProtoMessage() {}
 
 func (x *ChangeDetectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[3]
+	mi := &file_detection_3rd_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -308,7 +308,7 @@ func (x *ChangeDetectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeDetectResponse.ProtoReflect.Descriptor instead.
 func (*ChangeDetectResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{3}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ChangeDetectResponse) GetCode() int32 {
@@ -388,13 +388,16 @@ type Detection struct {
 	PlateNumber     string  `protobuf:"bytes,6,opt,name=plate_number,json=plateNumber,proto3" json:"plate_number,omitempty"`               // 车牌号
 	PlateType       string  `protobuf:"bytes,7,opt,name=plate_type,json=plateType,proto3" json:"plate_type,omitempty"`                     // 车牌类型
 	PlateConfidence float32 `protobuf:"fixed32,8,opt,name=plate_confidence,json=plateConfidence,proto3" json:"plate_confidence,omitempty"` // 车牌识别置信度
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// 连续帧检测标识（新增）
+	ConsecutiveCount int32 `protobuf:"varint,9,opt,name=consecutive_count,json=consecutiveCount,proto3" json:"consecutive_count,omitempty"` // 连续帧检测次数
+	IsSameObj        bool  `protobuf:"varint,10,opt,name=is_same_obj,json=isSameObj,proto3" json:"is_same_obj,omitempty"`                   // 是否为连续检测达标目标
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Detection) Reset() {
 	*x = Detection{}
-	mi := &file_detection_proto_msgTypes[4]
+	mi := &file_detection_3rd_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +409,7 @@ func (x *Detection) String() string {
 func (*Detection) ProtoMessage() {}
 
 func (x *Detection) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[4]
+	mi := &file_detection_3rd_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +422,7 @@ func (x *Detection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Detection.ProtoReflect.Descriptor instead.
 func (*Detection) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{4}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Detection) GetClassId() int32 {
@@ -478,6 +481,20 @@ func (x *Detection) GetPlateConfidence() float32 {
 	return 0
 }
 
+func (x *Detection) GetConsecutiveCount() int32 {
+	if x != nil {
+		return x.ConsecutiveCount
+	}
+	return 0
+}
+
+func (x *Detection) GetIsSameObj() bool {
+	if x != nil {
+		return x.IsSameObj
+	}
+	return false
+}
+
 type DetectionData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AlgorithmId   int32                  `protobuf:"varint,1,opt,name=algorithm_id,json=algorithmId,proto3" json:"algorithm_id,omitempty"`      // 算法ID
@@ -485,13 +502,17 @@ type DetectionData struct {
 	Detections    []*Detection           `protobuf:"bytes,3,rep,name=detections,proto3" json:"detections,omitempty"`                            // 检测结果列表
 	TotalCount    int32                  `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`         // 检测总数
 	DetectTime    float32                `protobuf:"fixed32,5,opt,name=detect_time,json=detectTime,proto3" json:"detect_time,omitempty"`        // 检测耗时（秒）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// 连续帧检测统计（新增）
+	HasFrameCheck     bool  `protobuf:"varint,6,opt,name=has_frame_check,json=hasFrameCheck,proto3" json:"has_frame_check,omitempty"`               // 是否启用了连续帧检测
+	FrameCheckCount   int32 `protobuf:"varint,7,opt,name=frame_check_count,json=frameCheckCount,proto3" json:"frame_check_count,omitempty"`         // 连续帧检测阈值
+	SameObjTotalCount int32 `protobuf:"varint,8,opt,name=same_obj_total_count,json=sameObjTotalCount,proto3" json:"same_obj_total_count,omitempty"` // 连续检测达标的目标数量
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DetectionData) Reset() {
 	*x = DetectionData{}
-	mi := &file_detection_proto_msgTypes[5]
+	mi := &file_detection_3rd_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -503,7 +524,7 @@ func (x *DetectionData) String() string {
 func (*DetectionData) ProtoMessage() {}
 
 func (x *DetectionData) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[5]
+	mi := &file_detection_3rd_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -516,7 +537,7 @@ func (x *DetectionData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetectionData.ProtoReflect.Descriptor instead.
 func (*DetectionData) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{5}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DetectionData) GetAlgorithmId() int32 {
@@ -554,6 +575,27 @@ func (x *DetectionData) GetDetectTime() float32 {
 	return 0
 }
 
+func (x *DetectionData) GetHasFrameCheck() bool {
+	if x != nil {
+		return x.HasFrameCheck
+	}
+	return false
+}
+
+func (x *DetectionData) GetFrameCheckCount() int32 {
+	if x != nil {
+		return x.FrameCheckCount
+	}
+	return 0
+}
+
+func (x *DetectionData) GetSameObjTotalCount() int32 {
+	if x != nil {
+		return x.SameObjTotalCount
+	}
+	return 0
+}
+
 type DetectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`      // 状态码 (200=成功)
@@ -565,7 +607,7 @@ type DetectResponse struct {
 
 func (x *DetectResponse) Reset() {
 	*x = DetectResponse{}
-	mi := &file_detection_proto_msgTypes[6]
+	mi := &file_detection_3rd_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -577,7 +619,7 @@ func (x *DetectResponse) String() string {
 func (*DetectResponse) ProtoMessage() {}
 
 func (x *DetectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[6]
+	mi := &file_detection_3rd_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -590,7 +632,7 @@ func (x *DetectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetectResponse.ProtoReflect.Descriptor instead.
 func (*DetectResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{6}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DetectResponse) GetCode() int32 {
@@ -625,7 +667,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_detection_proto_msgTypes[7]
+	mi := &file_detection_3rd_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -637,7 +679,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[7]
+	mi := &file_detection_3rd_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -650,10 +692,9 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{7}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{7}
 }
 
-// 健康检查响应消息
 type HealthResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 服务状态
@@ -678,7 +719,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_detection_proto_msgTypes[8]
+	mi := &file_detection_3rd_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -690,7 +731,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[8]
+	mi := &file_detection_3rd_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -703,7 +744,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{8}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -773,7 +814,7 @@ type VersionRequest struct {
 
 func (x *VersionRequest) Reset() {
 	*x = VersionRequest{}
-	mi := &file_detection_proto_msgTypes[9]
+	mi := &file_detection_3rd_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -785,7 +826,7 @@ func (x *VersionRequest) String() string {
 func (*VersionRequest) ProtoMessage() {}
 
 func (x *VersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[9]
+	mi := &file_detection_3rd_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,10 +839,9 @@ func (x *VersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionRequest.ProtoReflect.Descriptor instead.
 func (*VersionRequest) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{9}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{9}
 }
 
-// 版本查询响应消息
 type VersionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 服务版本号
@@ -826,7 +866,7 @@ type VersionResponse struct {
 
 func (x *VersionResponse) Reset() {
 	*x = VersionResponse{}
-	mi := &file_detection_proto_msgTypes[10]
+	mi := &file_detection_3rd_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -838,7 +878,7 @@ func (x *VersionResponse) String() string {
 func (*VersionResponse) ProtoMessage() {}
 
 func (x *VersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_detection_proto_msgTypes[10]
+	mi := &file_detection_3rd_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -851,7 +891,7 @@ func (x *VersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VersionResponse.ProtoReflect.Descriptor instead.
 func (*VersionResponse) Descriptor() ([]byte, []int) {
-	return file_detection_proto_rawDescGZIP(), []int{10}
+	return file_detection_3rd_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *VersionResponse) GetVersion() string {
@@ -910,11 +950,11 @@ func (x *VersionResponse) GetAlgoSupported() []int32 {
 	return nil
 }
 
-var File_detection_proto protoreflect.FileDescriptor
+var File_detection_3rd_proto protoreflect.FileDescriptor
 
-const file_detection_proto_rawDesc = "" +
+const file_detection_3rd_proto_rawDesc = "" +
 	"\n" +
-	"\x0fdetection.proto\x12\tdetection\"o\n" +
+	"\x13detection_3rd.proto\x12\tdetection\"o\n" +
 	"\rDetectRequest\x12!\n" +
 	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12%\n" +
@@ -944,7 +984,7 @@ const file_detection_proto_rawDesc = "" +
 	"detectTime\x121\n" +
 	"\aregions\x18\b \x03(\v2\x17.detection.ChangeRegionR\aregions\x12\x1f\n" +
 	"\vtotal_count\x18\t \x01(\x05R\n" +
-	"totalCount\"\x8a\x02\n" +
+	"totalCount\"\xd7\x02\n" +
 	"\tDetection\x12\x19\n" +
 	"\bclass_id\x18\x01 \x01(\x05R\aclassId\x12\x1d\n" +
 	"\n" +
@@ -957,7 +997,10 @@ const file_detection_proto_rawDesc = "" +
 	"\fplate_number\x18\x06 \x01(\tR\vplateNumber\x12\x1d\n" +
 	"\n" +
 	"plate_type\x18\a \x01(\tR\tplateType\x12)\n" +
-	"\x10plate_confidence\x18\b \x01(\x02R\x0fplateConfidence\"\xd1\x01\n" +
+	"\x10plate_confidence\x18\b \x01(\x02R\x0fplateConfidence\x12+\n" +
+	"\x11consecutive_count\x18\t \x01(\x05R\x10consecutiveCount\x12\x1e\n" +
+	"\vis_same_obj\x18\n" +
+	" \x01(\bR\tisSameObj\"\xd6\x02\n" +
 	"\rDetectionData\x12!\n" +
 	"\falgorithm_id\x18\x01 \x01(\x05R\valgorithmId\x12%\n" +
 	"\x0ealgorithm_name\x18\x02 \x01(\tR\ralgorithmName\x124\n" +
@@ -967,7 +1010,10 @@ const file_detection_proto_rawDesc = "" +
 	"\vtotal_count\x18\x04 \x01(\x05R\n" +
 	"totalCount\x12\x1f\n" +
 	"\vdetect_time\x18\x05 \x01(\x02R\n" +
-	"detectTime\"l\n" +
+	"detectTime\x12&\n" +
+	"\x0fhas_frame_check\x18\x06 \x01(\bR\rhasFrameCheck\x12*\n" +
+	"\x11frame_check_count\x18\a \x01(\x05R\x0fframeCheckCount\x12/\n" +
+	"\x14same_obj_total_count\x18\b \x01(\x05R\x11sameObjTotalCount\"l\n" +
 	"\x0eDetectResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12,\n" +
@@ -1001,19 +1047,19 @@ const file_detection_proto_rawDesc = "" +
 	"GetVersion\x12\x19.detection.VersionRequest\x1a\x1a.detection.VersionResponseB!Z\x1fm7s.live/v5/plugin/detection/pbb\x06proto3"
 
 var (
-	file_detection_proto_rawDescOnce sync.Once
-	file_detection_proto_rawDescData []byte
+	file_detection_3rd_proto_rawDescOnce sync.Once
+	file_detection_3rd_proto_rawDescData []byte
 )
 
-func file_detection_proto_rawDescGZIP() []byte {
-	file_detection_proto_rawDescOnce.Do(func() {
-		file_detection_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_detection_proto_rawDesc), len(file_detection_proto_rawDesc)))
+func file_detection_3rd_proto_rawDescGZIP() []byte {
+	file_detection_3rd_proto_rawDescOnce.Do(func() {
+		file_detection_3rd_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_detection_3rd_proto_rawDesc), len(file_detection_3rd_proto_rawDesc)))
 	})
-	return file_detection_proto_rawDescData
+	return file_detection_3rd_proto_rawDescData
 }
 
-var file_detection_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_detection_proto_goTypes = []any{
+var file_detection_3rd_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_detection_3rd_proto_goTypes = []any{
 	(*DetectRequest)(nil),        // 0: detection.DetectRequest
 	(*ChangeDetectRequest)(nil),  // 1: detection.ChangeDetectRequest
 	(*ChangeRegion)(nil),         // 2: detection.ChangeRegion
@@ -1026,7 +1072,7 @@ var file_detection_proto_goTypes = []any{
 	(*VersionRequest)(nil),       // 9: detection.VersionRequest
 	(*VersionResponse)(nil),      // 10: detection.VersionResponse
 }
-var file_detection_proto_depIdxs = []int32{
+var file_detection_3rd_proto_depIdxs = []int32{
 	2,  // 0: detection.ChangeDetectResponse.regions:type_name -> detection.ChangeRegion
 	4,  // 1: detection.DetectionData.detections:type_name -> detection.Detection
 	5,  // 2: detection.DetectResponse.data:type_name -> detection.DetectionData
@@ -1045,26 +1091,26 @@ var file_detection_proto_depIdxs = []int32{
 	0,  // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_detection_proto_init() }
-func file_detection_proto_init() {
-	if File_detection_proto != nil {
+func init() { file_detection_3rd_proto_init() }
+func file_detection_3rd_proto_init() {
+	if File_detection_3rd_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_detection_proto_rawDesc), len(file_detection_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_detection_3rd_proto_rawDesc), len(file_detection_3rd_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_detection_proto_goTypes,
-		DependencyIndexes: file_detection_proto_depIdxs,
-		MessageInfos:      file_detection_proto_msgTypes,
+		GoTypes:           file_detection_3rd_proto_goTypes,
+		DependencyIndexes: file_detection_3rd_proto_depIdxs,
+		MessageInfos:      file_detection_3rd_proto_msgTypes,
 	}.Build()
-	File_detection_proto = out.File
-	file_detection_proto_goTypes = nil
-	file_detection_proto_depIdxs = nil
+	File_detection_3rd_proto = out.File
+	file_detection_3rd_proto_goTypes = nil
+	file_detection_3rd_proto_depIdxs = nil
 }

@@ -4,7 +4,7 @@ package detection;
 option go_package="m7s.live/v5/plugin/detection/pb";
 
 // ============================================================
-// 检测服务定义
+// 检测服务 gRPC 接口（外部客户端使用）
 // ============================================================
 service DetectionService {
   // 通用检测接口
@@ -89,6 +89,10 @@ message Detection {
   string plate_number = 6;          // 车牌号
   string plate_type = 7;            // 车牌类型
   float plate_confidence = 8;       // 车牌识别置信度
+
+  // 连续帧检测标识（新增）
+  int32 consecutive_count = 9;      // 连续帧检测次数
+  bool is_same_obj = 10;            // 是否为连续检测达标目标
 }
 
 message DetectionData {
@@ -97,6 +101,11 @@ message DetectionData {
   repeated Detection detections = 3; // 检测结果列表
   int32 total_count = 4;            // 检测总数
   float detect_time = 5;            // 检测耗时（秒）
+
+  // 连续帧检测统计（新增）
+  bool has_frame_check = 6;         // 是否启用了连续帧检测
+  int32 frame_check_count = 7;      // 连续帧检测阈值
+  int32 same_obj_total_count = 8;   // 连续检测达标的目标数量
 }
 
 message DetectResponse {
@@ -110,7 +119,6 @@ message DetectResponse {
 // ============================================================
 message HealthRequest {}
 
-// 健康检查响应消息
 message HealthResponse {
   // 服务状态
   string status = 1;
@@ -135,7 +143,6 @@ message HealthResponse {
 // ============================================================
 message VersionRequest {}
 
-// 版本查询响应消息
 message VersionResponse {
   // 服务版本号
   string version = 1;

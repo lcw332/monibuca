@@ -2,20 +2,24 @@ package plugin_detection
 
 import (
 	"m7s.live/v5"
+	pb "m7s.live/v5/plugin/detection/pb"
 	detection "m7s.live/v5/plugin/detection/pkg"
 )
 
 var (
 	_ = m7s.InstallPlugin[DetectionPlugin](m7s.PluginMeta{
-		Name:           "Detection",
-		Version:        "v0.0.1",
-		NewTransformer: detection.NewTransform,
+		Name:                "Detection",
+		Version:             "v0.0.1",
+		NewTransformer:      detection.NewTransform,
+		ServiceDesc:         &pb.Api_ServiceDesc,
+		RegisterGRPCHandler: pb.RegisterApiHandler,
 	})
 )
 
 type (
 	// DetectionPlugin 图像插件
 	DetectionPlugin struct {
+		pb.UnimplementedApiServer
 		m7s.Plugin
 		SnapImgFormat string `json:"snapImgFormat" default:"jpg" desc:"截图文件格式(jpg/png)"`
 		SnapOriginal  bool   `json:"snapOriginal" default:"false" desc:"是否保存原始图片"`

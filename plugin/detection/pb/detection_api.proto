@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+import "google/api/annotations.proto";
+
+package detection;
+option go_package="m7s.live/v5/plugin/detection/pb";
+
+// ============================================================
+// 检测管理服务 API（内部管理使用）
+// ============================================================
+service api {
+  // 启动图像检测
+  rpc LaunchDetection(LaunchDetectionRequest) returns (LaunchDetectionResponse) {
+    option (google.api.http) = {
+      post: "/detection/launch"
+      body: "*"
+    };
+  };
+
+  // 停止图像检测
+  rpc DisposeDetection(DisposeDetectionRequest) returns (DisposeDetectionResponse) {
+    option (google.api.http) = {
+      post: "/detection/dispose"
+      body: "*"
+    };
+  };
+
+  // 列出所有检测配置
+  rpc ListDetections(ListDetectionsRequest) returns (ListDetectionsResponse) {
+    option (google.api.http) = {
+      post: "/detection/list"
+      body: "*"
+    };
+  };
+
+  // 获取单个检测配置
+  rpc GetDetection(GetDetectionRequest) returns (GetDetectionResponse) {
+    option (google.api.http) = {
+      post: "/detection/get"
+      body: "*"
+    };
+  };
+}
+
+// 启动检测请求
+message LaunchDetectionRequest {
+  string stream_path = 1;           // 流地址
+  repeated DetectionConfig configurations = 2; // 检测配置列表
+}
+
+// 启动检测响应
+message LaunchDetectionResponse {
+  int32 code = 1;                   // 状态码 (0=成功)
+  string message = 2;               // 状态消息
+}
+
+// 停止检测请求
+message DisposeDetectionRequest {
+  string stream_path = 1;           // 流地址
+}
+
+// 停止检测响应
+message DisposeDetectionResponse {
+  int32 code = 1;                   // 状态码 (0=成功)
+  string message = 2;               // 状态消息
+}
+
+// 列表检测请求
+message ListDetectionsRequest {
+  string stream_path = 1;           // 流地址（可选，模糊匹配）
+  repeated int32 algorithm_id = 2;   // 算法ID过滤（可选）
+  int32 page = 3;                   // 页码（默认1）
+  int32 page_size = 4;              // 每页数量（默认10）
+}
+
+// 单个检测配置项
+message DetectionConfigItem {
+  int32 algorithm_id = 1;           // 算法ID
+  string algorithm_name = 2;        // 算法名称
+  string stream_path = 3;           // 流地址
+  float threshold = 4;              // 置信度阈值
+  int32 snap_mode = 5;              // 截图模式: 0-时间间隔，1-关键帧间隔
+  string timer_interval = 6;        // 截图时间间隔（如 "1s"）
+  int32 iframe_interval = 7;        // 关键帧间隔
+  int32 frame_check = 8;            // 连续帧检测次数
+  float iou_threshold = 9;          // IoU阈值
+}
+
+// 列表检测响应
+message ListDetectionsResponse {
+  int32 code = 1;                   // 状态码 (0=成功)
+  string message = 2;               // 状态消息
+  int32 total = 3;                  // 总数
+  int32 page = 4;                   // 当前页码
+  int32 page_size = 5;              // 每页数量
+  repeated DetectionConfigItem data = 6; // 配置列表
+}
+
+// 获取单个检测请求
+message GetDetectionRequest {
+  string stream_path = 1;           // 流地址
+}
+
+// 获取单个检测响应
+message GetDetectionResponse {
+  int32 code = 1;                   // 状态码 (0=成功)
+  string message = 2;               // 状态消息
+  repeated DetectionConfigItem data = 3; // 配置列表
+}
+
+// 检测配置
+message DetectionConfig {
+  int32 snap_mode = 1;              // 截图模式: 0-时间间隔，1-关键帧间隔
+  string timer_interval = 2;        // 截图时间间隔（如 "1s"）
+  int32 iframe_interval = 3;        // 关键帧间隔
+  int32 algorithm_id = 4;           // 算法ID
+  float threshold = 5;              // 置信度阈值
+  int32 frame_check = 6;            // 连续帧检测次数
+  float iou_threshold = 7;          // IoU阈值
+}
